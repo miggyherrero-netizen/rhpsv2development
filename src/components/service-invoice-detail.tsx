@@ -73,9 +73,9 @@ export default function InvoiceDetailClient({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <GhostButton onClick={() => window.print()} className="inline-flex items-center gap-1.5">
-            <Printer size={13} /> Print
-          </GhostButton>
+          <Link href={`/service/invoices/${invoice.id}/document`} className="btn-svc-ghost rounded-xl px-3 py-2.5 text-[12px] inline-flex items-center gap-1.5">
+            <Printer size={13} /> Print / PDF / Share
+          </Link>
           <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5">
             <Pencil size={13} /> Edit
           </GhostButton>
@@ -269,6 +269,9 @@ export default function InvoiceDetailClient({
                   ) : null}
                   <div className="flex-1" />
                   <Money cents={p.amountCents} className="text-[13px]" />
+                  <Link href={`/service/invoices/${invoice.id}/receipts/${p.id}`} className="text-[11.5px] hover:underline" style={{ color: "var(--color-svc-accent)" }}>
+                    Receipt / PDF / Share
+                  </Link>
                   <button
                     onClick={() => run(() => deletePayment(p.id))}
                     className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"

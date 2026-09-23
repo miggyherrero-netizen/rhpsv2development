@@ -552,6 +552,23 @@ export const servicePayments = pgTable("service_payments", {
   receivedIdx: index("service_payments_received_idx").on(t.receivedAt),
 }));
 
+/** Bearer links for read-only invoice and individual payment-receipt documents.
+ * Only SHA-256 hashes of the random tokens are persisted. */
+export const serviceDocumentShares = pgTable("service_document_shares", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invoiceId: uuid("invoice_id").notNull().references(() => serviceInvoices.id, { onDelete: "cascade" }),
+  paymentId: uuid("payment_id").references(() => servicePayments.id, { onDelete: "cascade" }),
+  kind: text("kind").$type<"invoice" | "receipt">().notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  revokedAt: timestamp("revoked_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  invoiceIdx: index("service_document_shares_invoice_idx").on(t.invoiceId),
+  ownerIdx: index("service_document_shares_owner_idx").on(t.ownerId),
+}));
+
 export const serviceExpenses = pgTable("service_expenses", {
   id: uuid("id").defaultRandom().primaryKey(),
   category: text("category").notNull().default("other"),
@@ -636,5 +653,6 @@ export type ServiceTimeLog = typeof serviceTimeLogs.$inferSelect;
 export type ServiceInvoice = typeof serviceInvoices.$inferSelect;
 export type ServiceInvoiceItem = typeof serviceInvoiceItems.$inferSelect;
 export type ServicePayment = typeof servicePayments.$inferSelect;
+export type ServiceDocumentShare = typeof serviceDocumentShares.$inferSelect;
 export type ServiceExpense = typeof serviceExpenses.$inferSelect;
 export type ServiceSetting = typeof serviceSettings.$inferSelect;
