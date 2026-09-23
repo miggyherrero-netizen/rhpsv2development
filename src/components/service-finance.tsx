@@ -10,7 +10,9 @@ import {
 } from "@/components/service-ui";
 
 export default function FinanceClient({ report }: { report: FinanceReport }) {
-  const { kpis, months, aging, expenseByCategory, topCustomers, jobMargins } = report;
+  const { kpis, months, aging, expenseByCategory, topCustomers, jobMargins, options } = report;
+  const avgSub = options.avgInvoiceBasis === "job" ? "invoiced ÷ completed jobs" : "invoiced ÷ invoices";
+  const revenueHeading = options.marginExcludesVat ? "Revenue excl. VAT" : "Invoiced";
   const maxMonth = Math.max(
     1,
     ...months.map((m) => Math.max(m.invoicedCents, m.collectedCents, m.expenseCents)),
@@ -45,7 +47,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
         />
         <StatCard label="Outstanding" value={<Money cents={kpis.outstandingCents} />} tone="warn" sub="unpaid balance" />
         <StatCard label="Overdue" value={<Money cents={kpis.overdueCents} />} tone="danger" sub="past due date" />
-        <StatCard label="Avg invoice" value={<Money cents={kpis.avgJobValueCents} />} sub="invoiced ÷ invoices" />
+        <StatCard label="Avg invoice" value={<Money cents={kpis.avgInvoiceCents} />} sub={avgSub} />
         <StatCard label="Collection rate" value={`${kpis.collectionRatePct}%`} icon={<Gauge size={15} />} sub="collected ÷ invoiced" />
       </div>
 
@@ -76,7 +78,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
               <div key={b.key}>
                 <div className="flex items-center justify-between text-[12.5px] mb-1.5">
                   <span style={{ color: "var(--color-svc-text-dim)" }}>{b.label}</span>
-                  <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(b.amountCents / 100)}</span>
+                  <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(b.amountCents)}</span>
                 </div>
                 <Bar
                   pct={(b.amountCents / maxBucket) * 100}
@@ -101,7 +103,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
                     <span style={{ color: "var(--color-svc-text-dim)" }}>
                       {EXPENSE_CATEGORY_LABEL[c.category] ?? c.category}
                     </span>
-                    <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(c.amountCents / 100)}</span>
+                    <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(c.amountCents)}</span>
                   </div>
                   <Bar pct={(c.amountCents / maxCat) * 100} color="var(--color-svc-violet)" />
                 </div>
@@ -111,7 +113,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
         </SectionCard>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className={`grid grid-cols-1 gap-5 ${options.showJobMargins ? "lg:grid-cols-2" : ""}`}>
         <SectionCard title="Top customers">
           <div className="svc-divide">
             {topCustomers.length === 0 ? (
@@ -123,7 +125,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
                   <span className="text-right">
                     <Money cents={c.billedCents} className="text-[13px]" />
                     <p className="text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                      {peso(c.paidCents / 100)} paid
+                      {peso(c.paidCents)} paid
                     </p>
                   </span>
                 </div>
@@ -132,52 +134,58 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
           </div>
         </SectionCard>
 
-        <SectionCard title="Recent job margins">
-          {jobMargins.length === 0 ? (
-            <p className="px-5 py-6 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-              Complete and invoice a job to see its margin.
-            </p>
-          ) : (
-            <div className="overflow-x-auto thin-scroll">
-              <table className="w-full text-left">
-                <thead>
-                  <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                    {["Job", "Invoiced", "Cost", "Profit", "Margin"].map((h) => (
-                      <th key={h} className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="svc-divide">
-                  {jobMargins.map((j) => (
-                    <tr key={j.jobId}>
-                      <td className="px-5 py-2.5 max-w-[180px]">
-                        <Link href={`/service/jobs/${j.jobId}`} className="text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
-                          {j.title}
-                        </Link>
-                        <p className="text-[11px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>{j.customerName}</p>
-                      </td>
-                      <td className="px-5 py-2.5"><Money cents={j.invoicedCents} className="text-[12.5px]" /></td>
-                      <td className="px-5 py-2.5"><Money cents={j.costCents} className="text-[12.5px]" /></td>
-                      <td className="px-5 py-2.5">
-                        <Money cents={j.profitCents} signed className="text-[12.5px]" />
-                      </td>
-                      <td className="px-5 py-2.5">
-                        <Chip tone={j.marginPct >= 40 ? "success" : j.marginPct >= 15 ? "warn" : "danger"}>
-                          {j.invoicedCents > 0 ? `${j.marginPct}%` : "—"}
-                        </Chip>
-                      </td>
+        {options.showJobMargins ? (
+          <SectionCard title="Recent job margins">
+            {jobMargins.length === 0 ? (
+              <p className="px-5 py-6 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                Complete and invoice a job to see its margin.
+              </p>
+            ) : (
+              <div className="overflow-x-auto thin-scroll">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr style={{ color: "var(--color-svc-text-faint)" }}>
+                      {["Job", revenueHeading, "Cost", "Profit", "Margin"].map((h) => (
+                        <th key={h} className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
+                  </thead>
+                  <tbody className="svc-divide">
+                    {jobMargins.map((j) => (
+                      <tr key={j.jobId}>
+                        <td className="px-5 py-2.5 max-w-[180px]">
+                          <Link href={`/service/jobs/${j.jobId}`} className="text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                            {j.title}
+                          </Link>
+                          <p className="text-[11px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>{j.customerName}</p>
+                        </td>
+                        <td className="px-5 py-2.5"><Money cents={j.revenueCents} className="text-[12.5px]" /></td>
+                        <td className="px-5 py-2.5"><Money cents={j.costCents} className="text-[12.5px]" /></td>
+                        <td className="px-5 py-2.5">
+                          <Money cents={j.profitCents} signed className="text-[12.5px]" />
+                        </td>
+                        <td className="px-5 py-2.5">
+                          <Chip tone={j.marginPct >= 40 ? "success" : j.marginPct >= 15 ? "warn" : "danger"}>
+                            {j.revenueCents > 0 ? `${j.marginPct}%` : "—"}
+                          </Chip>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
+        ) : null}
       </div>
 
-      <p className="text-[11.5px] flex items-center gap-1.5" style={{ color: "var(--color-svc-text-faint)" }}>
-        <LineChart size={13} /> Costs include labor (crew rate × on-site hours), parts, and expenses linked to the job.
-      </p>
+      {options.showJobMargins ? (
+        <p className="text-[11.5px] flex items-center gap-1.5" style={{ color: "var(--color-svc-text-faint)" }}>
+          <LineChart size={13} />
+          {options.includeLaborCost
+            ? "Costs include labor (crew rate × on-site hours), parts, and expenses linked to the job."
+            : "Costs include parts and expenses linked to the job; crew labor is excluded."}        </p>
+      ) : null}
     </div>
   );
 }
@@ -208,7 +216,7 @@ function Bar3({ value, max, color, label }: { value: number; max: number; color:
     <div
       className="w-1/4 rounded-t-md transition-all"
       style={{ height: `${Math.max(2, pct)}%`, background: color }}
-      title={`${label}: ${peso(value / 100)}`}
+      title={`${label}: ${peso(value)}`}
     />
   );
 }

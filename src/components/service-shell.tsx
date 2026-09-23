@@ -40,17 +40,23 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
 export default function ServiceShell({
   children,
   businessName,
+  showFinance = true,
 }: {
   children: ReactNode;
   businessName: string;
+  /** Owner setting: hides the Finance link only — the route itself is not blocked. */
+  showFinance?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const groups = showFinance
+    ? GROUPS
+    : GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.href !== "/service/finance") }));
 
   const nav = (
     <nav className="flex-1 px-3 py-2 space-y-5 overflow-y-auto thin-scroll">
-      {GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.label}>
           <p
             className="px-3.5 pb-1.5 text-[9.5px] uppercase tracking-[0.24em]"

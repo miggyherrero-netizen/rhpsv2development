@@ -11,7 +11,7 @@ import { fmtDate, fmtTime, toLocalInput, peso } from "@/lib/format";
 import {
   JOB_STATUSES, JOB_STATUS_LABEL, JOB_STATUS_TONE, SERVICE_TYPES, SERVICE_TYPE_LABEL,
   TIME_KINDS, TIME_KIND_LABEL, ITEM_KINDS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL,
-  computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents,
+  computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents, taxLineLabel,
 } from "@/lib/service";
 import type { JobDetail } from "@/server/service-data";
 import {
@@ -28,10 +28,21 @@ export default function JobDetailClient({
   detail: initialDetail,
   jobPrefix,
   taxRateBps,
+  taxLabel,
+  vatEnabled,
+  marginExcludesVat,
+  includeLaborCost,
+  showJobMargins,
 }: {
   detail: JobDetail;
   jobPrefix: string;
   taxRateBps: number;
+  taxLabel: string;
+  /** Owner setting: quote previews (and new invoices) carry no VAT when false. */
+  vatEnabled: boolean;
+  marginExcludesVat: boolean;
+  includeLaborCost: boolean;
+  showJobMargins: boolean;
 }) {
   const detail = initialDetail;
   const router = useRouter();
@@ -46,19 +57,27 @@ export default function JobDetailClient({
 
   const { job } = detail;
   const totals = useMemo(
-    () => computeTotals(detail.items, { taxRateBps }),
-    [detail.items, taxRateBps],
+    () => computeTotals(detail.items, { taxRateBps, vatEnabled }),
+    [detail.items, taxRateBps, vatEnabled],
   );
   const workMinutes = detail.timeLogs.filter((l) => l.kind === "work").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const travelMinutes = detail.timeLogs.filter((l) => l.kind === "travel").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const expenseCents = detail.expenses.reduce((s, e) => s + e.amountCents, 0);
-  const invoicedCents = detail.invoices.filter((i) => !i.voidedAt).reduce((s, i) => s + i.totalCents, 0);
-  const margin = jobMargin({
-    laborCostCents: job.laborCostCents,
-    partsCostCents: job.partsCostCents,
-    expenseCents,
-    invoicedCents,
-  });
+  const liveInvoices = detail.invoices.filter((i) => !i.voidedAt);
+  const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
+  // Saved VAT on each invoice — historical invoices keep whatever rate they were issued at.
+  const invoicedTaxCents = liveInvoices.reduce((s, i) => s + i.taxCents, 0);
+  const margin = jobMargin(
+    {
+      laborCostCents: job.laborCostCents,
+      partsCostCents: job.partsCostCents,
+      expenseCents,
+      invoicedCents,
+      taxCents: invoicedTaxCents,
+    },
+    { marginExcludesVat, includeLaborCost },
+  );
+  const costBreakdown = includeLaborCost ? "labor + parts + expenses" : "parts + expenses";
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -245,7 +264,7 @@ export default function JobDetailClient({
                           </td>
                           <td className="px-5 py-2.5 text-[11.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
                             {item.kind}
-                            {item.taxable ? "" : " · no VAT"}
+                            {vatEnabled && !item.taxable ? " · no VAT" : ""}
                           </td>
                           <td className="px-5 py-2.5">
                             <input
@@ -295,7 +314,9 @@ export default function JobDetailClient({
                   style={{ borderTop: "1px solid var(--color-svc-border)" }}
                 >
                   <Row label="Subtotal"><Money cents={totals.subtotalCents} /></Row>
-                  <Row label={`VAT (${(taxRateBps / 100).toFixed(0)}%)`}><Money cents={totals.taxCents} /></Row>
+                  {vatEnabled ? (
+                    <Row label={taxLineLabel(taxLabel, taxRateBps)}><Money cents={totals.taxCents} /></Row>
+                  ) : null}
                   <Row label="Total" strong><Money cents={totals.totalCents} /></Row>
                 </div>
               </>
@@ -383,7 +404,7 @@ export default function JobDetailClient({
                 <div className="px-5 py-2.5 flex gap-5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                   <span>On site {fmtMinutes(workMinutes)}</span>
                   <span>Travel {fmtMinutes(travelMinutes)}</span>
-                  <span>Labor cost {peso(job.laborCostCents / 100)}</span>
+                  <span>Labor cost {peso(job.laborCostCents)}</span>
                 </div>
               </div>
             )}
@@ -423,7 +444,7 @@ export default function JobDetailClient({
                   </div>
                 ))}
                 <div className="px-5 py-2.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                  Total expenses {peso(expenseCents / 100)}
+                  Total expenses {peso(expenseCents)}
                 </div>
               </div>
             )}
@@ -474,16 +495,18 @@ export default function JobDetailClient({
             </div>
           </SectionCard>
 
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Job cost" value={peso(margin.costCents / 100)} sub="labor + parts + expenses" />
-            <StatCard
-              label="Margin"
-              value={`${margin.marginPct}%`}
-              sub={peso(margin.profitCents / 100)}
-              tone={margin.profitCents >= 0 ? "success" : "danger"}
-              icon={<TrendingUp size={15} />}
-            />
-          </div>
+          {showJobMargins ? (
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
+              <StatCard
+                label="Margin"
+                value={`${margin.marginPct}%`}
+                sub={peso(margin.profitCents)}
+                tone={margin.profitCents >= 0 ? "success" : "danger"}
+                icon={<TrendingUp size={15} />}
+              />
+            </div>
+          ) : null}
 
           <SectionCard title="Timeline">
             <div className="px-5 py-4 space-y-3">
@@ -551,6 +574,7 @@ export default function JobDetailClient({
         open={itemOpen}
         onClose={() => setItemOpen(false)}
         catalog={detail.catalog}
+        vatEnabled={vatEnabled}
         pending={pending}
         onCreate={(input) => run(() => addJobItem(job.id, input))}
       />
@@ -705,12 +729,15 @@ function AddItemModal({
   open,
   onClose,
   catalog,
+  vatEnabled,
   pending,
   onCreate,
 }: {
   open: boolean;
   onClose: () => void;
   catalog: JobDetail["catalog"];
+  /** VAT off: the taxable select is hidden and the line keeps its price-book default. */
+  vatEnabled: boolean;
   pending: boolean;
   onCreate: (input: { kind: string; description: string; qty: number; unitPrice: number; taxable: boolean; catalogItemId?: string | null }) => void;
 }) {
@@ -737,7 +764,7 @@ function AddItemModal({
             <Select defaultValue="" onChange={(e) => pickFromCatalog(e.target.value)}>
               <option value="">Choose an item…</option>
               {catalog.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} — {peso(c.unitPriceCents / 100)}</option>
+                <option key={c.id} value={c.id}>{c.name} — {peso(c.unitPriceCents)}</option>
               ))}
             </Select>
           </Field>
@@ -761,12 +788,14 @@ function AddItemModal({
           <Field label="Unit price" hint="Pesos">
             <TextInput type="number" step="50" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="2500" />
           </Field>
-          <Field label="VAT">
-            <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-              <option value="yes">Taxable</option>
-              <option value="no">Exempt</option>
-            </Select>
-          </Field>
+          {vatEnabled ? (
+            <Field label="VAT">
+              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
+                <option value="yes">Taxable</option>
+                <option value="no">Exempt</option>
+              </Select>
+            </Field>
+          ) : null}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <GhostButton onClick={onClose}>Cancel</GhostButton>

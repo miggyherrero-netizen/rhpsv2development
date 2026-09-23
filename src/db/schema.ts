@@ -590,6 +590,18 @@ export const serviceSettings = pgTable("service_settings", {
   reminderLeadDays: integer("reminder_lead_days").notNull().default(30),
   currency: text("currency").notNull().default("PHP"),
   workingHours: jsonb("working_hours").$type<WorkingHours>().notNull().default({}),
+  /** Charge VAT on newly created invoices (existing invoices keep their saved rate). */
+  vatEnabled: boolean("vat_enabled").notNull().default(true),
+  /** Job profit is measured on revenue before VAT. */
+  marginExcludesVat: boolean("margin_excludes_vat").notNull().default(true),
+  /** Count recorded crew labor as a job cost in margin reports. */
+  includeLaborCost: boolean("include_labor_cost").notNull().default(true),
+  /** Finance "average invoice" denominator: non-void invoices or completed jobs. */
+  avgInvoiceBasis: text("avg_invoice_basis").$type<"invoice" | "job">().notNull().default("invoice"),
+  /** Show the Finance link in the workspace menu (the route itself stays reachable). */
+  showFinance: boolean("show_finance").notNull().default(true),
+  /** Show profit/margin on job pages and in Finance. */
+  showJobMargins: boolean("show_job_margins").notNull().default(true),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 

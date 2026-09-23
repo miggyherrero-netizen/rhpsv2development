@@ -69,6 +69,8 @@ export const JOB_STATUS_TONE: Record<string, Tone> = Object.fromEntries(
 /** Statuses that still need attention — everything else is closed out. */
 export const OPEN_JOB_STATUSES = ["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"];
 export const CLOSED_JOB_STATUSES = ["completed", "invoiced", "paid", "cancelled"];
+/** Work that was actually done (closed, but not cancelled). */
+export const COMPLETED_JOB_STATUSES = ["completed", "invoiced", "paid"];
 
 export const ITEM_KINDS = [
   { key: "service", label: "Service" },
@@ -189,10 +191,11 @@ export type Totals = {
 /**
  * Single source of truth for quote/invoice arithmetic.
  * `taxCents` is computed on the taxable base only; discounts are negative lines.
+ * `vatEnabled: false` forces tax to zero regardless of `taxRateBps` (default true).
  */
 export function computeTotals(
   lines: PricedLine[],
-  opts: { discountCents?: number; taxRateBps?: number } = {},
+  opts: { discountCents?: number; taxRateBps?: number; vatEnabled?: boolean } = {},
 ): Totals {
   const subtotalCents = lines.reduce((sum, l) => sum + lineTotalCents(l), 0);
   const discountCents = Math.max(0, Math.round(opts.discountCents ?? 0));
@@ -200,7 +203,7 @@ export function computeTotals(
     (sum, l) => (l.taxable === false ? sum : sum + lineTotalCents(l)),
     0,
   );
-  const taxRateBps = Math.max(0, Math.round(opts.taxRateBps ?? 0));
+  const taxRateBps = opts.vatEnabled === false ? 0 : Math.max(0, Math.round(opts.taxRateBps ?? 0));
   const taxCents = Math.round((Math.max(0, taxableCents - discountCents) * taxRateBps) / 10_000);
   return {
     subtotalCents,
@@ -209,6 +212,19 @@ export function computeTotals(
     taxCents,
     totalCents: subtotalCents - discountCents + taxCents,
   };
+}
+
+/** "12%", "12.5%" — basis points to a trimmed percent string. */
+export const fmtRatePct = (bps: number): string => `${Number((Math.max(0, bps) / 100).toFixed(2))}%`;
+
+/**
+ * Tax line label that shows the rate exactly once. The settings label usually already
+ * carries a rate ("VAT (12%)"); that trailing "(n%)" is dropped and the *document's own*
+ * saved rate is appended, so an old invoice never shows today's rate.
+ */
+export function taxLineLabel(label: string | null | undefined, taxRateBps: number): string {
+  const base = (label ?? "").replace(/\s*\(\s*\d+(?:\.\d+)?\s*%\s*\)\s*$/, "").trim() || "VAT";
+  return `${base} (${fmtRatePct(taxRateBps)})`;
 }
 
 export type InvoiceLike = {
@@ -305,18 +321,83 @@ export type JobCosts = {
   laborCostCents: number;
   partsCostCents: number;
   expenseCents: number;
+  /** Sum of non-void invoice totals (VAT included). */
   invoicedCents: number;
+  /** Sum of the *saved* taxCents on those same non-void invoices. Defaults to 0. */
+  taxCents?: number;
 };
 
-/** Job profitability: what was billed minus labor, parts, and job-linked expenses. */
-export function jobMargin(costs: JobCosts) {
-  const costCents = costs.laborCostCents + costs.partsCostCents + costs.expenseCents;
-  const profitCents = costs.invoicedCents - costCents;
+export type MarginOptions = {
+  /** Profit is measured on revenue before VAT (VAT is owed to the government). Default true. */
+  marginExcludesVat?: boolean;
+  /** Count recorded crew labor as a job cost. Default true. */
+  includeLaborCost?: boolean;
+};
+
+export type JobMargin = {
+  costCents: number;
+  profitCents: number;
+  marginPct: number;
+  /** The revenue base profit is measured against (invoiced, or invoiced − VAT). */
+  revenueCents: number;
+};
+
+/**
+ * Job profitability: revenue minus parts, job-linked expenses, and (optionally) labor.
+ * Pure reporting — it never changes the recorded labor/invoice amounts it is given.
+ */
+export function jobMargin(costs: JobCosts, opts: MarginOptions = {}): JobMargin {
+  const excludeVat = opts.marginExcludesVat !== false;
+  const includeLabor = opts.includeLaborCost !== false;
+  const revenueCents = costs.invoicedCents - (excludeVat ? Math.max(0, costs.taxCents ?? 0) : 0);
+  const costCents = (includeLabor ? costs.laborCostCents : 0) + costs.partsCostCents + costs.expenseCents;
+  const profitCents = revenueCents - costCents;
   return {
     costCents,
     profitCents,
-    marginPct: costs.invoicedCents > 0 ? Math.round((profitCents / costs.invoicedCents) * 100) : 0,
+    marginPct: revenueCents > 0 ? Math.round((profitCents / revenueCents) * 100) : 0,
+    revenueCents,
   };
+}
+
+/** How the Finance "average invoice" KPI divides invoiced revenue. */
+export const AVG_INVOICE_BASES = ["invoice", "job"] as const;
+export type AvgInvoiceBasis = (typeof AVG_INVOICE_BASES)[number];
+
+export const SETTINGS_TOGGLES = [
+  "vatEnabled", "marginExcludesVat", "includeLaborCost", "showFinance", "showJobMargins",
+] as const;
+export type SettingsToggle = (typeof SETTINGS_TOGGLES)[number];
+export type ReportSettingsPatch = Partial<Record<SettingsToggle, boolean>> & { avgInvoiceBasis?: AvgInvoiceBasis };
+
+/**
+ * Strict validation for the owner's money/report/visibility options. An omitted field is
+ * left out (unchanged), an explicit `false` is kept, and anything malformed is an error —
+ * never silently coerced (e.g. the string "false" is rejected, not read as true).
+ */
+export function validateReportSettings(
+  patch: Record<string, unknown>,
+): { ok: true; value: ReportSettingsPatch } | { ok: false; error: string } {
+  const value: ReportSettingsPatch = {};
+  for (const key of SETTINGS_TOGGLES) {
+    const v = patch[key];
+    if (v === undefined) continue;
+    if (typeof v !== "boolean") return { ok: false, error: `Invalid value for ${key}: expected true or false.` };
+    value[key] = v;
+  }
+  const basis = patch.avgInvoiceBasis;
+  if (basis !== undefined) {
+    if (typeof basis !== "string" || !(AVG_INVOICE_BASES as readonly string[]).includes(basis)) {
+      return { ok: false, error: `Invalid average invoice basis: expected ${AVG_INVOICE_BASES.join(" or ")}.` };
+    }
+    value.avgInvoiceBasis = basis as AvgInvoiceBasis;
+  }
+  return { ok: true, value };
+}
+
+/** Average of `invoicedCents` over `count`; 0 when there is nothing to divide by. */
+export function avgInvoiceCents(invoicedCents: number, count: number): number {
+  return count > 0 ? Math.round(invoicedCents / count) : 0;
 }
 
 /* ============================================================

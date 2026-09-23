@@ -25,11 +25,13 @@ export default function ExpensesClient({
   categoryTotals,
   monthTotalCents,
   monthCount,
+  showFinance,
 }: {
   expenses: ExpenseRow[];
   categoryTotals: { category: string; amountCents: number; count: number }[];
   monthTotalCents: number;
   monthCount: number;
+  showFinance: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export default function ExpensesClient({
         <StatCard
           label="Top category"
           value={categoryTotals[0] ? (EXPENSE_CATEGORY_LABEL[categoryTotals[0].category] ?? categoryTotals[0].category) : "—"}
-          sub={categoryTotals[0] ? peso(categoryTotals[0].amountCents / 100) : "no data"}
+          sub={categoryTotals[0] ? peso(categoryTotals[0].amountCents) : "no data"}
           tone="warn"
         />
       </div>
@@ -191,7 +193,7 @@ export default function ExpensesClient({
                     <span style={{ color: "var(--color-svc-text-dim)" }}>
                       {EXPENSE_CATEGORY_LABEL[c.category] ?? c.category}
                     </span>
-                    <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(c.amountCents / 100)}</span>
+                    <span className="tnum" style={{ color: "var(--color-svc-text)" }}>{peso(c.amountCents)}</span>
                   </div>
                   <Bar pct={(c.amountCents / maxCat) * 100} color="var(--color-svc-violet)" />
                 </div>
@@ -200,9 +202,11 @@ export default function ExpensesClient({
             <p className="text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>
               Category totals cover the last 90 days.
             </p>
-            <Link href="/service/finance" className="text-[11.5px] hover:underline" style={{ color: TONE_BAR.azure }}>
-              See the full finance report →
-            </Link>
+            {showFinance ? (
+              <Link href="/service/finance" className="text-[11.5px] hover:underline" style={{ color: TONE_BAR.azure }}>
+                See the full finance report →
+              </Link>
+            ) : null}
           </div>
         </SectionCard>
       </div>

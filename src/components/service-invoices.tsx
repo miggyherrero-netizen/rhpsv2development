@@ -27,11 +27,14 @@ export default function InvoicesClient({
   invoices,
   customers,
   invoicePrefix,
+  vatEnabled,
   aging,
 }: {
   invoices: InvoiceRow[];
   customers: { id: string; name: string }[];
   invoicePrefix: string;
+  /** Owner setting: new invoices carry no VAT, so the per-line taxable choice is hidden. */
+  vatEnabled: boolean;
   aging: {
     buckets: { key: string; label: string; amountCents: number; count: number }[];
     totalOutstandingCents: number;
@@ -213,7 +216,7 @@ export default function InvoicesClient({
                 <div className="flex items-center justify-between text-[12px] mb-1.5">
                   <span style={{ color: "var(--color-svc-text-dim)" }}>{b.label}</span>
                   <span className="tnum" style={{ color: "var(--color-svc-text)" }}>
-                    {peso(b.amountCents / 100)}
+                    {peso(b.amountCents)}
                   </span>
                 </div>
                 <Bar
@@ -231,7 +234,7 @@ export default function InvoicesClient({
             >
               <span className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>Total outstanding</span>
               <span className="text-[14px] tnum" style={{ color: "var(--color-svc-text)" }}>
-                {peso(aging.totalOutstandingCents / 100)}
+                {peso(aging.totalOutstandingCents)}
               </span>
             </div>
           </div>
@@ -242,6 +245,7 @@ export default function InvoicesClient({
         open={newOpen}
         onClose={() => setNewOpen(false)}
         customers={customers}
+        vatEnabled={vatEnabled}
         pending={pending}
         onCreate={(input) => run(() => createInvoice(input))}
       />
@@ -260,12 +264,14 @@ function NewInvoiceModal({
   open,
   onClose,
   customers,
+  vatEnabled,
   pending,
   onCreate,
 }: {
   open: boolean;
   onClose: () => void;
   customers: { id: string; name: string }[];
+  vatEnabled: boolean;
   pending: boolean;
   onCreate: (input: {
     customerId: string;
@@ -293,7 +299,7 @@ function NewInvoiceModal({
             ))}
           </Select>
         </Field>
-        <div className="grid grid-cols-[1fr_80px_120px_90px] gap-2 items-end">
+        <div className={`grid gap-2 items-end ${vatEnabled ? "grid-cols-[1fr_80px_120px_90px]" : "grid-cols-[1fr_80px_120px]"}`}>
           <Field label="Description">
             <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Concert tuning" />
           </Field>
@@ -303,12 +309,14 @@ function NewInvoiceModal({
           <Field label="Price">
             <TextInput type="number" step="50" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="2500" />
           </Field>
-          <Field label="VAT">
-            <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-              <option value="yes">Taxable</option>
-              <option value="no">Exempt</option>
-            </Select>
-          </Field>
+          {vatEnabled ? (
+            <Field label="VAT">
+              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
+                <option value="yes">Taxable</option>
+                <option value="no">Exempt</option>
+              </Select>
+            </Field>
+          ) : null}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Due date">
@@ -365,7 +373,7 @@ function PaymentModal({
       open
       onClose={onClose}
       title="Record payment"
-      subtitle={`Balance ${peso(invoice.balanceCents / 100)} · ${invoice.customerName}`}
+      subtitle={`Balance ${peso(invoice.balanceCents)} · ${invoice.customerName}`}
     >
       <div className="space-y-3.5">
         <Field label="Amount" hint="Pesos">

@@ -5,7 +5,7 @@
  * `--color-svc-*` tokens so the theme stays separate from admin/owner/public.
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { X, Loader2, Inbox, AlertCircle, CheckCircle2 } from "lucide-react";
 import { peso } from "@/lib/format";
 import type { Tone } from "@/lib/service";
@@ -336,6 +336,70 @@ export function Field({
         </span>
       ) : null}
     </label>
+  );
+}
+
+/**
+ * On/off setting row. A real checkbox (`role="switch"`) sits under the visual track, so
+ * clicking the label, Tab + Space, and screen readers all work natively; the hint is
+ * wired up via `aria-describedby`.
+ */
+export function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  return (
+    <div className={`flex items-start justify-between gap-4 ${disabled ? "opacity-60" : ""}`}>
+      <div className="min-w-0">
+        <label htmlFor={id} className="block text-[13px] cursor-pointer" style={{ color: "var(--color-svc-text)" }}>
+          {label}
+        </label>
+        {hint ? (
+          <p id={hintId} className="text-[11.5px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+            {hint}
+          </p>
+        ) : null}
+      </div>
+      <span className="relative inline-flex shrink-0 mt-0.5">
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          checked={checked}
+          disabled={disabled}
+          aria-describedby={hint ? hintId : undefined}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer absolute inset-0 w-full h-full opacity-0 m-0 cursor-pointer disabled:cursor-not-allowed"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none w-9 h-5 rounded-full transition-colors peer-focus-visible:shadow-[0_0_0_3px_var(--color-svc-accent-soft)]"
+          style={{
+            background: checked ? "var(--color-svc-accent)" : "var(--color-svc-surface-2)",
+            border: `1px solid ${checked ? "var(--color-svc-accent)" : "var(--color-svc-border-strong)"}`,
+          }}
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-[3px] left-[3px] w-3.5 h-3.5 rounded-full transition-transform"
+          style={{
+            background: checked ? "#051021" : "var(--color-svc-text-dim)",
+            transform: checked ? "translateX(16px)" : "translateX(0)",
+          }}
+        />
+      </span>
+    </div>
   );
 }
 

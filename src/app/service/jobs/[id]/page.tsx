@@ -8,13 +8,19 @@ export const dynamic = "force-dynamic";
 export default async function ServiceJobPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
-  const [detail, settings] = await Promise.all([getJobDetail(id), getServiceSettings(user.id)]);
+  const settings = await getServiceSettings(user.id);
+  const detail = await getJobDetail(id, settings);
   if (!detail) notFound();
   return (
     <JobDetailClient
       detail={detail}
       jobPrefix={settings.jobPrefix}
       taxRateBps={settings.taxRateBps}
+      taxLabel={settings.taxLabel}
+      vatEnabled={settings.vatEnabled}
+      marginExcludesVat={settings.marginExcludesVat}
+      includeLaborCost={settings.includeLaborCost}
+      showJobMargins={settings.showJobMargins}
     />
   );
 }

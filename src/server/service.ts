@@ -19,7 +19,8 @@ import { addDays } from "@/lib/dates";
 import {
   boolOr, computeTotals, elapsedMinutes, intOr, lineTotalCents, moneyToCents, oneOf,
   optionalDate, str, strOr, CUSTOMER_SOURCES, EXPENSE_CATEGORIES, ITEM_KINDS, JOB_STATUSES,
-  PAYMENT_METHODS, PIANO_TYPES, SERVICE_TYPES, TIME_KINDS,
+  PAYMENT_METHODS, PIANO_TYPES, SERVICE_TYPES, TIME_KINDS, validateReportSettings,
+  type AvgInvoiceBasis, type ReportSettingsPatch,
 } from "@/lib/service";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -798,7 +799,9 @@ async function createInvoiceRows(input: {
       jobId: input.jobId ?? null,
       issueDate,
       dueDate,
-      taxRateBps: settings?.taxRateBps ?? 1200,
+      // Snapshot the effective rate: with VAT off the invoice is saved at 0% and stays that
+      // way; later settings changes never re-price an existing invoice.
+      taxRateBps: (settings?.vatEnabled ?? true) ? (settings?.taxRateBps ?? 1200) : 0,
       discountCents: Math.max(0, Math.round(input.discountCents ?? 0)),
       notes: str(input.notes, 2_000),
       terms: str(terms, 1_000),
@@ -1115,8 +1118,15 @@ export async function updateSettings(patch: {
   taxLabel?: string; defaultTermsDays?: number; defaultHourlyRate?: number;
   defaultTravelFee?: number; defaultTuningIntervalMonths?: number;
   reminderLeadDays?: number; workingHours?: Record<number, [number, number] | null>;
-}): Promise<Result> {
+  avgInvoiceBasis?: AvgInvoiceBasis;
+} & ReportSettingsPatch): Promise<Result> {
   const user = await requireUser();
+
+  // Validate the reporting/visibility options strictly (before any write): an omitted field
+  // is left alone, an explicit `false` is saved, and anything malformed is rejected.
+  const report = validateReportSettings(patch);
+  if (!report.ok) return fail(report.error);
+
   const [existing] = await db.select().from(serviceSettings).where(eq(serviceSettings.ownerId, user.id)).limit(1);
   if (!existing) {
     await db.insert(serviceSettings).values({ ownerId: user.id });
@@ -1138,6 +1148,7 @@ export async function updateSettings(patch: {
         ? Math.max(1, intOr(patch.defaultTuningIntervalMonths, 6)) : undefined,
       reminderLeadDays: patch.reminderLeadDays !== undefined ? Math.max(0, intOr(patch.reminderLeadDays, 30)) : undefined,
       workingHours: patch.workingHours,
+      ...report.value,
       updatedAt: new Date(),
     })
     .where(eq(serviceSettings.ownerId, user.id));

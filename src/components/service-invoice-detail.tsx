@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Trash2, Printer, Send, Ban, FileX2, Pencil } from "luc
 import { fmtDate, peso, toLocalInput } from "@/lib/format";
 import {
   INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PAYMENT_METHOD_LABEL,
-  computeTotals, invoiceCode,
+  computeTotals, invoiceCode, taxLineLabel,
 } from "@/lib/service";
 import type { InvoiceDetail } from "@/server/service-data";
 import {
@@ -41,6 +41,9 @@ export default function InvoiceDetailClient({
     discountCents: invoice.discountCents,
     taxRateBps: invoice.taxRateBps,
   });
+  // Driven by the invoice's own saved rate, not today's settings: an invoice issued with
+  // VAT keeps its tax line; one issued with VAT off (0%) shows no VAT wording at all.
+  const hasVat = invoice.taxRateBps > 0 || totals.taxCents > 0;
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -156,7 +159,7 @@ export default function InvoiceDetailClient({
                 <tr key={item.id} className="group" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
                   <td className="py-2.5 pr-4 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                     {item.description}
-                    {!item.taxable ? (
+                    {hasVat && !item.taxable ? (
                       <span className="ml-2 text-[10.5px]" style={{ color: "var(--color-svc-text-faint)" }}>VAT exempt</span>
                     ) : null}
                   </td>
@@ -214,9 +217,11 @@ export default function InvoiceDetailClient({
             {invoice.discountCents > 0 && (
               <Line label="Discount"><Money cents={-invoice.discountCents} /></Line>
             )}
-            <Line label={`${settings.taxLabel} (${(invoice.taxRateBps / 100).toFixed(0)}%)`}>
-              <Money cents={totals.taxCents} />
-            </Line>
+            {hasVat ? (
+              <Line label={taxLineLabel(settings.taxLabel, invoice.taxRateBps)}>
+                <Money cents={totals.taxCents} />
+              </Line>
+            ) : null}
             <div className="flex justify-between pt-2" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
               <span style={{ color: "var(--color-svc-text)" }}>Total</span>
               <span className="font-medium tnum"><Money cents={totals.totalCents} /></span>
@@ -340,6 +345,7 @@ export default function InvoiceDetailClient({
       <AddInvoiceItemModal
         open={itemOpen}
         onClose={() => setItemOpen(false)}
+        showVat={hasVat}
         pending={pending}
         onCreate={(input) => run(() => addInvoiceItem(invoice.id, input))}
       />
@@ -445,11 +451,14 @@ function EditInvoiceModal({
 function AddInvoiceItemModal({
   open,
   onClose,
+  showVat,
   pending,
   onCreate,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Hide the taxable select on invoices that carry no VAT. */
+  showVat: boolean;
   pending: boolean;
   onCreate: (input: { description: string; qty: number; unitPrice: number; taxable: boolean }) => void;
 }) {
@@ -464,19 +473,21 @@ function AddInvoiceItemModal({
         <Field label="Description">
           <TextInput value={description} onChange={(e) => setDescription(e.target.value)} autoFocus />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
+        <div className={`grid gap-3 ${showVat ? "grid-cols-3" : "grid-cols-2"}`}>
           <Field label="Qty">
             <TextInput type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="Price">
             <TextInput type="number" step="50" value={price} onChange={(e) => setPrice(e.target.value)} />
           </Field>
-          <Field label="VAT">
-            <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-              <option value="yes">Taxable</option>
-              <option value="no">Exempt</option>
-            </Select>
-          </Field>
+          {showVat ? (
+            <Field label="VAT">
+              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
+                <option value="yes">Taxable</option>
+                <option value="no">Exempt</option>
+              </Select>
+            </Field>
+          ) : null}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <GhostButton onClick={onClose}>Cancel</GhostButton>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database } from "lucide-react";
+import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
 import { peso } from "@/lib/format";
 import { DAYS_SHORT } from "@/lib/config";
-import { ITEM_KINDS } from "@/lib/service";
+import { ITEM_KINDS, type AvgInvoiceBasis } from "@/lib/service";
 import type { ServiceSettings } from "@/server/service-data";
 import type { ServiceCatalogItem, ServiceTechnician } from "@/db/schema";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/server/service";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
-  SectionCard, Select, SuccessLine, SvcModal, TextInput, TONE_TEXT,
+  SectionCard, Select, SuccessLine, SvcModal, TextInput, ToggleRow, TONE_TEXT,
 } from "@/components/service-ui";
 
 const minToTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -50,6 +50,12 @@ export default function SettingsClient({
   const [interval, setInterval] = useState(String(settings.defaultTuningIntervalMonths));
   const [lead, setLead] = useState(String(settings.reminderLeadDays));
   const [hours, setHours] = useState<Record<number, [number, number] | null>>(settings.workingHours ?? {});
+  const [vatEnabled, setVatEnabled] = useState(settings.vatEnabled);
+  const [marginExcludesVat, setMarginExcludesVat] = useState(settings.marginExcludesVat);
+  const [includeLaborCost, setIncludeLaborCost] = useState(settings.includeLaborCost);
+  const [avgInvoiceBasis, setAvgInvoiceBasis] = useState<AvgInvoiceBasis>(settings.avgInvoiceBasis);
+  const [showFinance, setShowFinance] = useState(settings.showFinance);
+  const [showJobMargins, setShowJobMargins] = useState(settings.showJobMargins);
 
   const [newItem, setNewItem] = useState({ name: "", kind: "service", price: "", minutes: "60" });
 
@@ -76,6 +82,12 @@ export default function SettingsClient({
         defaultTuningIntervalMonths: Number(interval),
         reminderLeadDays: Number(lead),
         workingHours: hours,
+        vatEnabled,
+        marginExcludesVat,
+        includeLaborCost,
+        avgInvoiceBasis,
+        showFinance,
+        showJobMargins,
       });
       if (res.ok) setSaved(true);
       return res;
@@ -102,20 +114,14 @@ export default function SettingsClient({
       {/* Business + invoicing */}
       <SectionCard title="Business & invoicing" className="overflow-hidden">
         <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Business name">
+          <Field label="Business name" className="sm:col-span-2">
             <TextInput value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
-          </Field>
-          <Field label="Tax label" hint="Shown on invoices">
-            <TextInput value={taxLabel} onChange={(e) => setTaxLabel(e.target.value)} />
           </Field>
           <Field label="Invoice prefix">
             <TextInput value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase())} />
           </Field>
           <Field label="Job prefix">
             <TextInput value={jobPrefix} onChange={(e) => setJobPrefix(e.target.value.toUpperCase())} />
-          </Field>
-          <Field label="Tax rate" hint="Percent (12 = Philippine VAT)">
-            <TextInput type="number" min={0} step="1" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
           </Field>
           <Field label="Payment terms" hint="Days">
             <TextInput type="number" min={0} value={terms} onChange={(e) => setTerms(e.target.value)} />
@@ -134,10 +140,76 @@ export default function SettingsClient({
           </Field>
         </div>
 
-        <div className="px-5 py-4" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
-          <p className="text-[10.5px] uppercase tracking-[0.16em] mb-3 flex items-center gap-1.5" style={{ color: "var(--color-svc-text-faint)" }}>
-            <CalendarClock size={12} /> Dispatch hours
-          </p>
+        <div className="px-5 py-4 space-y-4" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+          <SubHeading icon={<Receipt size={12} />}>Tax &amp; invoices</SubHeading>
+          <ToggleRow
+            label="Charge VAT on new invoices"
+            hint="Off means no VAT on newly created invoices; existing invoices stay as saved."
+            checked={vatEnabled}
+            onChange={setVatEnabled}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Tax label" hint="Shown on invoices">
+              <TextInput value={taxLabel} disabled={!vatEnabled} onChange={(e) => setTaxLabel(e.target.value)} />
+            </Field>
+            <Field label="Tax rate" hint="Percent (12 = Philippine VAT)">
+              <TextInput
+                type="number"
+                min={0}
+                step="1"
+                value={taxRate}
+                disabled={!vatEnabled}
+                onChange={(e) => setTaxRate(e.target.value)}
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-4" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+          <SubHeading icon={<TrendingUp size={12} />}>Profit &amp; reports</SubHeading>
+          <ToggleRow
+            label="Exclude VAT from job profit"
+            hint="VAT goes to the government, so profit uses the amount before VAT."
+            checked={marginExcludesVat}
+            onChange={setMarginExcludesVat}
+          />
+          <ToggleRow
+            label="Include crew labor in job cost"
+            hint="Uses recorded crew time and rates."
+            checked={includeLaborCost}
+            onChange={setIncludeLaborCost}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Average invoice based on">
+              <Select
+                value={avgInvoiceBasis}
+                onChange={(e) => setAvgInvoiceBasis(e.target.value === "job" ? "job" : "invoice")}
+              >
+                <option value="invoice">Invoices</option>
+                <option value="job">Completed jobs</option>
+              </Select>
+            </Field>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-4" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+          <SubHeading icon={<Eye size={12} />}>Workspace visibility</SubHeading>
+          <ToggleRow
+            label="Show Finance in menu"
+            hint="Hides the link only; the page still opens by address."
+            checked={showFinance}
+            onChange={setShowFinance}
+          />
+          <ToggleRow
+            label="Show job margins"
+            hint="Hides profit and margin on job pages and in Finance."
+            checked={showJobMargins}
+            onChange={setShowJobMargins}
+          />
+        </div>
+
+        <div className="px-5 py-4 space-y-3" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+          <SubHeading icon={<CalendarClock size={12} />}>Dispatch hours</SubHeading>
           <div className="space-y-2">
             {DAYS_SHORT.map((day, index) => {
               const value = hours[index] ?? null;
@@ -427,6 +499,18 @@ export default function SettingsClient({
         }}
       />
     </div>
+  );
+}
+
+/** Small uppercase section label inside a settings card (matches "Dispatch hours"). */
+function SubHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <p
+      className="text-[10.5px] uppercase tracking-[0.16em] flex items-center gap-1.5"
+      style={{ color: "var(--color-svc-text-faint)" }}
+    >
+      {icon} {children}
+    </p>
   );
 }
 

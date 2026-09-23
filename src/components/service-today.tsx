@@ -104,20 +104,20 @@ export default function TodayClient({
         />
         <StatCard
           label="Collected today"
-          value={peso(board.stats.collectedTodayCents / 100)}
+          value={peso(board.stats.collectedTodayCents)}
           tone="success"
           icon={<Wallet size={15} />}
         />
         <StatCard
           label="Outstanding"
-          value={peso(board.stats.outstandingCents / 100)}
+          value={peso(board.stats.outstandingCents)}
           tone={board.stats.outstandingCents > 0 ? "warn" : "slate"}
           sub="unpaid invoices"
           icon={<Gauge size={15} />}
         />
         <StatCard
           label="Open quotes"
-          value={peso(board.stats.openQuotesCents / 100)}
+          value={peso(board.stats.openQuotesCents)}
           tone="violet"
           sub="lead + quoted jobs"
           icon={<BellRing size={15} />}

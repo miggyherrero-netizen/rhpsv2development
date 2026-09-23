@@ -8,5 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function ServiceLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
   const settings = await getServiceSettings(user.id);
-  return <ServiceShell businessName={settings.businessName}>{children}</ServiceShell>;
+  return (
+    <ServiceShell businessName={settings.businessName} showFinance={settings.showFinance}>
+      {children}
+    </ServiceShell>
+  );
 }

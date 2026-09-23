@@ -15,6 +15,7 @@ export default async function ServiceInvoicesPage() {
       invoices={invoices}
       customers={customers}
       invoicePrefix={settings.invoicePrefix}
+      vatEnabled={settings.vatEnabled}
       aging={aging}
     />
   );

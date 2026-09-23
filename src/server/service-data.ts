@@ -17,15 +17,16 @@ import {
 import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, type SQL } from "drizzle-orm";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import {
-  agingSummary, balanceCents, daysOverdue, invoiceStatus, jobCode, DEFAULT_WORKING_HOURS,
-  type AgingSummary, type WorkingHours,
+  agingSummary, avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceStatus, jobCode,
+  jobMargin, DEFAULT_WORKING_HOURS, COMPLETED_JOB_STATUSES,
+  type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
 
 /* ============================================================
  * Settings, crew, price book
  * ============================================================ */
 
-export type ServiceSettings = ServiceSetting & { workingHours: WorkingHours };
+export type ServiceSettings = ServiceSetting & { workingHours: WorkingHours; avgInvoiceBasis: AvgInvoiceBasis };
 
 /** Settings row is created on first access so pages can rely on it existing. */
 export async function getServiceSettings(ownerId: string): Promise<ServiceSettings> {
@@ -294,7 +295,10 @@ export type JobDetail = {
   totals: { subtotalCents: number; taxCents: number; totalCents: number; quotedCents: number };
 };
 
-export async function getJobDetail(id: string): Promise<JobDetail | null> {
+/** The tax inputs a quote preview needs; comes from the owner's service settings. */
+export type QuoteTaxSettings = Pick<ServiceSettings, "taxRateBps" | "vatEnabled">;
+
+export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<JobDetail | null> {
   const [row] = await db
     .select(jobSelect)
     .from(serviceJobs)
@@ -335,10 +339,8 @@ export async function getJobDetail(id: string): Promise<JobDetail | null> {
         : Promise.resolve(null),
     ]);
 
-  const subtotalCents = items.reduce((s, i) => s + i.qty * i.unitPriceCents, 0);
-  const taxCents = Math.round(
-    (items.reduce((s, i) => (i.taxable ? s + i.qty * i.unitPriceCents : s), 0) * 1200) / 10_000,
-  );
+  // Quote preview uses the owner's current effective VAT setting via the shared calculator.
+  const quote = computeTotals(items, { taxRateBps: tax.taxRateBps, vatEnabled: tax.vatEnabled });
 
   return {
     job: toJobRow(row, running),
@@ -354,7 +356,7 @@ export async function getJobDetail(id: string): Promise<JobDetail | null> {
     catalog,
     customers,
     technicians,
-    totals: { subtotalCents, taxCents, totalCents: subtotalCents + taxCents, quotedCents: row.job.quotedCents },
+    totals: { subtotalCents: quote.subtotalCents, taxCents: quote.taxCents, totalCents: quote.totalCents, quotedCents: row.job.quotedCents },
   };
 }
 
@@ -675,24 +677,41 @@ export type FinanceReport = {
     netCents: number;
     outstandingCents: number;
     overdueCents: number;
-    avgJobValueCents: number;
+    /** Invoiced ÷ non-void invoices, or ÷ all completed jobs — see `options.avgInvoiceBasis`. */
+    avgInvoiceCents: number;
     collectionRatePct: number;
   };
   aging: AgingSummary;
   expenseByCategory: { category: string; amountCents: number; count: number }[];
   topCustomers: { customerId: string; name: string; billedCents: number; paidCents: number }[];
-  jobMargins: { jobId: string; title: string; customerName: string; invoicedCents: number; costCents: number; profitCents: number; marginPct: number }[];
+  /** Empty when the owner has hidden job margins (`options.showJobMargins` false). */
+  jobMargins: {
+    jobId: string; title: string; customerName: string;
+    invoicedCents: number; taxCents: number; revenueCents: number;
+    costCents: number; profitCents: number; marginPct: number;
+  }[];
+  /** The reporting settings this report was computed with, so the UI can label it honestly. */
+  options: FinanceReportOptions;
 };
+
+export type FinanceReportOptions = Pick<
+  ServiceSettings,
+  "avgInvoiceBasis" | "marginExcludesVat" | "includeLaborCost" | "showJobMargins"
+>;
 
 function monthStartUTC(year: number, month: number) {
   return new Date(Date.UTC(year, month, 1));
 }
 
-export async function getFinanceReport(months = 6, now: Date = new Date()): Promise<FinanceReport> {
+export async function getFinanceReport(
+  options: FinanceReportOptions,
+  months = 6,
+  now: Date = new Date(),
+): Promise<FinanceReport> {
   const first = monthStartUTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1));
   const seriesStart = startOfManilaDayUTC(first);
 
-  const [invoiceRows, paymentRows, expenseRows, allInvoices, categoryRows, customerRows, jobRows] = await Promise.all([
+  const [invoiceRows, paymentRows, expenseRows, allInvoices, categoryRows, customerRows, jobRows, completedJobs] = await Promise.all([
     db
       .select({
         month: sql<string>`to_char(${serviceInvoices.issueDate}, 'YYYY-MM')`,
@@ -739,17 +758,37 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
       .groupBy(serviceInvoices.customerId, serviceCustomers.name)
       .orderBy(desc(sql`sum(${serviceInvoices.totalCents})`))
       .limit(6),
+    // Margins hidden in settings → skip the per-job queries entirely.
+    options.showJobMargins
+      ? db
+          .select({
+            jobId: serviceJobs.id, title: serviceJobs.title, customerName: serviceCustomers.name,
+            laborCostCents: serviceJobs.laborCostCents, partsCostCents: serviceJobs.partsCostCents,
+            completedAt: serviceJobs.completedAt,
+          })
+          .from(serviceJobs)
+          .innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId))
+          .where(
+            and(
+              ne(serviceJobs.status, "cancelled"),
+              or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+            ),
+          )
+          .orderBy(desc(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`))
+          .limit(25)
+      : Promise.resolve([]),
+    // All-time completed jobs (invoiced or not) — the "job" basis denominator for the
+    // average. Deliberately separate from the 25-row margins list above. Status counts too:
+    // invoicing a job moves it to "invoiced" without necessarily stamping completedAt.
     db
-      .select({
-        jobId: serviceJobs.id, title: serviceJobs.title, customerName: serviceCustomers.name,
-        laborCostCents: serviceJobs.laborCostCents, partsCostCents: serviceJobs.partsCostCents,
-        completedAt: serviceJobs.completedAt,
-      })
+      .select({ count: sql<number>`count(*)::int` })
       .from(serviceJobs)
-      .innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId))
-      .where(isNotNull(serviceJobs.completedAt))
-      .orderBy(desc(serviceJobs.completedAt))
-      .limit(25),
+      .where(
+        and(
+          ne(serviceJobs.status, "cancelled"),
+          or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+        ),
+      ),
   ]);
 
   const jobIds = jobRows.map((j) => j.jobId);
@@ -759,11 +798,13 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
           .select({
             jobId: serviceInvoices.jobId,
             invoiced: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
+            // Saved VAT on the same non-void invoices — never re-estimated from today's rate.
+            tax: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.taxCents} else 0 end), 0)::int`,
           })
           .from(serviceInvoices)
           .where(inArray(serviceInvoices.jobId, jobIds))
           .groupBy(serviceInvoices.jobId)
-      : Promise.resolve([] as { jobId: string | null; invoiced: number }[]),
+      : Promise.resolve([] as { jobId: string | null; invoiced: number; tax: number }[]),
     jobIds.length
       ? db
           .select({ jobId: serviceExpenses.jobId, amount: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` })
@@ -773,7 +814,7 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
       : Promise.resolve([] as { jobId: string | null; amount: number }[]),
   ]);
 
-  const invoicedMap = new Map(invoiceByJob.map((r) => [r.jobId!, r.invoiced]));
+  const invoicedMap = new Map(invoiceByJob.map((r) => [r.jobId!, r]));
   const expenseMap = new Map(expenseByJob.map((r) => [r.jobId!, r.amount]));
 
   // Build the monthly series in Asia/Manila month buckets.
@@ -802,25 +843,38 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
   });
 
   const aging = agingSummary(allInvoices, now);
-  const invoicedCents = allInvoices
-    .filter((i) => !i.voidedAt)
-    .reduce((s, i) => s + i.totalCents, 0);
+  const liveInvoices = allInvoices.filter((i) => !i.voidedAt);
+  const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
   const collectedCents = allInvoices.reduce((s, i) => s + i.amountPaidCents, 0);
   const expenseCents = categoryRows.reduce((s, c) => s + c.amountCents, 0);
-  const completedJobCount = jobRows.length || 1;
+  const avgDenominator = options.avgInvoiceBasis === "job"
+    ? completedJobs[0]?.count ?? 0
+    : liveInvoices.length;
 
   const jobMargins = jobRows.map((j) => {
-    const invoiced = invoicedMap.get(j.jobId) ?? 0;
-    const costCents = j.laborCostCents + j.partsCostCents + (expenseMap.get(j.jobId) ?? 0);
-    const profitCents = invoiced - costCents;
+    const money = invoicedMap.get(j.jobId);
+    const invoiced = money?.invoiced ?? 0;
+    const tax = money?.tax ?? 0;
+    const m = jobMargin(
+      {
+        laborCostCents: j.laborCostCents,
+        partsCostCents: j.partsCostCents,
+        expenseCents: expenseMap.get(j.jobId) ?? 0,
+        invoicedCents: invoiced,
+        taxCents: tax,
+      },
+      { marginExcludesVat: options.marginExcludesVat, includeLaborCost: options.includeLaborCost },
+    );
     return {
       jobId: j.jobId,
       title: j.title,
       customerName: j.customerName,
       invoicedCents: invoiced,
-      costCents,
-      profitCents,
-      marginPct: invoiced > 0 ? Math.round((profitCents / invoiced) * 100) : 0,
+      taxCents: tax,
+      revenueCents: m.revenueCents,
+      costCents: m.costCents,
+      profitCents: m.profitCents,
+      marginPct: m.marginPct,
     };
   });
 
@@ -833,7 +887,7 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
       netCents: collectedCents - expenseCents,
       outstandingCents: aging.totalOutstandingCents,
       overdueCents: aging.overdueCents,
-      avgJobValueCents: Math.round(invoicedCents / completedJobCount),
+      avgInvoiceCents: avgInvoiceCents(invoicedCents, avgDenominator),
       collectionRatePct: invoicedCents > 0 ? Math.round((collectedCents / invoicedCents) * 100) : 0,
     },
     aging,
@@ -842,6 +896,12 @@ export async function getFinanceReport(months = 6, now: Date = new Date()): Prom
       customerId: c.customerId, name: c.name, billedCents: c.billed, paidCents: c.paid,
     })),
     jobMargins,
+    options: {
+      avgInvoiceBasis: options.avgInvoiceBasis,
+      marginExcludesVat: options.marginExcludesVat,
+      includeLaborCost: options.includeLaborCost,
+      showJobMargins: options.showJobMargins,
+    },
   };
 }
 
