@@ -7,6 +7,18 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
+/**
+ * SSL on for hosted Postgres (e.g. the Supabase pooler), off for local/Docker databases.
+ * Override with DATABASE_SSL=true|false.
+ */
+function sslEnabledFor(url: string): boolean {
+  const flag = process.env.DATABASE_SSL?.toLowerCase();
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  const host = new URL(url).hostname;
+  return !["localhost", "127.0.0.1", "::1", "db"].includes(host);
+}
+
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
@@ -15,7 +27,7 @@ export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: databaseUrl,
-    ssl: { rejectUnauthorized: false },
+    ssl: sslEnabledFor(databaseUrl) ? { rejectUnauthorized: false } : false,
   });
 
 pool.on("connect", (client) => {
