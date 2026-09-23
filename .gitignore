@@ -1,0 +1,24 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# env files (secrets)
+.env
+.env.local
+.env.*.local
+
+# local tool/agent config
+.mcp.json
+.claude/settings.local.json
+.codex/
+.agents/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "-d", "--build", "web"],
+      "url": "http://localhost:9847",
+      "port": 9847
+    }
+  ]
+}

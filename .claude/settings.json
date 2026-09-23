@@ -1,0 +1,65 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:localhost)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:9847\" -UseBasicParsing)",
+      "Bash(npm run *)",
+      "Bash(docker compose *)"
+    ]
+  },
+  "development": {
+    "verification_commands": {
+      "typecheck": "npm run typecheck",
+      "lint": "npm run lint",
+      "build": "npm run build",
+      "dev": "npm run dev"
+    },
+    "docker_commands": {
+      "rebuild_web": "docker compose up -d --build web",
+      "check_status": "docker compose ps",
+      "logs_web": "docker compose logs -f web",
+      "logs_db": "docker compose logs -f db"
+    },
+    "browser_test_config": {
+      "dev_server": "http://localhost:9847",
+      "port": 9847,
+      "after_rebuild_note": "Always use a fresh browser tab after rebuild to avoid stale Server Action references"
+    }
+  },
+  "verification_strategy": {
+    "ui_changes": [
+      "typecheck",
+      "lint",
+      "browser_test (verify observable changes in fresh tab)"
+    ],
+    "backend_changes": [
+      "typecheck",
+      "lint",
+      "build",
+      "targeted Server Action tests if applicable"
+    ],
+    "database_changes": [
+      "schema_consistency check",
+      "migration safety review",
+      "affected queries verification",
+      "existing data compatibility check"
+    ],
+    "security_changes": [
+      "security_auditor review",
+      "allowed/denied paths verification",
+      "sensitive data access review"
+    ],
+    "bug_fixes": [
+      "reproduce original failure",
+      "verify fix resolves it",
+      "check for regressions",
+      "run affected tests"
+    ]
+  },
+  "smart_auto_routing": {
+    "enabled": true,
+    "orchestrator": ".claude/agents/tech-lead-orchestrator.md",
+    "routing_matrix": ".claude/ROUTING.md",
+    "workflow": "INSPECT → ROUTE → IMPLEMENT → VERIFY → REVIEW → FIX FINDINGS → REPORT"
+  }
+}
