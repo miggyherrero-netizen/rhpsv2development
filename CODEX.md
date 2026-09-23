@@ -26,6 +26,7 @@ repository in this workspace; do not claim to have reviewed a Git diff or create
 | `/` | Public marketing site and showroom |
 | `/admin/*` | Projects, tasks, inventory, workers, curator, monitoring, and settings |
 | `/owner/*` | Personal today, calendar, tasks, inbox, overdue, upcoming, and settings views |
+| `/service/*` | Home service: today, schedule/dispatch, jobs, customers, invoices, expenses, time, finance, settings |
 | `/portal/[uuid]` | Client restoration journal accessed through a secret UUID link |
 | `/workshop` | Technician kiosk with worker PIN authentication |
 
@@ -37,10 +38,12 @@ Keep `/api/live` authenticated.
 
 ## Project invariants
 
-- Preserve the existing-user guard in `src/db/seed.ts`; the subsequent seed clears tables and must not run against established business data.
+- Preserve the existing-user guard in `src/db/seed.ts`; the subsequent seed clears tables and must not run against established business data. Home-service demo rows are seeded in the same guarded block, and `seedServiceDemo()` in `src/server/service.ts` is the idempotent way to populate the workspace on an existing database.
+- Home-service money is always integer centavos and totals are recomputed server-side (`computeTotals`, `recalcInvoice`, `recalcJobMoney`, `recalcJobLabor`). Never trust a client-sent total.
 - Keep public assets available in both Docker build and runtime stages.
 - Business dates use Asia/Manila. Use `startOfManilaDayUTC()` for Manila day boundaries; container-local midnight is not equivalent.
 - Preserve the owner workspace's premium dark theme: charcoal/navy surfaces with teal, blue, violet, rose, and slate accents. No brown, beige, yellow, or amber in owner views or their category colors.
+- The home service workspace has its own theme (`--color-svc-*`, `.card-svc`, `.input-svc`, `.btn-svc-primary`, `.chip-svc`): dark graphite surfaces with azure, emerald, amber, rose, and violet accents. Do not use `--color-ow-*` tokens there, and do not use `--color-svc-*` anywhere else.
 - Owner styles use `--color-ow-*` tokens and `.ow-*`/`.card-ow`/`.input-ow`/`.btn-ow-primary` classes. Admin and public styles have separate themes.
 - Test a newly opened browser tab after rebuilding to avoid stale Server Action references.
 
@@ -53,6 +56,7 @@ Keep `/api/live` authenticated.
 | `npm run typecheck` | TypeScript checking |
 | `npm run build` | Production build; database configuration must be available |
 | `node tests/task-flow.cjs` | Task/workshop integration checks against a configured PostgreSQL database |
+| `npm run test:service` | Home-service domain checks — money, tax, AR aging, margins, Manila time parsing |
 | `docker compose up -d --build web` | Rebuild/restart the app when needed for an authorized implementation |
 | `docker compose ps` | Inspect service status and actual published port |
 

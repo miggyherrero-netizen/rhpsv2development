@@ -1,6 +1,6 @@
 # Herrero Pianos — Project Context
 
-Piano atelier business app: public marketing site + showroom, admin back-office (projects/tasks/workers/inventory/payroll), a personal "owner workspace" (calendar/tasks/inbox), a client portal, and a workshop kiosk for technicians.
+Piano atelier business app: public marketing site + showroom, admin back-office (projects/tasks/workers/inventory/payroll), a personal "owner workspace" (calendar/tasks/inbox), a **home service workspace** (in-home scheduling, time, and finance), a client portal, and a workshop kiosk for technicians.
 
 ## Smart Auto-Routing (Developer Workflow)
 
@@ -115,14 +115,15 @@ Unlike skills (passive reference docs I read myself), agents are subagent person
 - `/` — public marketing site + showroom (`src/components/public-site.tsx`)
 - `/admin/*` — back-office (dashboard, projects, tasks, inventory, workers, curator, monitor/payroll, settings). One role today (`users.role = "owner"`).
 - `/owner/*` — the shop owner's **personal** workspace (today/calendar/tasks/inbox/overdue/upcoming/settings) — dark "Personal Workspace" theme, see below.
+- `/service/*` — **home service** (in-home visits): today/schedule/jobs/customers/invoices/expenses/time/finance/settings. Its own dark graphite + azure theme (`--color-svc-*`), its own tables (`service_*`), and its own field crew (`service_technicians`, separate from the workshop `workers` roster). See `SERVICE_WORKSPACE_PLAN.md`.
 - `/portal/[uuid]` — private client-facing restoration journal, no login (secret UUID link)
 - `/workshop` — PIN-based kiosk for technicians (clock in/out, claim tasks, breaks) — separate auth from `users` (uses `workers` table + signed cookie, not session table)
 
 ## Code layout convention
 - `src/app/**/page.tsx` — thin: fetch data, pass to a client component. No business logic here.
 - `src/components/{area}-*.tsx` — flat-file-per-page components, prefixed by area (`owner-*`, `admin-*`). Shared pieces live in `owner-ui.tsx` / `ui.tsx`.
-- `src/server/data.ts` — all **reads** (queries), grouped by domain with comment headers.
-- `src/server/{admin,owner,workshop,public-actions,auth-actions}.ts` — all **writes** (Server Actions, `"use server"`), one file per area. Every mutation calls `requireUser()` (admin/owner) or reads the worker cookie (workshop) as its own auth check.
+- `src/server/data.ts` — all **reads** (queries), grouped by domain with comment headers. Home service reads live in `src/server/service-data.ts` to keep this file readable.
+- `src/server/{admin,owner,workshop,service,public-actions,auth-actions}.ts` — all **writes** (Server Actions, `"use server"`), one file per area. Every mutation calls `requireUser()` (admin/owner) or reads the worker cookie (workshop) as its own auth check.
 - `src/lib/` — pure helpers: `dates.ts`, `format.ts`, `security.ts` (hashing/signing), `config.ts` (enums/label maps/priority styles), `env.ts` (startup env validation), `rate-limit.ts`.
 
 ## Known gotchas (already fixed — don't reintroduce)
@@ -138,6 +139,7 @@ Dark, premium theme — deliberately different from the rest of the app. Tokens 
 - Accent: muted teal (`--color-ow-accent` `#4fb8ab`) for primary actions/active nav — used sparingly.
 - Secondary hues: muted blue (`--color-ow-blue`), muted violet (`--color-ow-violet`), muted rose (`--color-ow-rose` for danger/overdue).
 - **Hard rule: no brown, beige, or yellow/amber anywhere in this theme** (explicit user requirement) — this also applies to `CATEGORY_COLORS` in `src/lib/config.ts`, which owner categories/calendar event tints pull from. If you add new status colors, stay within the teal/blue/violet/rose/slate family.
+- The **home service workspace** (`/service/*`) has a fourth theme: `--color-svc-*` tokens with `.card-svc` / `.input-svc` / `.btn-svc-primary` / `.chip-svc` classes. Deep graphite + azure/emerald, deliberately distinct from the Personal Workspace's teal.
 - Admin (`/admin/*`) has its own separate, older theme (`card-dark`/`card-light`, `bg-ink` etc.) — don't apply Personal Workspace tokens there, and don't apply admin's accents to the Personal Workspace.
 - The **public site** (`/` and `/portal/[uuid]`) has its own third theme, also `--color-paper`/`--color-parchment`/`--color-ink`/`--color-gold` tokens in `globals.css` but deliberately redesigned to a deep near-black + brass "rich atelier" look (paper is now dark, not light — see memory `project-public-site-dark-luxury-palette`). Don't confuse this with the Personal Workspace's teal/blue/violet/rose palette or admin's theme — three separate systems.
 

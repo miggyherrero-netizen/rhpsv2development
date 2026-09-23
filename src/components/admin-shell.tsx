@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Workflow, ListChecks, Boxes, Users, BookImage, Palette,
-  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, LogOut,
+  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -46,6 +46,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
       ))}
       <div className="pt-5 pb-2 px-3.5 text-[9.5px] uppercase tracking-[0.26em] text-mist/50">Beyond the shop</div>
       {[
+        { href: "/service/today", label: "Home Service", icon: Home },
         { href: "/owner/today", label: "Personal Workspace", icon: CalendarDays },
         { href: "/workshop", label: "Workshop Kiosk", icon: Hammer },
         { href: "/", label: "Public Website", icon: Globe },

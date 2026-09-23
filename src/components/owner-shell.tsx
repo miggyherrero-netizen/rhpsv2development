@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   Sun, Calendar, ListChecks, Inbox, AlarmClock, CalendarRange, Settings,
-  Menu, X, LayoutDashboard, LogOut,
+  Menu, X, LayoutDashboard, Home, LogOut,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -39,6 +39,9 @@ export default function OwnerShell({ children, userName }: { children: ReactNode
         </Link>
       ))}
       <div className="pt-5 pb-1.5 px-3.5 text-[9.5px] uppercase tracking-[0.26em] text-[var(--color-ow-text-faint)]">The atelier</div>
+      <Link href="/service/today" className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] transition-colors">
+        <Home size={16} strokeWidth={1.8} /> Home Service
+      </Link>
       <Link href="/admin" className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] transition-colors">
         <LayoutDashboard size={16} strokeWidth={1.8} /> Piano Management
       </Link>

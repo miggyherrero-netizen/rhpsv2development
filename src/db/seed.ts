@@ -4,6 +4,9 @@ import {
   users, workers, projects, tasks, timeEntries, updates, inventoryItems,
   pianos, inquiries, ownerCategories, ownerPreferences, ownerEvents,
   ownerTasks, ownerInbox, settings, sessions,
+  serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
+  serviceJobs, serviceJobItems, serviceJobEvents, serviceTimeLogs, serviceInvoices,
+  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings,
 } from "./schema";
 import { hashPassword, hashPin } from "../lib/security";
 import type { Recurrence } from "../lib/dates";
@@ -58,6 +61,21 @@ async function main() {
   await db.delete(ownerEvents);
   await db.delete(ownerPreferences);
   await db.delete(ownerCategories);
+  // Home service (child tables first — payments/items hang off invoices and jobs)
+  await db.delete(servicePayments);
+  await db.delete(serviceInvoiceItems);
+  await db.delete(serviceInvoices);
+  await db.delete(serviceExpenses);
+  await db.delete(serviceTimeLogs);
+  await db.delete(serviceJobEvents);
+  await db.delete(serviceJobItems);
+  await db.delete(serviceJobs);
+  await db.delete(servicePianos);
+  await db.delete(serviceLocations);
+  await db.delete(serviceCustomers);
+  await db.delete(serviceCatalog);
+  await db.delete(serviceTechnicians);
+  await db.delete(serviceSettings);
   await db.delete(inquiries);
   await db.delete(pianos);
   await db.delete(updates);
@@ -348,6 +366,95 @@ async function main() {
     { ownerId: owner.id, title: "Someone on Facebook asked if we buy old pianos", priority: "low" },
     { ownerId: owner.id, title: "Buy new PO boxes for serial plates", priority: "normal" },
     { ownerId: owner.id, title: "Conservatory wants term tuning contract — draft scope", priority: "high", processedAt: at(-1), convertedType: "task" },
+  ]);
+
+
+  /* ---- Home service workspace ---- */
+  console.log("Seeding home service…");
+  await db.insert(serviceSettings).values({
+    ownerId: owner.id,
+    businessName: "Herrero Pianos",
+    workingHours: { 0: null, 1: [480, 1080], 2: [480, 1080], 3: [480, 1080], 4: [480, 1080], 5: [480, 1080], 6: [540, 840] },
+  });
+
+  const [svcTechA, svcTechB] = await db.insert(serviceTechnicians).values([
+    { name: "Jerome Villanueva", title: "Senior Piano Technician", phone: "0917 555 0142", color: "#4d8df0", hourlyRateCents: 32000, billableRateCents: 85000 },
+    { name: "Ariel Mendoza", title: "Field Technician", phone: "0917 555 0188", color: "#3fb984", hourlyRateCents: 22000, billableRateCents: 60000 },
+  ]).returning();
+
+  const svcCustomers = await db.insert(serviceCustomers).values([
+    { name: "Maria Santos", phone: "0917 222 3344", email: "maria.santos@example.com", source: "referral", tags: ["residential"], notes: "Prefers morning appointments." },
+    { name: "Isabella Navarro", phone: "0918 888 1122", email: "isa.navarro@example.com", source: "repeat", tags: ["grand", "vip"] },
+    { name: "Sta. Mesa Parish", company: "Sta. Mesa Parish", phone: "(082) 221 4477", source: "referral", tags: ["institution", "chapel"] },
+    { name: "Lourdes Tan", phone: "0920 334 5566", source: "facebook", tags: ["upright"] },
+  ]).returning();
+
+  const svcLocations = await db.insert(serviceLocations).values([
+    { customerId: svcCustomers[0].id, label: "Residence", addressLine: "14 Palm Drive, Juna Subdivision", city: "Davao City", area: "Matina", accessNotes: "Gate code 2214", travelMinutes: 25, travelFeeCents: 50000 },
+    { customerId: svcCustomers[1].id, label: "Residence", addressLine: "B3 L9 Camella Northpoint", city: "Davao City", area: "Buhangin", accessNotes: "Grand piano on 2nd floor", travelMinutes: 35, travelFeeCents: 70000 },
+    { customerId: svcCustomers[2].id, label: "Parish Hall", addressLine: "12 Sta. Mesa Ave.", city: "Davao City", area: "Sta. Mesa", accessNotes: "Ask for Fr. Miguel", travelMinutes: 20, travelFeeCents: 40000 },
+    { customerId: svcCustomers[3].id, label: "Condo", addressLine: "Unit 1204 Avida Towers", city: "Davao City", area: "Claro M. Recto", accessNotes: "Service elevator only", travelMinutes: 15, travelFeeCents: 30000 },
+  ]).returning();
+
+  const svcPianos = await db.insert(servicePianos).values([
+    { customerId: svcCustomers[0].id, locationId: svcLocations[0].id, brand: "Yamaha", model: "U1", type: "Upright", year: 1998, tuningIntervalMonths: 6, lastServiceAt: at(-190), nextServiceDueAt: at(-10) },
+    { customerId: svcCustomers[1].id, locationId: svcLocations[1].id, brand: "Kawai", model: "GX-2", type: "Grand", year: 2011, tuningIntervalMonths: 4, lastServiceAt: at(-60), nextServiceDueAt: at(60) },
+    { customerId: svcCustomers[2].id, locationId: svcLocations[2].id, brand: "Steinway", model: "Model O", type: "Grand", year: 1926, tuningIntervalMonths: 3, lastServiceAt: at(-95), nextServiceDueAt: at(-5) },
+    { customerId: svcCustomers[3].id, locationId: svcLocations[3].id, brand: "Casio", model: "GP-510", type: "Digital", year: 2020, tuningIntervalMonths: 12 },
+  ]).returning();
+
+  await db.insert(serviceCatalog).values([
+    { name: "Concert tuning", description: "Pitch raise + fine tuning", kind: "service", unitPriceCents: 350000, estimatedMinutes: 90, position: 1 },
+    { name: "Standard tuning", description: "Single-pass tuning", kind: "service", unitPriceCents: 250000, estimatedMinutes: 75, position: 2 },
+    { name: "Action regulation", description: "Touch and escapement adjustment", kind: "service", unitPriceCents: 650000, estimatedMinutes: 180, position: 3 },
+    { name: "Hammer voicing", description: "Tone shaping across the scale", kind: "service", unitPriceCents: 300000, estimatedMinutes: 120, position: 4 },
+    { name: "Damper felts (set)", kind: "part", unitPriceCents: 120000, estimatedMinutes: 60, position: 5 },
+    { name: "Travel / service call", kind: "fee", unitPriceCents: 50000, estimatedMinutes: 0, position: 6 },
+    { name: "Repeat client discount", kind: "discount", unitPriceCents: -25000, estimatedMinutes: 0, position: 7 },
+  ]);
+
+  const svcJobs = await db.insert(serviceJobs).values([
+    { customerId: svcCustomers[0].id, locationId: svcLocations[0].id, pianoId: svcPianos[0].id, technicianId: svcTechA.id,
+      title: "Standard tuning — Yamaha U1", serviceType: "tuning", status: "scheduled", priority: "normal",
+      scheduledStart: at(0, 9), scheduledEnd: at(0, 10, 30), estimatedMinutes: 90, travelMinutes: 25, travelFeeCents: 50000 },
+    { customerId: svcCustomers[1].id, locationId: svcLocations[1].id, pianoId: svcPianos[1].id, technicianId: svcTechB.id,
+      title: "Concert tuning + voicing — Kawai GX-2", serviceType: "tuning", status: "in_progress", priority: "high",
+      scheduledStart: at(0, 13), scheduledEnd: at(0, 16), estimatedMinutes: 180, travelMinutes: 35, travelFeeCents: 70000 },
+    { customerId: svcCustomers[2].id, locationId: svcLocations[2].id, pianoId: svcPianos[2].id, technicianId: svcTechA.id,
+      title: "Chapel piano maintenance visit", serviceType: "maintenance", status: "scheduled", priority: "normal",
+      scheduledStart: at(1, 10), scheduledEnd: at(1, 12), estimatedMinutes: 120, travelMinutes: 20, travelFeeCents: 40000 },
+    { customerId: svcCustomers[3].id, locationId: svcLocations[3].id, pianoId: svcPianos[3].id,
+      title: "Digital piano assessment", serviceType: "assessment", status: "quoted", priority: "low",
+      estimatedMinutes: 60, travelFeeCents: 30000 },
+  ]).returning();
+
+  const jobA = svcJobs[0], jobB = svcJobs[1], jobC = svcJobs[2], jobD = svcJobs[3];
+
+  await db.insert(serviceJobItems).values([
+    { jobId: jobA.id, kind: "service", description: "Standard tuning", qty: 1, unitPriceCents: 250000, taxable: true, minutes: 75, position: 1 },
+    { jobId: jobA.id, kind: "fee", description: "Travel / service call", qty: 1, unitPriceCents: 50000, taxable: true, position: 2 },
+    { jobId: jobB.id, kind: "service", description: "Concert tuning", qty: 1, unitPriceCents: 350000, taxable: true, minutes: 90, position: 1 },
+    { jobId: jobB.id, kind: "service", description: "Hammer voicing", qty: 1, unitPriceCents: 300000, taxable: true, minutes: 120, position: 2 },
+    { jobId: jobB.id, kind: "discount", description: "Repeat client discount", qty: 1, unitPriceCents: -25000, taxable: true, position: 3 },
+    { jobId: jobC.id, kind: "service", description: "Action regulation", qty: 1, unitPriceCents: 650000, taxable: true, minutes: 180, position: 1 },
+    { jobId: jobC.id, kind: "part", description: "Damper felts (set)", qty: 1, unitPriceCents: 120000, taxable: true, position: 2 },
+    { jobId: jobD.id, kind: "service", description: "Assessment visit", qty: 1, unitPriceCents: 120000, taxable: true, minutes: 60, position: 1 },
+  ]);
+
+  await db.insert(serviceTimeLogs).values([
+    { jobId: jobB.id, technicianId: svcTechB.id, kind: "travel", startedAt: at(-1, 12, 30), endedAt: at(-1, 13, 5), minutes: 35, hourlyRateCents: 22000, billable: false },
+    { jobId: jobB.id, technicianId: svcTechB.id, kind: "work", startedAt: at(-1, 13, 5), endedAt: at(-1, 16, 20), minutes: 195, hourlyRateCents: 22000 },
+  ]);
+
+  await db.insert(serviceJobEvents).values([
+    { jobId: jobB.id, type: "created", message: "Job created from repeat booking", actorName: "Owner", at: at(-3, 9) },
+    { jobId: jobB.id, type: "started", message: "On site", actorName: "Owner", at: at(-1, 13) },
+  ]);
+
+  await db.insert(serviceExpenses).values([
+    { category: "fuel", description: "Diesel — Buhangin run", amountCents: 65000, spentAt: at(0, 8), jobId: jobB.id },
+    { category: "materials", description: "Damper felt stock", amountCents: 240000, spentAt: at(-4, 11), vendor: "Jahn Musik" },
+    { category: "meals", description: "Crew lunch — Sta. Mesa", amountCents: 45000, spentAt: at(1, 12) },
   ]);
 
   console.log("Seed complete ✔");

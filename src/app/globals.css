@@ -36,6 +36,27 @@
   --color-ow-violet: #9b8ad1;    /* muted violet — focus blocks, high priority */
   --color-ow-rose: #e08a95;      /* muted rose — urgent, overdue, destructive */
   --color-ow-rose-soft: rgba(224,138,149,0.14);
+
+  /* ---- Home Service workspace (dark graphite + azure) ---- */
+  --color-svc-bg: #0b0f14;            /* page background — cool near-black graphite */
+  --color-svc-sidebar: #080b0f;       /* sidebar — a step darker for depth */
+  --color-svc-surface: #121821;       /* card / panel surface */
+  --color-svc-surface-2: #18212c;     /* raised surface (hover, inputs, table heads) */
+  --color-svc-border: rgba(255,255,255,0.075);
+  --color-svc-border-strong: rgba(255,255,255,0.14);
+  --color-svc-text: #e7edf5;          /* primary text */
+  --color-svc-text-dim: #94a3b8;      /* secondary text / labels */
+  --color-svc-text-faint: #6b7a8d;    /* placeholders / tertiary */
+  --color-svc-accent: #4d8df0;        /* azure — scheduled, primary actions, active nav */
+  --color-svc-accent-soft: rgba(77,141,240,0.14);
+  --color-svc-success: #3fb984;       /* paid, completed */
+  --color-svc-success-soft: rgba(63,185,132,0.14);
+  --color-svc-warn: #d9a05b;          /* on site, part-paid, due soon */
+  --color-svc-warn-soft: rgba(217,160,91,0.14);
+  --color-svc-danger: #dd7b7b;        /* cancelled, overdue, loss */
+  --color-svc-danger-soft: rgba(221,123,123,0.14);
+  --color-svc-violet: #8f9ae0;        /* travel, invoiced, quoted */
+  --color-svc-violet-soft: rgba(143,154,224,0.14);
 }
 
 html {
@@ -264,6 +285,80 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
 .chip-ow { background: var(--color-ow-surface-2); border: 1px solid var(--color-ow-border); color: var(--color-ow-text-dim); }
 
 .ow-divide > * + * { border-top: 1px solid var(--color-ow-border); }
+
+/* ---------- Home Service workspace surfaces ---------- */
+.svc-shell { background: var(--color-svc-bg); color: var(--color-svc-text); }
+.svc-sidebar { background: var(--color-svc-sidebar); border-color: var(--color-svc-border); }
+
+.card-svc {
+  background: var(--color-svc-surface);
+  border: 1px solid var(--color-svc-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.14), 0 12px 28px -18px rgba(0,0,0,0.5);
+}
+.card-svc-hover { transition: border-color 0.15s ease, background 0.15s ease; }
+.card-svc-hover:hover { border-color: var(--color-svc-border-strong); }
+
+.input-svc {
+  width: 100%;
+  background: var(--color-svc-surface-2);
+  border: 1px solid var(--color-svc-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--color-svc-text);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.input-svc::placeholder { color: var(--color-svc-text-faint); }
+.input-svc:focus {
+  border-color: var(--color-svc-accent);
+  box-shadow: 0 0 0 3px var(--color-svc-accent-soft);
+}
+.input-svc option, .input-svc optgroup { background: var(--color-svc-surface-2); color: var(--color-svc-text); }
+
+.btn-svc-primary {
+  background: var(--color-svc-accent);
+  color: #051021;
+  font-weight: 500;
+  transition: filter 0.15s ease;
+}
+.btn-svc-primary:hover { filter: brightness(1.08); }
+.btn-svc-primary:disabled { opacity: 0.5; }
+
+.btn-svc-ghost {
+  border: 1px solid var(--color-svc-border);
+  color: var(--color-svc-text-dim);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.btn-svc-ghost:hover { border-color: var(--color-svc-border-strong); color: var(--color-svc-text); background: rgba(255,255,255,0.04); }
+
+.chip-svc {
+  background: var(--color-svc-surface-2);
+  border: 1px solid var(--color-svc-border);
+  color: var(--color-svc-text-dim);
+}
+.svc-divide > * + * { border-top: 1px solid var(--color-svc-border); }
+
+/* Dispatch grid lines */
+.svc-grid-line { border-top: 1px solid rgba(255,255,255,0.05); }
+.svc-col-line { border-left: 1px solid rgba(255,255,255,0.05); }
+
+/* ---------- Print (invoices) ---------- */
+@media print {
+  [data-print-hide] { display: none !important; }
+  body, .svc-shell { background: #fff !important; }
+  main { padding: 0 !important; }
+  [data-print-surface] {
+    background: #fff !important;
+    border-color: #d4d4d8 !important;
+    box-shadow: none !important;
+    color: #111 !important;
+  }
+  [data-print-surface] * { color: #111 !important; }
+  [data-print-surface] input { border: none !important; background: transparent !important; }
+  .card-svc { break-inside: avoid; }
+}
 
 /* number ticker tabular */
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
