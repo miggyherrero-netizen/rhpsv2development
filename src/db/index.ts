@@ -18,6 +18,10 @@ export const pool =
     ssl: { rejectUnauthorized: false },
   });
 
+pool.on("connect", (client) => {
+  client.query('SET search_path TO "$user", public');
+});
+
 if (process.env.NODE_ENV !== "production") {
   globalForDb.__arenaNextJsPostgresqlPool = pool;
 }
