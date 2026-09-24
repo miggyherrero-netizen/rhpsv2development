@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus, Trash2, Piano as PianoIcon, ArchiveRestore, Coins, Search, Upload, X } from "lucide-react";
@@ -27,6 +27,12 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
 
   const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 
+  function closeModal() {
+    setModal(null);
+    setUploadError("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   function onFileChosen(file: File | undefined) {
     setUploadError("");
     if (!file || !modal) return;
@@ -43,10 +49,6 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
     reader.onerror = () => setUploadError("Couldn't read that file — please try again.");
     reader.readAsDataURL(file);
   }
-
-  useEffect(() => {
-    if (!modal) { setUploadError(""); if (fileInputRef.current) fileInputRef.current.value = ""; }
-  }, [modal]);
 
   const active = pianos.filter((p) => p.status !== "sold");
   const sold = pianos.filter((p) => p.status === "sold");
@@ -66,7 +68,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
     if (modal.id) await updatePiano(modal.id, payload);
     else await createPiano(payload);
     setBusy(false);
-    setModal(null);
+    closeModal();
   }
 
   async function changeStatus(id: string, status: string) {
@@ -145,7 +147,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
       )}
 
       {/* edit / add modal */}
-      <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.id ? "Edit piano" : "Add piano"} wide>
+      <Modal open={!!modal} onClose={closeModal} title={modal?.id ? "Edit piano" : "Add piano"} wide>
         {modal && (
           <div className="grid sm:grid-cols-2 gap-3.5">
             <Field label="Brand"><input className={inp} value={modal.data.brand} onChange={(e) => setModal({ ...modal, data: { ...modal.data, brand: e.target.value } })} /></Field>
@@ -198,7 +200,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                 {busy && <Spinner className="text-black" />} {modal.id ? "Save changes" : "Add piano"}
               </button>
               {modal.id && (
-                <button onClick={async () => { if (confirm("Remove this piano from the showroom?")) { setBusy(true); await deletePiano(modal.id!); setBusy(false); setModal(null); } }}
+                <button onClick={async () => { if (confirm("Remove this piano from the showroom?")) { setBusy(true); await deletePiano(modal.id!); setBusy(false); closeModal(); } }}
                   className="px-4 rounded-xl border border-rose-500/25 text-rose-400 hover:bg-rose-500/10 transition"><Trash2 size={15} /></button>
               )}
             </div>

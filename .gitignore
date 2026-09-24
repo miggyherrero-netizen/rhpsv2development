@@ -17,6 +17,7 @@ tsconfig.tsbuildinfo
 .claude/settings.local.json
 .codex/
 .agents/
+.workbuddy-ai/
 
 # misc
 .DS_Store
