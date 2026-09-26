@@ -34,7 +34,6 @@ export default async function LoginGatePage({ searchParams }: { searchParams: Pr
             Open login
           </button>
         </form>
-        <p className="text-center text-[11px] text-mist/40 mt-6">Demo PIN - 0000</p>
       </div>
     </div>
   );
