@@ -24,7 +24,7 @@ export default async function LoginGatePage({ searchParams }: { searchParams: Pr
             required
             autoFocus
             className="input-dark text-center text-2xl tracking-[0.45em] mt-5"
-            placeholder="0000"
+            placeholder="••••"
           />
           {params.error && <p className="text-rose-400 text-xs anim-shake mt-4 text-center">Incorrect PIN.</p>}
           <button
