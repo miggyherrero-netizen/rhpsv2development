@@ -76,7 +76,6 @@ export default function LoginClient() {
           <p className="text-center text-[11px] text-mist/70 mt-8">
             Staff working today? <Link href="/workshop" className="text-chrome underline underline-offset-4">Open the workshop kiosk</Link>
           </p>
-          <p className="text-center text-[11px] text-mist/40 mt-3">Demo - owner@herrero.ph / atelier2026</p>
         </div>
       </div>
     </div>

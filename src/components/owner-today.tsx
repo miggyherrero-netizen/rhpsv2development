@@ -41,7 +41,7 @@ export function nowClock() {
 
 export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle }) {
   const bundle = useMemo(() => deserializeOwnerBundle(rawBundle), [rawBundle]);
-  const [clock, setClock] = useState<string | null>(null);
+  const [clock, setClock] = useState<string | null>(() => nowClock());
   const [modal, setModal] = useState<null | { edit?: ItemEdit; time?: string }>(null);
   const [quick, setQuick] = useState("");
   const [quickType, setQuickType] = useState<"task" | "inbox">("task");
@@ -51,12 +51,11 @@ export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle
   const [reschedId, setReschedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setClock(nowClock());
     const t = setInterval(() => setClock(nowClock()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const overdue = useMemo(() => {
     const todayStart = startOfDay(today);
     return bundle.tasks.filter(
