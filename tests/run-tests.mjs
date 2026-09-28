@@ -8,9 +8,10 @@
  * Usage:  npm test           (lint + typecheck + all domain tests)
  *         node tests/run-tests.mjs   (domain tests only)
  *
- * Database-dependent integration tests (task-flow.cjs) are NOT run here
- * because they require a running PostgreSQL instance. Use:
- *   npm run test:integration
+ * Database-dependent integration tests (task-flow.cjs, accounting-flow.cjs)
+ * are NOT run here because they require a running PostgreSQL instance. Use:
+ *   npm run test:integration  (task-flow)
+ *   node tests/accounting-flow.cjs  (accounting; see file header for env)
  */
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
@@ -23,6 +24,7 @@ const testFiles = [
   { name: "service-money", file: "tests/service-money.ts" },
   { name: "service-mock", file: "tests/service-mock.ts" },
   { name: "service-documents", file: "tests/service-documents.ts" },
+  { name: "accounting-money", file: "tests/accounting-money.ts" },
 ];
 
 function runTest(name, file) {
