@@ -714,29 +714,29 @@ export async function getFinanceReport(
   const [invoiceRows, paymentRows, expenseRows, allInvoices, categoryRows, customerRows, jobRows, completedJobs] = await Promise.all([
     db
       .select({
-        month: sql<string>`to_char(${serviceInvoices.issueDate}, 'YYYY-MM')`,
+        month: sql<string>`to_char(${serviceInvoices.issueDate} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`,
         amount: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
         jobCount: sql<number>`count(*)::int`,
       })
       .from(serviceInvoices)
       .where(gte(serviceInvoices.issueDate, seriesStart))
-      .groupBy(sql`to_char(${serviceInvoices.issueDate}, 'YYYY-MM')`),
+      .groupBy(sql`to_char(${serviceInvoices.issueDate} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`),
     db
       .select({
-        month: sql<string>`to_char(${servicePayments.receivedAt}, 'YYYY-MM')`,
+        month: sql<string>`to_char(${servicePayments.receivedAt} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`,
         amount: sql<number>`coalesce(sum(${servicePayments.amountCents}), 0)::int`,
       })
       .from(servicePayments)
       .where(gte(servicePayments.receivedAt, seriesStart))
-      .groupBy(sql`to_char(${servicePayments.receivedAt}, 'YYYY-MM')`),
+      .groupBy(sql`to_char(${servicePayments.receivedAt} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`),
     db
       .select({
-        month: sql<string>`to_char(${serviceExpenses.spentAt}, 'YYYY-MM')`,
+        month: sql<string>`to_char(${serviceExpenses.spentAt} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`,
         amount: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int`,
       })
       .from(serviceExpenses)
       .where(gte(serviceExpenses.spentAt, seriesStart))
-      .groupBy(sql`to_char(${serviceExpenses.spentAt}, 'YYYY-MM')`),
+      .groupBy(sql`to_char(${serviceExpenses.spentAt} AT TIME ZONE 'Asia/Manila', 'YYYY-MM')`),
     db
       .select({
         id: serviceInvoices.id, totalCents: serviceInvoices.totalCents,

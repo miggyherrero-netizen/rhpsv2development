@@ -48,7 +48,7 @@ function load(relative) {
 async function main() {
   await setup.query(`CREATE SCHEMA "${namespace}"`);
   try {
-    for (const table of ["users", "sessions", "workers", "projects", "tasks", "time_entries", "worker_breaks", "payments"]) {
+    for (const table of ["users", "sessions", "workers", "projects", "tasks", "task_assignees", "time_entries", "worker_breaks", "payments"]) {
       await pool.query(`CREATE TABLE "${table}" (LIKE public."${table}" INCLUDING ALL)`);
     }
     await pool.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived_at timestamp');

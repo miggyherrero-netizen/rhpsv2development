@@ -12,6 +12,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Recurrence } from "@/lib/dates";
 import type { WorkingHours } from "@/lib/service";
 
@@ -74,6 +75,14 @@ export const projects = pgTable("projects", {
   imageUrl: text("image_url"),
   notes: text("notes"),
   lastClientUpdateAt: timestamp("last_client_update_at", { mode: "date" }),
+  /** Owner Accounting: agreed contract value, materialized from project_items. */
+  quotedCents: integer("quoted_cents").notNull().default(0),
+  /** VAT rate applied when project billing is finalized (basis points; 0 = VAT-exempt). */
+  taxRateBps: integer("tax_rate_bps").notNull().default(1200),
+  /** Set when the owner finalizes billing — payments after this reduce AR, not deposits. */
+  billingFinalizedAt: timestamp("billing_finalized_at", { mode: "date" }),
+  /** Final billed subtotal (pre-VAT) as confirmed at finalize; null until then. */
+  billedCents: integer("billed_cents"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -622,6 +631,296 @@ export const serviceSettings = pgTable("service_settings", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/* ============ OWNER ACCOUNTING ============ */
+/*
+ * Lightweight chart of accounts + append-only legged journal. Money is entered in the
+ * module where the work happens (service, projects, showroom, payroll); this section
+ * consolidates, classifies, reconciles, and reports. See ACCOUNTING_WORKSPACE_PLAN.md.
+ */
+
+/** Wallets (cash/bank/e-wallet) and book accounts (AR, deposits, equity, VAT, …). */
+export const accAccounts = pgTable("acc_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // asset | liability | equity | revenue | expense
+  isWallet: boolean("is_wallet").notNull().default(false),
+  walletKind: text("wallet_kind"), // cash | bank | ewallet | other — null for book accounts
+  /** Locks posting-rule lookups for built-in accounts ("ar", "deposits_held", …). */
+  systemKey: text("system_key").unique(),
+  /** Baseline before any journal lines; editable only while the account has no lines. */
+  openingBalanceCents: integer("opening_balance_cents").notNull().default(0),
+  openingAsOf: timestamp("opening_as_of", { mode: "date" }),
+  active: boolean("active").notNull().default(true),
+  position: integer("position").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  typeIdx: index("acc_accounts_type_idx").on(t.type),
+  walletIdx: index("acc_accounts_wallet_idx").on(t.isWallet),
+}));
+
+/** One row per economic event. Append-only — corrections are reversal entries. */
+export const accJournal = pgTable("acc_journal", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  /** Monotonic human-facing number; displayed as `JE-${year}-${padded}`. */
+  entryNumber: serial("entry_number").notNull().unique(),
+  occurredAt: timestamp("occurred_at", { mode: "date" }).notNull(),
+  kind: text("kind").notNull(), // see JOURNAL_KINDS in src/lib/accounting.ts
+  stream: text("stream").notNull().default("operations"),
+  memo: text("memo"),
+  /** Pointer back to the operational row this entry was posted from (bridge / inline). */
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  /** Hash of the source state at posting time — change detection for the bridge. */
+  sourceHash: text("source_hash"),
+  postedAt: timestamp("posted_at", { mode: "date" }).defaultNow().notNull(),
+  postedBy: text("posted_by"),
+  reversalOfId: uuid("reversal_of_id").references((): AnyPgColumn => accJournal.id, { onDelete: "set null" }),
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  occurredIdx: index("acc_journal_occurred_idx").on(t.occurredAt),
+  kindIdx: index("acc_journal_kind_idx").on(t.kind),
+  sourceIdx: index("acc_journal_source_idx").on(t.sourceType, t.sourceId),
+  reversalIdx: index("acc_journal_reversal_idx").on(t.reversalOfId),
+}));
+
+/** One reconciliation attempt per wallet against a real statement. */
+export const accReconciliations = pgTable("acc_reconciliations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accAccounts.id, { onDelete: "restrict" }),
+  statementDate: timestamp("statement_date", { mode: "date" }).notNull(),
+  statementEndingCents: integer("statement_ending_cents").notNull(),
+  status: text("status").notNull().default("open"), // open | completed
+  /** Snapshots taken at completion, so history survives later activity. */
+  bookBalanceCents: integer("book_balance_cents"),
+  clearedBalanceCents: integer("cleared_balance_cents"),
+  differenceCents: integer("difference_cents"),
+  startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { mode: "date" }),
+  completedBy: text("completed_by"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  accountIdx: index("acc_reconciliations_account_idx").on(t.accountId),
+  statusIdx: index("acc_reconciliations_status_idx").on(t.status),
+}));
+
+/** Journal legs. Σ debits = Σ credits per entry; enforced by the posting helpers. */
+export const accJournalLines = pgTable("acc_journal_lines", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  journalId: uuid("journal_id")
+    .notNull()
+    .references(() => accJournal.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accAccounts.id, { onDelete: "restrict" }),
+  debitCents: integer("debit_cents").notNull().default(0),
+  creditCents: integer("credit_cents").notNull().default(0),
+  lineMemo: text("line_memo"),
+  /** Reconciliation state: when this line was confirmed against a statement. */
+  clearedAt: timestamp("cleared_at", { mode: "date" }),
+  reconciliationId: uuid("reconciliation_id").references(() => accReconciliations.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  journalIdx: index("acc_journal_lines_journal_idx").on(t.journalId),
+  accountIdx: index("acc_journal_lines_account_idx").on(t.accountId),
+  reconIdx: index("acc_journal_lines_recon_idx").on(t.reconciliationId),
+}));
+
+/** Closed months. Journal writes inside a locked period are rejected (bridge: exception). */
+export const accPeriodLocks = pgTable("acc_period_locks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  lockedAt: timestamp("locked_at", { mode: "date" }).defaultNow().notNull(),
+  lockedBy: text("locked_by"),
+  note: text("note"),
+}, (t) => ({
+  periodIdx: uniqueIndex("acc_period_locks_period_idx").on(t.year, t.month),
+}));
+
+/** Events the bridge could not post cleanly (locked period, changed source, unmapped method). */
+export const accExceptions = pgTable("acc_exceptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  reason: text("reason").notNull(),
+  details: text("details"),
+  status: text("status").notNull().default("open"), // open | resolved
+  resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  statusIdx: index("acc_exceptions_status_idx").on(t.status),
+}));
+
+/** One row per owner — books start date, payment-method → wallet map, payroll wallet. */
+export const accSettings = pgTable("acc_settings", {
+  id: serial("id").primaryKey(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Events before this date are not posted (except pre-books collections). */
+  booksStartDate: timestamp("books_start_date", { mode: "date" }).notNull(),
+  /** PAYMENT_METHODS key → acc_accounts.id. */
+  methodMap: jsonb("method_map").$type<Record<string, string>>().notNull().default({}),
+  payrollAccountId: uuid("payroll_account_id").references(() => accAccounts.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** Append-only record of every accounting-relevant write. */
+export const auditLog = pgTable("audit_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tableName: text("table_name").notNull(),
+  rowId: text("row_id").notNull(),
+  action: text("action").notNull(), // create | update | void | post | lock | unlock | reconcile | resolve
+  before: jsonb("before"),
+  after: jsonb("after"),
+  actor: text("actor"),
+  note: text("note"),
+  at: timestamp("at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  rowIdx: index("audit_log_row_idx").on(t.tableName, t.rowId),
+  atIdx: index("audit_log_at_idx").on(t.at),
+}));
+
+/* ============ PROJECT BILLING (restorations) ============ */
+
+/** Quote lines + approved additional charges. Contract value = Σ qty × unit_price. */
+export const projectItems = pgTable("project_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull().default("service"), // service | part | fee | discount
+  description: text("description").notNull(),
+  qty: integer("qty").notNull().default(1),
+  unitPriceCents: integer("unit_price_cents").notNull().default(0),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  projectIdx: index("project_items_project_idx").on(t.projectId),
+}));
+
+/** Customer payments on a restoration. `restrict` — payment history is never lost. */
+export const projectPayments = pgTable("project_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "restrict" }),
+  kind: text("kind").notNull().default("deposit"), // deposit | progress | final
+  amountCents: integer("amount_cents").notNull(),
+  method: text("method").notNull().default("cash"),
+  reference: text("reference"),
+  receivedAt: timestamp("received_at", { mode: "date" }).defaultNow().notNull(),
+  note: text("note"),
+  /** Voids reverse the journal entry and keep the row for history — never hard-delete. */
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  projectIdx: index("project_payments_project_idx").on(t.projectId),
+  receivedIdx: index("project_payments_received_idx").on(t.receivedAt),
+}));
+
+/** Materials / subcontractor / other project costs. Unpaid rows sit in Accounts Payable. */
+export const projectCosts = pgTable("project_costs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  category: text("category").notNull().default("materials"), // materials | parts | subcontractor | tools | other
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  spentAt: timestamp("spent_at", { mode: "date" }).defaultNow().notNull(),
+  vendor: text("vendor"),
+  /** Wallet the cost was paid from; null = unpaid (posted to Accounts Payable). */
+  paidAccountId: uuid("paid_account_id").references(() => accAccounts.id, { onDelete: "set null" }),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  receiptUrl: text("receipt_url"),
+  note: text("note"),
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  projectIdx: index("project_costs_project_idx").on(t.projectId),
+}));
+
+/* ============ PIANO SALES (showroom) ============ */
+
+/** One sale record per showroom piano. Price + carrying cost are snapshotted at completion. */
+export const pianoSales = pgTable("piano_sales", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pianoId: uuid("piano_id")
+    .notNull()
+    .unique()
+    .references(() => pianos.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("reserved"), // reserved | completed | cancelled
+  reservedAt: timestamp("reserved_at", { mode: "date" }),
+  soldAt: timestamp("sold_at", { mode: "date" }),
+  /** Agreed selling price, VAT-inclusive (retail convention). */
+  priceCents: integer("price_cents").notNull().default(0),
+  taxRateBps: integer("tax_rate_bps").notNull().default(1200),
+  /** Frozen at completion — later cost edits never change realized margin. */
+  costSnapshotCents: integer("cost_snapshot_cents"),
+  buyerName: text("buyer_name"),
+  buyerContact: text("buyer_contact"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  statusIdx: index("piano_sales_status_idx").on(t.status),
+}));
+
+/** Buyer payments on a piano sale (reservation deposit → partials → balance). */
+export const pianoPayments = pgTable("piano_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  saleId: uuid("sale_id")
+    .notNull()
+    .references(() => pianoSales.id, { onDelete: "cascade" }),
+  amountCents: integer("amount_cents").notNull(),
+  method: text("method").notNull().default("cash"),
+  reference: text("reference"),
+  receivedAt: timestamp("received_at", { mode: "date" }).defaultNow().notNull(),
+  note: text("note"),
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  saleIdx: index("piano_payments_sale_idx").on(t.saleId),
+  receivedIdx: index("piano_payments_received_idx").on(t.receivedAt),
+}));
+
+/** Acquisition + preparation costs of sale stock; accumulates the Pianos-on-Hand balance. */
+export const pianoCostEntries = pgTable("piano_cost_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pianoId: uuid("piano_id")
+    .notNull()
+    .references(() => pianos.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull().default("acquisition"), // acquisition | prep | other
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  spentAt: timestamp("spent_at", { mode: "date" }).defaultNow().notNull(),
+  vendor: text("vendor"),
+  paidAccountId: uuid("paid_account_id").references(() => accAccounts.id, { onDelete: "set null" }),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  receiptUrl: text("receipt_url"),
+  note: text("note"),
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  pianoIdx: index("piano_cost_entries_piano_idx").on(t.pianoId),
+}));
+
 /* ============ TYPES ============ */
 
 export type User = typeof users.$inferSelect;
@@ -656,3 +955,18 @@ export type ServicePayment = typeof servicePayments.$inferSelect;
 export type ServiceDocumentShare = typeof serviceDocumentShares.$inferSelect;
 export type ServiceExpense = typeof serviceExpenses.$inferSelect;
 export type ServiceSetting = typeof serviceSettings.$inferSelect;
+
+export type AccAccount = typeof accAccounts.$inferSelect;
+export type AccJournalEntry = typeof accJournal.$inferSelect;
+export type AccJournalLine = typeof accJournalLines.$inferSelect;
+export type AccReconciliation = typeof accReconciliations.$inferSelect;
+export type AccPeriodLock = typeof accPeriodLocks.$inferSelect;
+export type AccException = typeof accExceptions.$inferSelect;
+export type AccSettings = typeof accSettings.$inferSelect;
+export type AuditLogRow = typeof auditLog.$inferSelect;
+export type ProjectItem = typeof projectItems.$inferSelect;
+export type ProjectPayment = typeof projectPayments.$inferSelect;
+export type ProjectCost = typeof projectCosts.$inferSelect;
+export type PianoSale = typeof pianoSales.$inferSelect;
+export type PianoPayment = typeof pianoPayments.$inferSelect;
+export type PianoCostEntry = typeof pianoCostEntries.$inferSelect;

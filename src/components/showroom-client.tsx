@@ -129,7 +129,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                     <td className="px-4 py-3">
                       <Link href={`/admin/showroom/${p.id}/cost`}
                         className="inline-flex items-center gap-1.5 text-[11px] text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">
-                        <Coins size={13} /> View
+                        <Coins size={13} /> Costs &amp; sale
                       </Link>
                     </td>
                     <td className="px-4 py-3">
@@ -222,7 +222,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                     <p className="text-mist text-[11px] mt-0.5">{p.priceCents != null ? peso(p.priceCents) : "—"}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link href={`/admin/showroom/${p.id}/cost`} className="text-[11px] text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">Cost</Link>
+                    <Link href={`/admin/showroom/${p.id}/cost`} className="text-[11px] text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">Costs &amp; sale</Link>
                     <button onClick={() => changeStatus(p.id, "available")}
                       className="text-[11px] text-emerald-300 hover:text-emerald-200 underline underline-offset-4 decoration-emerald-300/30 transition">Relist</button>
                   </div>

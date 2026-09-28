@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  LayoutGrid, Rows3, Search, Plus, ArrowUpDown, Copy, Check, Trash2, Pencil, Link2, ChevronRight,
+  LayoutGrid, Rows3, Search, Plus, ArrowUpDown, Copy, Check, Trash2, Pencil, Link2, ChevronRight, ReceiptText,
 } from "lucide-react";
 import type { ProjectRow } from "@/server/data";
 import type { Worker } from "@/db/schema";
@@ -267,6 +268,15 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
                   <div key={k} className="card-dark p-3"><p className="text-[9.5px] uppercase tracking-[0.18em] text-mist/70 mb-1">{k}</p><p className="text-chrome">{v}</p></div>
                 ))}
               </div>
+
+              {/* billing shortcut */}
+              <Link
+                href={`/admin/projects/${detail.project.id}`}
+                className="flex items-center justify-between card-dark px-4 py-3 text-[13px] text-chrome hover:text-white transition"
+              >
+                <span className="flex items-center gap-2.5"><ReceiptText size={15} /> Billing &amp; costs — quote, payments, expenses, profitability</span>
+                <ChevronRight size={14} className="text-mist" />
+              </Link>
 
               {/* stage selector */}
               <div>

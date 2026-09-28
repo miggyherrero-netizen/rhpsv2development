@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Workflow, ListChecks, Boxes, Users, BookImage, Palette,
   Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut,
+  Landmark, Wallet, ArrowLeftRight, ReceiptText, BarChart3, UserRound,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -42,6 +43,28 @@ export default function AdminShell({ children, userName }: { children: ReactNode
         >
           <item.icon size={16} strokeWidth={1.8} />
           {item.label}
+        </Link>
+      ))}
+      <div className="pt-5 pb-2 px-3.5 text-[9.5px] uppercase tracking-[0.26em] text-mist/50">Accounting</div>
+      {[
+        { href: "/admin/accounting", label: "Overview", icon: Landmark },
+        { href: "/admin/accounting/accounts", label: "Accounts", icon: Wallet },
+        { href: "/admin/accounting/transactions", label: "Transactions", icon: ArrowLeftRight },
+        { href: "/admin/accounting/receivables", label: "Receivables", icon: ReceiptText },
+        { href: "/admin/accounting/reports", label: "Reports", icon: BarChart3 },
+        { href: "/admin/accounting/owner", label: "Owner Money", icon: UserRound },
+      ].map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={() => setMobileOpen(false)}
+          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${
+            isActive(item.href)
+              ? "bg-white/[0.09] text-white border border-white/[0.08]"
+              : "text-mist hover:text-white hover:bg-white/[0.045] border border-transparent"
+          }`}
+        >
+          <item.icon size={16} strokeWidth={1.8} /> {item.label}
         </Link>
       ))}
       <div className="pt-5 pb-2 px-3.5 text-[9.5px] uppercase tracking-[0.26em] text-mist/50">Beyond the shop</div>
