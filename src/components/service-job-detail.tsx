@@ -202,9 +202,34 @@ export default function JobDetailClient({
                 )}
               </Info>
               <Info label="Piano">
-                {detail.piano
-                  ? `${[detail.piano.brand, detail.piano.model].filter(Boolean).join(" ") || detail.piano.type} (${detail.piano.type})`
-                  : "Not linked"}
+                {detail.piano ? (
+                  `${[detail.piano.brand, detail.piano.model].filter(Boolean).join(" ") || detail.piano.type} (${detail.piano.type})`
+                ) : detail.customerPianos.length > 0 ? (
+                  // No piano on this job yet — offer the customer's instruments instead of a dead "Not linked".
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Select
+                      aria-label="Link a piano to this job"
+                      defaultValue=""
+                      disabled={pending}
+                      className="!w-auto !min-h-10"
+                      onChange={(e) => e.target.value && run(() => updateJob(job.id, { pianoId: e.target.value }))}
+                    >
+                      <option value="" disabled>Link piano…</option>
+                      {detail.customerPianos.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {[p.brand, p.model].filter(Boolean).join(" ") || p.type} ({p.type})
+                        </option>
+                      ))}
+                    </Select>
+                  </span>
+                ) : (
+                  <span>
+                    <span style={{ color: "var(--color-svc-text-faint)" }}>No piano on file · </span>
+                    <Link href="/service/customers" className="hover:underline" style={{ color: TONE_TEXT.azure }}>
+                      add a piano to this customer
+                    </Link>
+                  </span>
+                )}
               </Info>
               <Info label="Scheduled">
                 {job.scheduledStart

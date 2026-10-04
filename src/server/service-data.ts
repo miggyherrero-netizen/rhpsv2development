@@ -22,7 +22,7 @@ import {
   type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
 import {
-  countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
+  titleCaseName, countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
   resolveRange, type RangeKey, type ResolvedRange, type SeriesPoint,
 } from "@/lib/service-reports";
 
@@ -133,6 +133,7 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
     const money = moneyStats.get(c.id);
     return {
       ...c,
+      name: titleCaseName(c.name),
       locations: locations.filter((l) => l.customerId === c.id),
       pianos: pianos
         .filter((p) => p.customerId === c.id)
@@ -178,7 +179,7 @@ export async function getRecalls(now: Date = new Date(), leadDays = 30): Promise
     pianoId: piano.id,
     pianoLabel: [piano.brand, piano.model].filter(Boolean).join(" ") || piano.type,
     customerId: customer.id,
-    customerName: customer.name,
+    customerName: titleCaseName(customer.name),
     phone: customer.phone,
     area: location?.area ?? null,
     addressLine: location?.addressLine ?? null,
@@ -228,7 +229,7 @@ function toJobRow(r: {
 }, running: Map<string, { id: string; kind: string; startedAt: Date; technicianId: string | null }>): JobRow {
   return {
     ...r.job,
-    customerName: r.customerName,
+    customerName: titleCaseName(r.customerName),
     customerPhone: r.customerPhone,
     locationLabel: r.locationLabel,
     addressLine: r.addressLine,
@@ -311,6 +312,8 @@ export type JobDetail = {
   expenses: ServiceExpense[];
   catalog: ServiceCatalogItem[];
   customers: { id: string; name: string }[];
+  /** The customer's instruments, so a job with no piano can offer "Link piano". */
+  customerPianos: ServicePiano[];
   technicians: ServiceTechnician[];
   totals: { subtotalCents: number; taxCents: number; totalCents: number; quotedCents: number };
 };
@@ -331,7 +334,7 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
   if (!row) return null;
 
   const running = await runningTimersByJob();
-  const [customer, items, events, logs, invoices, expenses, catalog, customers, technicians, location, piano, technician] =
+  const [customer, items, events, logs, invoices, expenses, catalog, customers, technicians, location, piano, technician, customerPianos] =
     await Promise.all([
       db.select().from(serviceCustomers).where(eq(serviceCustomers.id, row.job.customerId)).limit(1).then((r) => r[0]!),
       db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, id)).orderBy(asc(serviceJobItems.position), asc(serviceJobItems.id)),
@@ -357,6 +360,7 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
       row.job.technicianId
         ? db.select().from(serviceTechnicians).where(eq(serviceTechnicians.id, row.job.technicianId)).limit(1).then((r) => r[0] ?? null)
         : Promise.resolve(null),
+      db.select().from(servicePianos).where(eq(servicePianos.customerId, row.job.customerId)).orderBy(asc(servicePianos.brand)),
     ]);
 
   // Quote preview uses the owner's current effective VAT setting via the shared calculator.
@@ -364,7 +368,7 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
 
   return {
     job: toJobRow(row, running),
-    customer,
+    customer: { ...customer, name: titleCaseName(customer.name) },
     location,
     piano,
     technician,
@@ -374,7 +378,8 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
     invoices,
     expenses,
     catalog,
-    customers,
+    customers: customers.map((c) => ({ ...c, name: titleCaseName(c.name) })),
+    customerPianos,
     technicians,
     totals: { subtotalCents: quote.subtotalCents, taxCents: quote.taxCents, totalCents: quote.totalCents, quotedCents: row.job.quotedCents },
   };
@@ -489,7 +494,7 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
   return {
     date: dayStart,
     jobs,
-    running: running.map((r) => ({ ...r.log, jobTitle: r.jobTitle, customerName: r.customerName, technicianName: r.technicianName })),
+    running: running.map((r) => ({ ...r.log, jobTitle: r.jobTitle, customerName: titleCaseName(r.customerName), technicianName: r.technicianName })),
     technicians,
     recalls: recalls.slice(0, 8),
     unfinished,
@@ -555,7 +560,7 @@ export async function getInvoices(filter: InvoiceFilter = {}, now: Date = new Da
     return {
       ...r.invoice,
       status: derived,
-      customerName: r.customerName,
+      customerName: titleCaseName(r.customerName),
       customerPhone: r.customerPhone,
       jobCode: r.jobNumber ? jobCode("WO", r.jobNumber, r.jobCreatedAt) : null,
       jobTitle: r.jobTitle,
@@ -601,7 +606,7 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
     invoice: {
       ...row.invoice,
       status: derived,
-      customerName: row.customer.name,
+      customerName: titleCaseName(row.customer.name),
       customerPhone: row.customer.phone,
       jobCode: row.job ? jobCode("WO", row.job.jobNumber, row.jobCreatedAt) : null,
       jobTitle: row.job?.title ?? null,
@@ -684,7 +689,7 @@ export async function getTimeLogs(from: Date, to: Date, technicianId?: string): 
     .leftJoin(serviceTechnicians, eq(serviceTechnicians.id, serviceTimeLogs.technicianId))
     .where(and(...clauses))
     .orderBy(asc(serviceTimeLogs.startedAt));
-  return rows.map(({ log, ...rest }) => ({ ...log, ...rest }));
+  return rows.map(({ log, ...rest }) => ({ ...log, ...rest, customerName: titleCaseName(rest.customerName) }));
 }
 
 /* ============================================================
@@ -903,11 +908,12 @@ export async function getFinanceReport(
  * ============================================================ */
 
 export async function getCustomerOptions() {
-  return db
+  const rows = await db
     .select({ id: serviceCustomers.id, name: serviceCustomers.name })
     .from(serviceCustomers)
     .where(isNull(serviceCustomers.archivedAt))
     .orderBy(asc(serviceCustomers.name));
+  return rows.map((r) => ({ ...r, name: titleCaseName(r.name) }));
 }
 
 export async function getLocationsForCustomer(customerId: string): Promise<ServiceLocation[]> {

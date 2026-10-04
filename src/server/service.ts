@@ -22,6 +22,7 @@ import {
   PAYMENT_METHODS, PIANO_TYPES, SERVICE_TYPES, TIME_KINDS, validateReportSettings,
   type AvgInvoiceBasis, type ReportSettingsPatch,
 } from "@/lib/service";
+import { titleCaseName } from "@/lib/service-reports";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -50,7 +51,7 @@ export type CustomerInput = {
 
 export async function createCustomer(input: CustomerInput): Promise<Result<{ id: string }>> {
   await requireUser();
-  const name = str(input.name, 160);
+  const name = titleCaseName(str(input.name, 160));
   if (!name) return fail("Customer name is required.");
   const [row] = await db
     .insert(serviceCustomers)
@@ -71,7 +72,7 @@ export async function createCustomer(input: CustomerInput): Promise<Result<{ id:
 export async function updateCustomer(id: string, patch: CustomerInput): Promise<Result> {
   await requireUser();
   if (!id) return fail("Missing customer.");
-  const name = str(patch.name, 160);
+  const name = titleCaseName(str(patch.name, 160));
   if (!name) return fail("Customer name is required.");
   await db
     .update(serviceCustomers)
@@ -81,7 +82,8 @@ export async function updateCustomer(id: string, patch: CustomerInput): Promise<
       email: str(patch.email, 200),
       phone: str(patch.phone, 60),
       source: oneOf(patch.source, CUSTOMER_SOURCES.map((s) => s.key), "referral"),
-      tags: (patch.tags ?? []).map((t) => str(t, 40)).filter((t): t is string => !!t),
+      // Only touch tags when the caller sends them — an edit form that omits them must never wipe them.
+      ...(patch.tags !== undefined ? { tags: patch.tags.map((t) => str(t, 40)).filter((t): t is string => !!t) } : {}),
       notes: str(patch.notes, 4_000),
       updatedAt: new Date(),
     })

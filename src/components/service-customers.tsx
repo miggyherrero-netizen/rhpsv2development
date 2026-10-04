@@ -7,6 +7,7 @@ import { fmtDate } from "@/lib/format";
 import {
   CUSTOMER_SOURCES, CUSTOMER_SOURCE_LABEL, PIANO_TYPES, EXPENSE_CATEGORIES,
 } from "@/lib/service";
+import { isBatchCustomer, withCustomerType } from "@/lib/service-reports";
 import type { CustomerCard, RecallRow } from "@/server/service-data";
 import {
   createCustomer, updateCustomer, archiveCustomer, createLocation, deleteLocation,
@@ -28,6 +29,7 @@ export default function CustomersClient({
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("active");
+  const [sort, setSort] = useState<"name" | "billed" | "recent">("name");
   const [newOpen, setNewOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: "location" | "piano"; id: string } | null>(null);
@@ -42,17 +44,27 @@ export default function CustomersClient({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const when = (c: CustomerCard) => (c.lastServiceAt ? new Date(c.lastServiceAt).getTime() : -Infinity);
     return customers
-      .filter((c) => (filter === "archived" ? !!c.archivedAt : !c.archivedAt))
+      .filter((c) => {
+        if (filter === "archived") return !!c.archivedAt;
+        if (c.archivedAt) return false;
+        // Trips / batches are groups of visits, not clients — they get their own list.
+        return filter === "batch" ? isBatchCustomer(c.tags, c.name) : !isBatchCustomer(c.tags, c.name);
+      })
       .filter((c) => !q || [c.name, c.company ?? "", c.phone ?? "", c.email ?? ""].join(" ").toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [customers, query, filter]);
+      .sort((a, b) =>
+        sort === "billed" ? b.billedCents - a.billedCents || a.name.localeCompare(b.name)
+        : sort === "recent" ? when(b) - when(a) || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name));
+  }, [customers, query, filter, sort]);
 
   const open = customers.find((c) => c.id === openId) ?? null;
 
   const totals = useMemo(
     () => ({
-      clients: customers.filter((c) => !c.archivedAt).length,
+      clients: customers.filter((c) => !c.archivedAt && !isBatchCustomer(c.tags, c.name)).length,
+      batches: customers.filter((c) => !c.archivedAt && isBatchCustomer(c.tags, c.name)).length,
       pianos: customers.reduce((s, c) => s + c.pianos.length, 0),
       billed: customers.reduce((s, c) => s + c.billedCents, 0),
       outstanding: customers.reduce((s, c) => s + c.outstandingCents, 0),
@@ -71,7 +83,7 @@ export default function CustomersClient({
             Customers
           </h1>
           <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
-            {totals.clients} clients · {totals.pianos} instruments · {recalls.length} due for service
+            {totals.clients} clients{totals.batches > 0 ? ` · ${totals.batches} trip${totals.batches === 1 ? "" : "s"} / batch${totals.batches === 1 ? "" : "es"}` : ""} · {totals.pianos} instruments · {recalls.length} due for service
           </p>
         </div>
         <PrimaryButton onClick={() => setNewOpen(true)}>
@@ -81,7 +93,7 @@ export default function CustomersClient({
 
       <ErrorLine>{error}</ErrorLine>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="svc-tiles">
         <StatCard label="Clients" value={totals.clients} icon={<Users size={15} />} />
         <StatCard label="Instruments" value={totals.pianos} tone="azure" icon={<PianoIcon size={15} />} />
         <StatCard label="Lifetime billed" value={<Money cents={totals.billed} />} tone="violet" />
@@ -131,7 +143,8 @@ export default function CustomersClient({
       <div className="flex flex-wrap items-center gap-3">
         <FilterPills
           options={[
-            { key: "active", label: "Active" },
+            { key: "active", label: "Clients" },
+            ...(totals.batches > 0 || filter === "batch" ? [{ key: "batch", label: "Trips / batches" }] : []),
             { key: "archived", label: "Archived" },
           ]}
           value={filter}
@@ -144,9 +157,15 @@ export default function CustomersClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, phone…"
+            aria-label="Search customers"
             className="!pl-9 w-64"
           />
         </div>
+        <Select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort customers" className="!w-auto">
+          <option value="name">Sort: Name A–Z</option>
+          <option value="billed">Sort: Most billed</option>
+          <option value="recent">Sort: Latest job</option>
+        </Select>
       </div>
 
       {filtered.length === 0 ? (
@@ -163,12 +182,12 @@ export default function CustomersClient({
           />
         </SectionCard>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
           {filtered.map((c) => (
             <button
               key={c.id}
               onClick={() => setOpenId(c.id)}
-              className="card-svc card-svc-hover p-5 text-left"
+              className="card-svc card-svc-hover p-5 text-left h-full flex flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -181,7 +200,9 @@ export default function CustomersClient({
                     </p>
                   ) : null}
                 </div>
-                <Chip tone="slate">{CUSTOMER_SOURCE_LABEL[c.source] ?? c.source}</Chip>
+                <Chip tone={isBatchCustomer(c.tags, c.name) ? "violet" : "slate"}>
+                  {isBatchCustomer(c.tags, c.name) ? "Trip / batch" : CUSTOMER_SOURCE_LABEL[c.source] ?? c.source}
+                </Chip>
               </div>
 
               <div className="mt-3 space-y-1 text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>
@@ -202,16 +223,14 @@ export default function CustomersClient({
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-3" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+              <div className="grid grid-cols-3 gap-2 mt-auto pt-3" style={{ borderTop: "1px solid var(--color-svc-border)", marginTop: "auto" }}>
                 <Metric label="Pianos" value={String(c.pianos.length)} />
                 <Metric label="Jobs" value={String(c.jobCount)} />
                 <Metric label="Billed" value={<Money cents={c.billedCents} className="!text-[12.5px]" />} />
               </div>
-              {c.openJobCount > 0 ? (
-                <p className="text-[11px] mt-2" style={{ color: TONE_TEXT.azure }}>
-                  {c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}
-                </p>
-              ) : null}
+              <p className="text-[12px] mt-2 min-h-[18px]" style={{ color: c.openJobCount > 0 ? TONE_TEXT.azure : "var(--color-svc-text-faint)" }}>
+                {c.openJobCount > 0 ? `${c.openJobCount} open job${c.openJobCount === 1 ? "" : "s"}` : "No open jobs"}
+              </p>
             </button>
           ))}
         </div>
@@ -256,10 +275,10 @@ export default function CustomersClient({
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[9.5px] uppercase tracking-[0.14em]" style={{ color: "var(--color-svc-text-faint)" }}>
+      <p className="text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--color-svc-text-faint)" }}>
         {label}
       </p>
-      <p className="text-[13px] tnum mt-0.5" style={{ color: "var(--color-svc-text)" }}>
+      <p className="text-[13px] svc-num mt-0.5" style={{ color: "var(--color-svc-text)" }}>
         {value}
       </p>
     </div>
@@ -276,9 +295,10 @@ function NewCustomerModal({
   onClose: () => void;
   pending: boolean;
   onCreate: (input: {
-    name: string; company: string; phone: string; email: string; source: string; notes: string;
+    name: string; company: string; phone: string; email: string; source: string; notes: string; tags: string[];
   }) => void;
 }) {
+  const [kind, setKind] = useState<"client" | "batch">("client");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
@@ -288,16 +308,22 @@ function NewCustomerModal({
 
   const submit = () => {
     if (!name.trim()) return;
-    onCreate({ name: name.trim(), company, phone, email, source, notes });
+    onCreate({ name: name.trim(), company, phone, email, source, notes, tags: withCustomerType([], kind) });
     onClose();
-    setName(""); setCompany(""); setPhone(""); setEmail(""); setNotes("");
+    setName(""); setCompany(""); setPhone(""); setEmail(""); setNotes(""); setKind("client");
   };
 
   return (
     <SvcModal open={open} onClose={onClose} title="New customer">
       <div className="space-y-3.5">
-        <Field label="Name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Santos" autoFocus />
+        <Field label="Type" hint="Use “Trip / batch” for a group of visits (e.g. an out-of-town trip), not a person">
+          <Select value={kind} onChange={(e) => setKind(e.target.value as "client" | "batch")}>
+            <option value="client">Client (person, household, school…)</option>
+            <option value="batch">Trip / batch</option>
+          </Select>
+        </Field>
+        <Field label="Name" hint="Saved in Title Case">
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "batch" ? "Gensan Trip — Nov" : "Maria Santos"} autoFocus />
         </Field>
         <Field label="Company / institution" hint="Optional — schools, chapels, hotels">
           <TextInput value={company} onChange={(e) => setCompany(e.target.value)} />
@@ -348,7 +374,7 @@ function CustomerSheet({
   onClose: () => void;
   pending: boolean;
   onSave: (patch: {
-    name: string; company: string; phone: string; email: string; source: string; notes: string;
+    name: string; company: string; phone: string; email: string; source: string; notes: string; tags: string[];
   }) => void;
   onArchive: () => void;
   onRestore: () => void;
@@ -366,6 +392,7 @@ function CustomerSheet({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(customer.name);
+  const [kind, setKind] = useState<"client" | "batch">(isBatchCustomer(customer.tags, customer.name) ? "batch" : "client");
   const [company, setCompany] = useState(customer.company ?? "");
   const [phone, setPhone] = useState(customer.phone ?? "");
   const [email, setEmail] = useState(customer.email ?? "");
@@ -382,6 +409,12 @@ function CustomerSheet({
         <div>
           {editing ? (
             <div className="space-y-3">
+              <Field label="Type">
+                <Select value={kind} onChange={(e) => setKind(e.target.value as "client" | "batch")}>
+                  <option value="client">Client</option>
+                  <option value="batch">Trip / batch</option>
+                </Select>
+              </Field>
               <Field label="Name">
                 <TextInput value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
@@ -410,7 +443,8 @@ function CustomerSheet({
                 <PrimaryButton
                   pending={pending}
                   onClick={() => {
-                    onSave({ name, company, phone, email, source, notes });
+                    // Keep every existing tag; only the explicit type tag changes.
+                    onSave({ name, company, phone, email, source, notes, tags: withCustomerType(customer.tags, kind) });
                     setEditing(false);
                   }}
                 >

@@ -240,7 +240,25 @@ export function jobHeading(title: string | null | undefined, serviceType: string
 /* ---------------------------------------------------------------- customers */
 
 export const BATCH_TAG = "type:batch";
-export const isBatchCustomer = (tags: unknown): boolean => Array.isArray(tags) && tags.includes(BATCH_TAG);
+export const CLIENT_TAG = "type:client";
+
+/**
+ * A "Trip / Batch" is a group of visits (e.g. "Gensan Trip"), not a person to bill or recall.
+ * An explicit tag always wins; with no tag, a name containing "trip" or "batch" is treated as one.
+ * Stored in the existing `tags` column — no schema change.
+ */
+export function isBatchCustomer(tags: unknown, name?: string | null): boolean {
+  const t = Array.isArray(tags) ? tags : [];
+  if (t.includes(CLIENT_TAG)) return false;
+  if (t.includes(BATCH_TAG)) return true;
+  return /\b(trip|batch)\b/i.test(name ?? "");
+}
+
+/** Set the explicit type tag, preserving every other tag. */
+export function withCustomerType(tags: unknown, kind: "client" | "batch"): string[] {
+  const rest = (Array.isArray(tags) ? tags : []).filter((x): x is string => typeof x === "string" && x !== BATCH_TAG && x !== CLIENT_TAG);
+  return [...rest, kind === "batch" ? BATCH_TAG : CLIENT_TAG];
+}
 
 const HONORIFICS: Record<string, string> = {
   dr: "Dr.", atty: "Atty.", engr: "Engr.", mr: "Mr.", mrs: "Mrs.", ms: "Ms.", fr: "Fr.", sr: "Sr.", jr: "Jr.", st: "St.", sto: "Sto.", sta: "Sta.",

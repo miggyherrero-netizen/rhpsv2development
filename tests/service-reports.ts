@@ -5,7 +5,7 @@
 import { invoiceStatus, isOverdue } from "../src/lib/service";
 import {
   isCountable, receivables, draftSummary, billedCents, needsFollowUp, resolveRange, inRange, parseRange,
-  financeRollup, compactPeso, chartScale, needsClosing, hasQuote, looksAbbreviated, jobHeading, titleCaseName, isBatchCustomer,
+  financeRollup, compactPeso, chartScale, needsClosing, hasQuote, looksAbbreviated, jobHeading, titleCaseName, isBatchCustomer, withCustomerType,
   type FinInvoice,
 } from "../src/lib/service-reports";
 
@@ -131,6 +131,10 @@ check("acronym kept in all-caps name", titleCaseName("BDO BANK"), "BDO Bank");
 check("hyphen / apostrophe", titleCaseName("anne-marie o'brien"), "Anne-Marie O'Brien");
 check("blank", titleCaseName("  "), "");
 check("batch tag", [isBatchCustomer(["type:batch"]), isBatchCustomer(["vip"]), isBatchCustomer(null)], [true, false, false]);
+check("name with 'Trip' / 'Batch' is treated as a batch", [isBatchCustomer([], "Gensan Trip"), isBatchCustomer(null, "Davao Batch 2"), isBatchCustomer([], "Tripp Santos"), isBatchCustomer([], "Maria Santos")], [true, true, false, false]);
+check("explicit client tag overrides the name guess", isBatchCustomer(["type:client"], "Gensan Trip"), false);
+check("withCustomerType keeps other tags and replaces the old type", withCustomerType(["vip", "type:batch"], "client"), ["vip", "type:client"]);
+check("withCustomerType batch", withCustomerType(undefined, "batch"), ["type:batch"]);
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nall service report checks passed");
