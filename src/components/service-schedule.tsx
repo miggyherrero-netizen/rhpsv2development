@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, GripVertical, CalendarDays, Inbox } from "lucide-react";
 import { ymd, addDays, startOfWeek } from "@/lib/dates";
 import { fmtDate, toLocalInput } from "@/lib/format";
-import { JOB_STATUS_TONE, SERVICE_TYPE_LABEL, fmtMinuteOfDay } from "@/lib/service";
+import { JOB_STATUS_TONE, SERVICE_TYPE_LABEL, fmtMinuteOfDay, fmtHourShort } from "@/lib/service";
 import type { ScheduleBoard } from "@/server/service-data";
 import { rescheduleJob } from "@/server/service";
 import {
@@ -75,11 +75,11 @@ export default function ScheduleClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1500px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
-            Dispatch board
+            Schedule
           </h1>
           <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {fmtDate(board.from)} – {fmtDate(addDays(board.from, 6))} · drag a visit to reschedule
@@ -109,7 +109,7 @@ export default function ScheduleClient({
           <div className="overflow-x-auto thin-scroll">
             <div className="min-w-[860px]">
               {/* Day header */}
-              <div className="grid" style={{ gridTemplateColumns: `56px repeat(7, minmax(0, 1fr))` }}>
+              <div className="grid" style={{ gridTemplateColumns: `60px repeat(7, minmax(0, 1fr))` }}>
                 <div style={{ borderBottom: "1px solid var(--color-svc-border)" }} />
                 {days.map((d) => {
                   const isToday = ymd(d) === today;
@@ -140,16 +140,16 @@ export default function ScheduleClient({
               </div>
 
               {/* Grid body */}
-              <div className="grid relative" style={{ gridTemplateColumns: `56px repeat(7, minmax(0, 1fr))` }}>
+              <div className="grid relative" style={{ gridTemplateColumns: `60px repeat(7, minmax(0, 1fr))` }}>
                 {/* Hour gutter */}
                 <div className="relative" style={{ height: ((DAY_END - DAY_START) / 60) * HOUR_PX }}>
                   {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
                     <div
                       key={i}
-                      className="absolute right-2 text-[10.5px] tnum -translate-y-1/2"
+                      className="absolute right-2 text-[11px] svc-num whitespace-nowrap -translate-y-1/2"
                       style={{ top: i * HOUR_PX, color: "var(--color-svc-text-faint)" }}
                     >
-                      {i === 0 ? "" : fmtMinuteOfDay(DAY_START + i * 60)}
+                      {i === 0 ? "" : fmtHourShort(DAY_START + i * 60)}
                     </div>
                   ))}
                 </div>

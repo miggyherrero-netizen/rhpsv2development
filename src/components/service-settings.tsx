@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
 import { peso } from "@/lib/format";
 import { DAYS_SHORT } from "@/lib/config";
@@ -13,7 +13,7 @@ import {
 } from "@/server/service";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
-  SectionCard, Select, SuccessLine, SvcModal, TextInput, ToggleRow, TONE_TEXT,
+  SectionCard, Select, SuccessLine, SvcModal, TextInput, ToggleRow, TONE_TEXT, UnitInput,
 } from "@/components/service-ui";
 
 const minToTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -59,6 +59,37 @@ export default function SettingsClient({
 
   const [newItem, setNewItem] = useState({ name: "", kind: "service", price: "", minutes: "60" });
 
+  // "Unsaved changes" = the form no longer matches the last saved snapshot.
+  const current = useMemo(
+    () => JSON.stringify({ businessName, invoicePrefix, jobPrefix, taxRate, taxLabel, terms, hourly, travelFee, interval, lead, hours, vatEnabled, marginExcludesVat, includeLaborCost, avgInvoiceBasis, showFinance, showJobMargins }),
+    [businessName, invoicePrefix, jobPrefix, taxRate, taxLabel, terms, hourly, travelFee, interval, lead, hours, vatEnabled, marginExcludesVat, includeLaborCost, avgInvoiceBasis, showFinance, showJobMargins],
+  );
+  const [baseline, setBaseline] = useState(current);
+  const dirty = current !== baseline;
+  const discard = () => {
+    const b = JSON.parse(baseline) as Record<string, never>;
+    setBusinessName(b.businessName); setInvoicePrefix(b.invoicePrefix); setJobPrefix(b.jobPrefix); setTaxRate(b.taxRate);
+    setTaxLabel(b.taxLabel); setTerms(b.terms); setHourly(b.hourly); setTravelFee(b.travelFee); setInterval(b.interval);
+    setLead(b.lead); setHours(b.hours); setVatEnabled(b.vatEnabled); setMarginExcludesVat(b.marginExcludesVat);
+    setIncludeLaborCost(b.includeLaborCost); setAvgInvoiceBasis(b.avgInvoiceBasis); setShowFinance(b.showFinance); setShowJobMargins(b.showJobMargins);
+  };
+
+  // Warn before the tab closes / reloads, and before an in-app link would drop the edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      if (!window.confirm("You have unsaved changes. Leave without saving?")) { e.preventDefault(); e.stopPropagation(); }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", onClick, true); };
+  }, [dirty]);
+
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
     setSaved(false);
@@ -89,15 +120,15 @@ export default function SettingsClient({
         showFinance,
         showJobMargins,
       });
-      if (res.ok) setSaved(true);
+      if (res.ok) { setSaved(true); setBaseline(current); }
       return res;
     });
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6">
+    <div className={`px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6 ${dirty ? "pb-28" : ""}`}>
       <header>
-        <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--color-svc-text-faint)" }}>
+        <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
           Home Service
         </p>
         <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
@@ -123,20 +154,20 @@ export default function SettingsClient({
           <Field label="Job prefix">
             <TextInput value={jobPrefix} onChange={(e) => setJobPrefix(e.target.value.toUpperCase())} />
           </Field>
-          <Field label="Payment terms" hint="Days">
-            <TextInput type="number" min={0} value={terms} onChange={(e) => setTerms(e.target.value)} />
+          <Field label="Payment terms" hint="How long clients have to pay">
+            <UnitInput type="number" inputMode="numeric" min={0} suffix="days" value={terms} onChange={(e) => setTerms(e.target.value)} />
           </Field>
-          <Field label="Default crew rate" hint="Pesos / hour">
-            <TextInput type="number" min={0} step="50" value={hourly} onChange={(e) => setHourly(e.target.value)} />
+          <Field label="Default crew rate" hint="What you pay per hour of crew time">
+            <UnitInput type="number" inputMode="decimal" min={0} step="50" prefix="₱" suffix="/hr" value={hourly} onChange={(e) => setHourly(e.target.value)} />
           </Field>
-          <Field label="Default travel fee" hint="Pesos">
-            <TextInput type="number" min={0} step="50" value={travelFee} onChange={(e) => setTravelFee(e.target.value)} />
+          <Field label="Default travel fee">
+            <UnitInput type="number" inputMode="decimal" min={0} step="50" prefix="₱" value={travelFee} onChange={(e) => setTravelFee(e.target.value)} />
           </Field>
-          <Field label="Tuning interval" hint="Months between recalls">
-            <TextInput type="number" min={1} value={interval} onChange={(e) => setInterval(e.target.value)} />
+          <Field label="Tuning interval" hint="Time between recalls">
+            <UnitInput type="number" inputMode="numeric" min={1} suffix="months" value={interval} onChange={(e) => setInterval(e.target.value)} />
           </Field>
-          <Field label="Recall lead time" hint="Days ahead to warn">
-            <TextInput type="number" min={0} value={lead} onChange={(e) => setLead(e.target.value)} />
+          <Field label="Recall lead time" hint="How early to warn before a recall is due">
+            <UnitInput type="number" inputMode="numeric" min={0} suffix="days" value={lead} onChange={(e) => setLead(e.target.value)} />
           </Field>
         </div>
 
@@ -148,29 +179,31 @@ export default function SettingsClient({
             checked={vatEnabled}
             onChange={setVatEnabled}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Tax label" hint="Shown on invoices">
-              <TextInput value={taxLabel} disabled={!vatEnabled} onChange={(e) => setTaxLabel(e.target.value)} />
-            </Field>
-            <Field label="Tax rate" hint="Percent (12 = Philippine VAT)">
-              <TextInput
-                type="number"
-                min={0}
-                step="1"
-                value={taxRate}
-                disabled={!vatEnabled}
-                onChange={(e) => setTaxRate(e.target.value)}
-              />
-            </Field>
-          </div>
+          {vatEnabled ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Tax label" hint="Shown on invoices">
+                <TextInput value={taxLabel} onChange={(e) => setTaxLabel(e.target.value)} />
+              </Field>
+              <Field label="Tax rate" hint="12 = Philippine VAT">
+                <UnitInput type="number" inputMode="decimal" min={0} step="1" suffix="%" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
+              </Field>
+            </div>
+          ) : (
+            <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+              VAT is off — new invoices carry no tax. Turn it on to set the label and rate.
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
           <SubHeading icon={<TrendingUp size={12} />}>Profit &amp; reports</SubHeading>
           <ToggleRow
             label="Exclude VAT from job profit"
-            hint="VAT goes to the government, so profit uses the amount before VAT."
+            hint={vatEnabled
+              ? "VAT goes to the government, so profit uses the amount before VAT."
+              : "Not applicable while VAT is off (it only affects invoices that carry VAT)."}
             checked={marginExcludesVat}
+            disabled={!vatEnabled}
             onChange={setMarginExcludesVat}
           />
           <ToggleRow
@@ -256,15 +289,28 @@ export default function SettingsClient({
           </div>
         </div>
 
-        <div
-          className="px-5 py-3 flex justify-end"
-          style={{ borderTop: "1px solid var(--color-svc-border)" }}
-        >
-          <PrimaryButton pending={pending} onClick={saveBusiness}>
-            <Building2 size={14} /> Save settings
-          </PrimaryButton>
-        </div>
       </SectionCard>
+
+      {/* Appears only when something changed */}
+      {dirty && (
+        <div
+          role="region"
+          aria-label="Unsaved changes"
+          className="fixed inset-x-0 bottom-16 lg:bottom-0 lg:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
+          style={{ background: "var(--color-svc-surface)", borderColor: "var(--color-svc-border-strong)", boxShadow: "0 -10px 30px rgba(0,0,0,0.35)" }}
+        >
+          <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+            <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: "var(--color-svc-warn)" }} />
+            You have unsaved changes
+          </p>
+          <div className="flex items-center gap-2">
+            <GhostButton onClick={discard} className="!min-h-10">Discard</GhostButton>
+            <PrimaryButton pending={pending} onClick={saveBusiness} className="!min-h-10">
+              <Building2 size={14} /> Save changes
+            </PrimaryButton>
+          </div>
+        </div>
+      )}
 
       {/* Crew */}
       <SectionCard
@@ -399,7 +445,7 @@ export default function SettingsClient({
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
                     {["Item", "Type", "Price", "Minutes", ""].map((h) => (
-                      <th key={h} className="py-2 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
+                      <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -506,8 +552,8 @@ export default function SettingsClient({
 function SubHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <p
-      className="text-[10.5px] uppercase tracking-[0.16em] flex items-center gap-1.5"
-      style={{ color: "var(--color-svc-text-faint)" }}
+      className="text-[11px] uppercase tracking-[0.1em] flex items-center gap-1.5"
+      style={{ color: "var(--color-svc-text-dim)" }}
     >
       {icon} {children}
     </p>

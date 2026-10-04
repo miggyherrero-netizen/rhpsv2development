@@ -2,7 +2,7 @@
  * Home-service reporting rules: drafts vs receivables, ranges (Manila), finance rollup,
  * past-due jobs, display helpers. No database. Run: npx tsx tests/service-reports.ts
  */
-import { invoiceStatus, isOverdue } from "../src/lib/service";
+import { invoiceStatus, isOverdue, fmtHourShort } from "../src/lib/service";
 import {
   isCountable, receivables, draftSummary, billedCents, needsFollowUp, resolveRange, inRange, parseRange,
   financeRollup, compactPeso, chartScale, needsClosing, hasQuote, looksAbbreviated, jobHeading, titleCaseName, isBatchCustomer, withCustomerType,
@@ -105,6 +105,9 @@ check("axis max covers the tallest value", sc.max >= 1_234_500, true);
 check("axis has 5 ticks from 0, evenly spaced", [sc.ticks.length, sc.ticks[0], sc.ticks[1] - sc.ticks[0] === sc.ticks[2] - sc.ticks[1]], [5, 0, true]);
 check("axis nice step (₱12,345 -> ₱5k steps up to ₱20k)", chartScale(1_234_500).ticks, [0, 500_000, 1_000_000, 1_500_000, 2_000_000]);
 check("empty chart still has an axis", chartScale(0).max > 0, true);
+
+console.log("calendar labels");
+check("hour labels never carry :00 (so they can't wrap)", [fmtHourShort(600), fmtHourShort(540), fmtHourShort(720), fmtHourShort(0), fmtHourShort(990)], ["10 AM", "9 AM", "12 PM", "12 AM", "4:30 PM"]);
 
 console.log("past-due jobs");
 const job = (status: string, start: Date | null) => ({ status, scheduledStart: start });

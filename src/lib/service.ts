@@ -435,6 +435,14 @@ export function fmtMinuteOfDay(min: number, format: "12h" | "24h" = "12h"): stri
   return `${h12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
+/** Compact hour label for axes: 9 AM, 12 PM, 4:30 PM (minutes only when not on the hour). */
+export function fmtHourShort(min: number): string {
+  const h24 = Math.floor(min / 60) % 24;
+  const m = Math.round(min % 60);
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h24 >= 12 ? "PM" : "AM"}`;
+}
+
 export function utilizationPct(billableMinutes: number, windowMinutes: number): number {
   if (windowMinutes <= 0) return 0;
   return Math.min(100, Math.round((billableMinutes / windowMinutes) * 100));

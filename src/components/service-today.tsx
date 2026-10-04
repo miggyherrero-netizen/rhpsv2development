@@ -71,7 +71,7 @@ export default function TodayClient({
       {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
@@ -305,7 +305,7 @@ export default function TodayClient({
                 {unscheduledToday.length > 0 && (
                   <div className="px-5 py-4">
                     <p
-                      className="text-[10.5px] uppercase tracking-[0.18em] mb-2"
+                      className="text-[11px] uppercase tracking-[0.1em] mb-2"
                       style={{ color: "var(--color-svc-text-faint)" }}
                     >
                       Unscheduled

@@ -277,7 +277,7 @@ export default function JobDetailClient({
                     <thead>
                       <tr style={{ color: "var(--color-svc-text-faint)" }}>
                         {["Description", "Type", "Qty", "Unit price", "Amount", ""].map((h) => (
-                          <th key={h} className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
+                          <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                         ))}
                       </tr>
                     </thead>

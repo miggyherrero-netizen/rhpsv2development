@@ -150,7 +150,7 @@ export default function InvoiceDetailClient({
             <thead>
               <tr style={{ color: "var(--color-svc-text-faint)" }}>
                 {["Description", "Qty", "Unit price", "Amount", ""].map((h) => (
-                  <th key={h} className="py-2 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
+                  <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                 ))}
               </tr>
             </thead>

@@ -340,8 +340,8 @@ export function Field({
   return (
     <label className={`block ${className}`}>
       <span
-        className="block text-[10.5px] uppercase tracking-[0.16em] mb-1.5"
-        style={{ color: "var(--color-svc-text-faint)" }}
+        className="block text-[11px] uppercase tracking-[0.1em] mb-1.5"
+        style={{ color: "var(--color-svc-text-dim)" }}
       >
         {label}
       </span>
@@ -421,6 +421,24 @@ export function ToggleRow({
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`input-svc ${props.className ?? ""}`} />;
+}
+
+/** Number/text input with the unit inside the box: ₱ [ 500 ] /hr, [ 30 ] days, [ 12 ] %. */
+export function UnitInput({
+  prefix, suffix, className = "", ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { prefix?: string; suffix?: string }) {
+  const dim = { color: props.disabled ? "var(--color-svc-text-faint)" : "var(--color-svc-text-dim)" };
+  return (
+    <span className="relative block">
+      {prefix ? <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={dim}>{prefix}</span> : null}
+      <input
+        {...props}
+        className={`input-svc svc-num ${className}`}
+        style={{ paddingLeft: prefix ? "1.9rem" : undefined, paddingRight: suffix ? `${Math.max(2.6, suffix.length * 0.62 + 1.2)}rem` : undefined, ...props.style }}
+      />
+      {suffix ? <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px]" style={dim}>{suffix}</span> : null}
+    </span>
+  );
 }
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
