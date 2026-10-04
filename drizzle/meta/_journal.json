@@ -8,6 +8,13 @@
       "when": 1791118759580,
       "tag": "0000_powerful_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791119551806,
+      "tag": "0001_absurd_bloodscream",
+      "breakpoints": true
     }
   ]
 }

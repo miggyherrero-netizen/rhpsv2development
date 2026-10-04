@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import AddInquiry from "@/components/gos/add-inquiry";
 import { CalendarCheck, Users, Briefcase, TrendingUp, Settings } from "lucide-react";
 
 const NAV = [
@@ -13,7 +14,15 @@ const NAV = [
   { href: "/os/settings", label: "Settings", Icon: Settings },
 ] as const;
 
-export default function GosShell({ userName, children }: { userName: string; children: ReactNode }) {
+function Badge({ n }: { n: number }) {
+  return (
+    <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--gos-danger)] px-1.5 text-xs font-bold text-white">
+      <span aria-hidden="true">{n}</span><span className="sr-only"> overdue</span>
+    </span>
+  );
+}
+
+export default function GosShell({ userName, overdue = 0, children }: { userName: string; overdue?: number; children: ReactNode }) {
   const path = usePathname();
   return (
     <div className="min-h-dvh lg:flex">
@@ -26,12 +35,16 @@ export default function GosShell({ userName, children }: { userName: string; chi
             <Link key={href} href={href} aria-current={active ? "page" : undefined}
               className={`gos-tap flex items-center gap-3 rounded-xl px-3 ${active ? "bg-[var(--gos-black)] text-white" : "hover:bg-white"}`}>
               <Icon size={20} aria-hidden="true" /> {label}
+                {href === "/os/today" && overdue > 0 && <Badge n={overdue} />}
             </Link>
           );
         })}
         <p className="mt-auto text-sm text-[var(--gos-ink-dim)]">Signed in: {userName}</p>
       </aside>
-      <main id="gos-main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-4 lg:pb-8">{children}</main>
+      <main id="gos-main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-4 lg:pb-8">
+          <div className="flex justify-end"><AddInquiry /></div>
+          {children}
+        </main>
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-[var(--gos-line)] bg-white lg:hidden">
         {NAV.map(({ href, label, Icon }) => {
           const active = path.startsWith(href);
@@ -39,7 +52,7 @@ export default function GosShell({ userName, children }: { userName: string; chi
             <Link key={href} href={href} aria-current={active ? "page" : undefined}
               className={`gos-tap flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] ${active ? "font-bold text-[var(--gos-ink)]" : "text-[var(--gos-ink-dim)]"}`}>
               <Icon size={20} aria-hidden="true" />
-              <span>{label}</span>
+              <span>{label}{href === "/os/today" && overdue > 0 && <Badge n={overdue} />}</span>
             </Link>
           );
         })}
