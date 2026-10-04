@@ -246,8 +246,11 @@ export function daysOverdue(inv: InvoiceLike, now: Date = new Date()): number {
   return d > 0 ? d : 0;
 }
 
+/** A draft (never sent, nothing paid) is not a receivable, so it can never be "overdue". */
+const isDraftLike = (inv: InvoiceLike): boolean => !inv.sentAt && (inv.amountPaidCents ?? 0) <= 0;
+
 export const isOverdue = (inv: InvoiceLike, now: Date = new Date()): boolean =>
-  !inv.voidedAt && balanceCents(inv) > 0 && daysOverdue(inv, now) > 0;
+  !inv.voidedAt && !isDraftLike(inv) && balanceCents(inv) > 0 && daysOverdue(inv, now) > 0;
 
 /**
  * Status is *derived* from money + dates rather than trusted from the stored column,

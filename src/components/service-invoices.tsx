@@ -2,11 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Receipt, Search, ArrowUpRight, Wallet2 } from "lucide-react";
+import { Plus, Receipt, Search, ArrowUpRight, Wallet2, FileClock } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
 import {
   AGING_BUCKETS, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, invoiceCode,
 } from "@/lib/service";
+import { billedCents, isCountable } from "@/lib/service-reports";
 import type { InvoiceRow } from "@/server/service-data";
 import { createInvoice, recordPayment, setInvoiceStatus } from "@/server/service";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/components/service-ui";
 
 const FILTERS = [
-  { key: "open", label: "Open" },
+  { key: "open", label: "Unpaid" },
   { key: "all", label: "All" },
   { key: "overdue", label: "Overdue" },
   { key: "paid", label: "Paid" },
@@ -29,7 +30,11 @@ export default function InvoicesClient({
   invoicePrefix,
   vatEnabled,
   aging,
+  drafts,
+  initialFilter = "open",
 }: {
+  drafts: { count: number; totalCents: number };
+  initialFilter?: string;
   invoices: InvoiceRow[];
   customers: { id: string; name: string }[];
   invoicePrefix: string;
@@ -43,7 +48,7 @@ export default function InvoicesClient({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState("open");
+  const [filter, setFilter] = useState(() => (FILTERS.some((f) => f.key === initialFilter) ? initialFilter : "open"));
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [payFor, setPayFor] = useState<InvoiceRow | null>(null);
@@ -61,7 +66,8 @@ export default function InvoicesClient({
     return invoices
       .filter((inv) => {
         if (filter === "all") return true;
-        if (filter === "open") return !inv.voidedAt && inv.balanceCents > 0;
+        // "Unpaid" = a real receivable (sent / part-paid) with a balance. Drafts have their own filter.
+        if (filter === "open") return isCountable(inv) && inv.balanceCents > 0;
         if (filter === "overdue") return inv.status === "overdue";
         return inv.status === filter;
       })
@@ -69,8 +75,8 @@ export default function InvoicesClient({
   }, [invoices, filter, query, invoicePrefix]);
 
   const totals = useMemo(() => {
-    const invoiced = invoices.filter((i) => !i.voidedAt).reduce((s, i) => s + i.totalCents, 0);
-    const collected = invoices.reduce((s, i) => s + i.amountPaidCents, 0);
+    const invoiced = billedCents(invoices);
+    const collected = invoices.filter((i) => isCountable(i)).reduce((s, i) => s + i.amountPaidCents, 0);
     return { invoiced, collected, outstanding: aging.totalOutstandingCents };
   }, [invoices, aging.totalOutstandingCents]);
 
@@ -88,6 +94,14 @@ export default function InvoicesClient({
           </h1>
           <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {filtered.length} shown · {aging.buckets.reduce((s, b) => s + b.count, 0)} unpaid
+            {drafts.count > 0 ? (
+              <>
+                {" · "}
+                <button type="button" onClick={() => setFilter("draft")} className="svc-num inline-flex items-center gap-1 underline underline-offset-4 min-h-8" style={{ color: "var(--color-svc-text-dim)" }}>
+                  <FileClock size={12} /> {drafts.count} draft{drafts.count === 1 ? "" : "s"} · {peso(drafts.totalCents)} not yet sent
+                </button>
+              </>
+            ) : null}
           </p>
         </div>
         <PrimaryButton onClick={() => setNewOpen(true)}>
@@ -97,19 +111,23 @@ export default function InvoicesClient({
 
       <ErrorLine>{error}</ErrorLine>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Invoiced" value={<Money cents={totals.invoiced} />} icon={<Receipt size={15} />} />
-        <StatCard label="Collected" value={<Money cents={totals.collected} />} tone="success" icon={<Wallet2 size={15} />} />
-        <StatCard label="Outstanding" value={<Money cents={totals.outstanding} />} tone="warn" sub="unpaid balance" />
-        <StatCard
-          label="Overdue"
-          value={<Money cents={aging.overdueCents} />}
-          tone={aging.overdueCents > 0 ? "danger" : "slate"}
-          sub="past due date"
-        />
+      <div className="svc-tiles">
+        <StatCard label="Invoiced" value={<Money cents={totals.invoiced} />} icon={<Receipt size={15} />} sub="sent · all time" />
+        <StatCard label="Collected" value={<Money cents={totals.collected} />} tone="success" icon={<Wallet2 size={15} />} sub="on sent invoices" />
+        <button type="button" onClick={() => setFilter("open")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]" aria-label="Show unpaid invoices">
+          <StatCard label="Outstanding" value={<Money cents={totals.outstanding} />} tone="warn" sub="sent, unpaid balance" />
+        </button>
+        <button type="button" onClick={() => setFilter("overdue")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]" aria-label="Show overdue invoices">
+          <StatCard
+            label="Overdue"
+            value={<Money cents={aging.overdueCents} />}
+            tone={aging.overdueCents > 0 ? "danger" : "slate"}
+            sub="past due date"
+          />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
+      <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-5">
         <SectionCard>
           <div className="flex flex-wrap items-center gap-3 px-5 py-3" style={{ borderBottom: "1px solid var(--color-svc-border)" }}>
             <FilterPills options={FILTERS} value={filter} onChange={setFilter} />
@@ -127,19 +145,28 @@ export default function InvoicesClient({
               hint="Invoices are created from a job, or ad hoc from this screen."
             />
           ) : (
-            <div className="overflow-x-auto thin-scroll">
-              <table className="w-full text-left">
+            <>
+              {/* Desktop / tablet: compact table that fits without sideways scrolling */}
+              <table className="hidden md:table w-full text-left table-fixed">
+                <colgroup>
+                  <col />
+                  <col className="w-[132px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[176px]" />
+                </colgroup>
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                    {["Invoice", "Customer", "Issued", "Due", "Total", "Balance", "Status", ""].map((h) => (
-                      <th key={h} className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal whitespace-nowrap">{h}</th>
+                    {["Invoice / customer", "Issued · due", "Total", "Balance", "Status", ""].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="svc-divide">
                   {filtered.map((inv) => (
                     <tr key={inv.id} className="group hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 min-w-0">
                         <Link
                           href={`/service/invoices/${inv.id}`}
                           className="text-[12.5px] font-mono hover:underline"
@@ -147,65 +174,77 @@ export default function InvoicesClient({
                         >
                           {invoiceCode(invoicePrefix, inv.invoiceNumber, inv.issueDate)}
                         </Link>
+                        <p className="text-[12.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }} title={inv.customerName}>
+                          {inv.customerName}
+                        </p>
                         {inv.jobTitle ? (
-                          <p className="text-[11px] truncate max-w-[180px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                          <p className="text-[11.5px] truncate" style={{ color: "var(--color-svc-text-faint)" }} title={inv.jobTitle}>
                             {inv.jobTitle}
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-5 py-3 text-[12.5px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
-                        {inv.customerName}
-                      </td>
-                      <td className="px-5 py-3 text-[12px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
+                      <td className="px-4 py-3 text-[12px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {fmtDate(new Date(inv.issueDate))}
+                        <p style={{ color: inv.status === "overdue" ? TONE_TEXT.danger : "var(--color-svc-text-faint)" }}>
+                          {inv.dueDate ? `due ${fmtDate(new Date(inv.dueDate))}` : "no due date"}
+                        </p>
                       </td>
-                      <td className="px-5 py-3 text-[12px] whitespace-nowrap" style={{ color: inv.status === "overdue" ? TONE_TEXT.danger : "var(--color-svc-text-dim)" }}>
-                        {inv.dueDate ? fmtDate(new Date(inv.dueDate)) : "—"}
+                      <td className="px-4 py-3 whitespace-nowrap"><Money cents={inv.totalCents} className="text-[13px]" /></td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {inv.status === "draft" || inv.voidedAt
+                          ? <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>—</span>
+                          : <Money cents={inv.balanceCents} className="text-[13px]" />}
                       </td>
-                      <td className="px-5 py-3 whitespace-nowrap"><Money cents={inv.totalCents} className="text-[13px]" /></td>
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        <Money cents={inv.balanceCents} className="text-[13px]" />
-                      </td>
-                      <td className="px-5 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>
                           {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
                         </Chip>
                       </td>
-                      <td className="px-5 py-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
-                          {inv.balanceCents > 0 && !inv.voidedAt && (
-                            <GhostButton
-                              disabled={pending}
-                              onClick={() => setPayFor(inv)}
-                              className="!py-1.5 !text-[11.5px]"
-                            >
-                              Record payment
-                            </GhostButton>
-                          )}
-                          {inv.status === "draft" && (
-                            <GhostButton
-                              disabled={pending}
-                              onClick={() => run(() => setInvoiceStatus(inv.id, "sent"))}
-                              className="!py-1.5 !text-[11.5px]"
-                            >
-                              Mark sent
-                            </GhostButton>
-                          )}
-                          <Link
-                            href={`/service/invoices/${inv.id}`}
-                            className="p-1.5 rounded-lg hover:bg-white/[0.06]"
-                            style={{ color: TONE_TEXT.azure }}
-                            aria-label="Open invoice"
-                          >
-                            <ArrowUpRight size={14} />
-                          </Link>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <InvoiceActions inv={inv} pending={pending} onPay={() => setPayFor(inv)} onSend={() => run(() => setInvoiceStatus(inv.id, "sent"))} />
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+
+              {/* Phone: one card per invoice */}
+              <ul className="md:hidden svc-divide">
+                {filtered.map((inv) => (
+                  <li key={inv.id} className="px-4 py-3.5 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link href={`/service/invoices/${inv.id}`} className="text-[13px] font-mono hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                          {invoiceCode(invoicePrefix, inv.invoiceNumber, inv.issueDate)}
+                        </Link>
+                        <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{inv.customerName}</p>
+                      </div>
+                      <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</Chip>
+                    </div>
+                    <div className="flex items-end justify-between gap-3 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                      <span>
+                        Issued {fmtDate(new Date(inv.issueDate))}
+                        <br />
+                        <span style={{ color: inv.status === "overdue" ? TONE_TEXT.danger : undefined }}>
+                          {inv.dueDate ? `Due ${fmtDate(new Date(inv.dueDate))}` : "No due date"}
+                        </span>
+                      </span>
+                      <span className="text-right">
+                        <Money cents={inv.totalCents} className="text-[14px]" />
+                        {inv.status !== "draft" && !inv.voidedAt && inv.balanceCents > 0 && (
+                          <span className="block">Balance <Money cents={inv.balanceCents} className="text-[12px]" /></span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <InvoiceActions inv={inv} pending={pending} onPay={() => setPayFor(inv)} onSend={() => run(() => setInvoiceStatus(inv.id, "sent"))} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </SectionCard>
 
@@ -257,6 +296,22 @@ export default function InvoicesClient({
         onRecord={(input) => run(() => recordPayment(input))}
       />
     </div>
+  );
+}
+
+function InvoiceActions({ inv, pending, onPay, onSend }: { inv: InvoiceRow; pending: boolean; onPay: () => void; onSend: () => void }) {
+  return (
+    <>
+      {inv.balanceCents > 0 && !inv.voidedAt && inv.status !== "draft" && (
+        <GhostButton disabled={pending} onClick={onPay} className="!min-h-10 !text-[12px]">Record payment</GhostButton>
+      )}
+      {inv.status === "draft" && (
+        <GhostButton disabled={pending} onClick={onSend} className="!min-h-10 !text-[12px]">Mark sent</GhostButton>
+      )}
+      <Link href={`/service/invoices/${inv.id}`} className="grid place-items-center h-10 w-10 rounded-lg hover:bg-white/[0.06]" style={{ color: TONE_TEXT.azure }} aria-label="Open invoice">
+        <ArrowUpRight size={14} />
+      </Link>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@
  * Home-service reporting rules: drafts vs receivables, ranges (Manila), finance rollup,
  * past-due jobs, display helpers. No database. Run: npx tsx tests/service-reports.ts
  */
+import { invoiceStatus, isOverdue } from "../src/lib/service";
 import {
   isCountable, receivables, draftSummary, billedCents, needsFollowUp, resolveRange, inRange, parseRange,
   financeRollup, compactPeso, chartScale, needsClosing, hasQuote, looksAbbreviated, jobHeading, titleCaseName, isBatchCustomer,
@@ -42,6 +43,11 @@ check("draft summary", draftSummary(all, NOW), { count: 1, totalCents: 100_000 }
 check("billed excludes draft + void", billedCents(all, NOW), 200_000 + 300_000 + 400_000 + 500_000);
 check("a draft that already has a payment is a real receivable (partial)", isCountable(inv({ totalCents: 100_000, sentAt: null, amountPaidCents: 10_000 }), NOW), true);
 check("follow-up = countable with balance, oldest due first", needsFollowUp(all, NOW).map((i) => i.totalCents), [300_000, 200_000, 400_000]);
+
+const stalDraft = inv({ totalCents: 100_000, sentAt: null, status: "draft", dueDate: manila(2026, 1, 1) });
+check("a draft past its due date is still just a draft, never 'overdue'", [invoiceStatus(stalDraft, NOW), isOverdue(stalDraft, NOW)], ["draft", false]);
+check("a sent invoice past due is overdue", invoiceStatus(overdue, NOW), "overdue");
+check("overdue amount ignores past-due drafts", receivables([stalDraft, overdue], NOW).overdueCents, 300_000);
 
 console.log("ranges (Manila)");
 const m = resolveRange("month", NOW);

@@ -7,6 +7,7 @@ import { fmtDate, fmtTime, toLocalInput } from "@/lib/format";
 import {
   JOB_STATUSES, JOB_STATUS_LABEL, JOB_STATUS_TONE, SERVICE_TYPES, SERVICE_TYPE_LABEL,
 } from "@/lib/service";
+import { hasQuote, jobHeading, needsClosing } from "@/lib/service-reports";
 import type { JobRow } from "@/server/service-data";
 import { createJob, deleteJob } from "@/server/service";
 import {
@@ -14,11 +15,19 @@ import {
   PrimaryButton, SectionCard, Select, SvcModal, TextInput, TONE_TEXT,
 } from "@/components/service-ui";
 
-const STATUS_FILTERS = [
+/** The four filters people use daily; everything else lives under "More". */
+const PRIMARY_FILTERS = [
   { key: "open", label: "Open" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "completed", label: "Completed" },
   { key: "all", label: "All" },
-  ...JOB_STATUSES.map((s) => ({ key: s.key, label: s.label })),
 ];
+const MORE_FILTERS = [
+  { key: "closing", label: "Needs closing" },
+  ...JOB_STATUSES.filter((s) => !["scheduled", "completed"].includes(s.key)).map((s) => ({ key: s.key, label: s.label })),
+];
+const PRIMARY_KEYS = new Set(PRIMARY_FILTERS.map((f) => f.key));
+const ALL_FILTER_KEYS = new Set([...PRIMARY_FILTERS, ...MORE_FILTERS].map((f) => f.key));
 
 const OPEN_SET = new Set(["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"]);
 
@@ -27,7 +36,9 @@ export default function JobsClient({
   customers,
   technicians,
   initialNew,
+  initialFilter = "open",
 }: {
+  initialFilter?: string;
   jobs: JobRow[];
   customers: { id: string; name: string }[];
   technicians: { id: string; name: string; color: string }[];
@@ -35,7 +46,8 @@ export default function JobsClient({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState("open");
+  const [status, setStatus] = useState(() => (ALL_FILTER_KEYS.has(initialFilter) ? initialFilter : "open"));
+  const [nowMs] = useState(() => Date.now());
   const [type, setType] = useState("all");
   const [tech, setTech] = useState("all");
   const [query, setQuery] = useState("");
@@ -46,14 +58,15 @@ export default function JobsClient({
     const q = query.trim().toLowerCase();
     return jobs.filter((j) => {
       if (status === "open" && !OPEN_SET.has(j.status)) return false;
-      if (status !== "open" && status !== "all" && j.status !== status) return false;
+      if (status === "closing" && !needsClosing(j, new Date(nowMs))) return false;
+      if (status !== "open" && status !== "all" && status !== "closing" && j.status !== status) return false;
       if (type !== "all" && j.serviceType !== type) return false;
       if (tech !== "all" && j.technicianId !== tech) return false;
       if (q && ![j.title, j.customerName, j.addressLine ?? "", j.area ?? ""].join(" ").toLowerCase().includes(q))
         return false;
       return true;
     });
-  }, [jobs, status, type, tech, query]);
+  }, [jobs, status, type, tech, query, nowMs]);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -87,7 +100,23 @@ export default function JobsClient({
       <ErrorLine>{error}</ErrorLine>
 
       <div className="flex flex-wrap items-center gap-3">
-        <FilterPills options={STATUS_FILTERS} value={status} onChange={setStatus} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterPills options={PRIMARY_FILTERS} value={PRIMARY_KEYS.has(status) ? status : ""} onChange={setStatus} />
+          <select
+            aria-label="More status filters"
+            value={PRIMARY_KEYS.has(status) ? "" : status}
+            onChange={(e) => e.target.value && setStatus(e.target.value)}
+            className="min-h-10 rounded-full px-3.5 text-[12.5px] border cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+            style={{
+              background: PRIMARY_KEYS.has(status) ? "var(--color-svc-surface-2)" : "var(--color-svc-accent-soft)",
+              color: PRIMARY_KEYS.has(status) ? "var(--color-svc-text-dim)" : TONE_TEXT.azure,
+              borderColor: "var(--color-svc-border)",
+            }}
+          >
+            <option value="" disabled>More ▾</option>
+            {MORE_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </select>
+        </div>
         <div className="flex-1" />
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
@@ -132,7 +161,7 @@ export default function JobsClient({
                   {["When", "Customer / job", "Crew", "Type", "Status", "Quote", ""].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal whitespace-nowrap"
+                      className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -140,7 +169,10 @@ export default function JobsClient({
                 </tr>
               </thead>
               <tbody className="svc-divide">
-                {filtered.map((job) => (
+                {filtered.map((job) => {
+                  const h = jobHeading(job.title, job.serviceType);
+                  const closing = needsClosing(job, new Date(nowMs));
+                  return (
                   <tr key={job.id} className="group transition hover:bg-white/[0.02]">
                     <td className="px-5 py-3 whitespace-nowrap">
                       {job.scheduledStart ? (
@@ -160,11 +192,12 @@ export default function JobsClient({
                     </td>
                     <td className="px-5 py-3 max-w-[320px]">
                       <Link href={`/service/jobs/${job.id}`} className="text-[13.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
-                        {job.title}
+                        {h.heading}
                       </Link>
-                      <p className="text-[11.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+                      <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-dim)" }} title={h.sub ? `${h.sub} — ${job.customerName}` : undefined}>
                         {job.customerName}
                         {job.area ? ` · ${job.area}` : ""}
+                        {h.sub ? <span style={{ color: "var(--color-svc-text-faint)" }}> · “{h.sub}”</span> : null}
                       </p>
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
@@ -183,14 +216,17 @@ export default function JobsClient({
                       <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>
                         {JOB_STATUS_LABEL[job.status] ?? job.status}
                       </Chip>
+                      {closing ? <span className="ml-1.5 align-middle"><Chip tone="warn">Needs closing</Chip></span> : null}
                       {job.runningLog ? (
-                        <span className="ml-1.5 text-[10.5px]" style={{ color: "var(--color-svc-warn)" }}>
+                        <span className="ml-1.5 text-[11px]" style={{ color: "var(--color-svc-warn)" }}>
                           ● live
                         </span>
                       ) : null}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
-                      <Money cents={job.quotedCents} className="text-[13px]" />
+                      {hasQuote(job.quotedCents)
+                        ? <Money cents={job.quotedCents} className="text-[13px]" />
+                        : <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>No quote</span>}
                     </td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -213,7 +249,8 @@ export default function JobsClient({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

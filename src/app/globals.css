@@ -339,6 +339,10 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
   border: 1px solid var(--color-svc-border);
   color: var(--color-svc-text-dim);
 }
+/* Tile rows that never leave an orphan: the last row stretches to fill the width. */
+.svc-tiles { display: flex; flex-wrap: wrap; gap: 12px; }
+.svc-tiles > * { flex: 1 1 calc(50% - 6px); min-width: 0; }
+@media (min-width: 768px) { .svc-tiles > * { flex-basis: 200px; } }
 .svc-divide > * + * { border-top: 1px solid var(--color-svc-border); }
 
 /* Dispatch grid lines */

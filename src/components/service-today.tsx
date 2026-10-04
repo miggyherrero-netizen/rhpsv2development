@@ -4,9 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Sun, MapPin, Navigation, Play, Square, CheckCircle2, Clock3, Phone, Wallet,
-  Gauge, BellRing, Plus, ArrowUpRight, Timer as TimerIcon,
+  Gauge, BellRing, Plus, ArrowUpRight, Timer as TimerIcon, AlertTriangle, FileClock, CalendarClock,
 } from "lucide-react";
-import { fmtTime, fmtDateLong, peso } from "@/lib/format";
+import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
+import { hasQuote, jobHeading } from "@/lib/service-reports";
 import {
   JOB_STATUS_LABEL, JOB_STATUS_TONE, SERVICE_TYPE_LABEL, fmtMinutes,
 } from "@/lib/service";
@@ -82,7 +83,7 @@ export default function TodayClient({
         </div>
         <div className="flex items-center gap-2">
           <Link href="/service/schedule" className="btn-svc-ghost rounded-xl px-3.5 py-2 text-[12.5px]">
-            Dispatch board
+            Schedule
           </Link>
           <PrimaryButton onClick={() => setQuickOpen(true)}>
             <Plus size={15} /> New job
@@ -92,37 +93,11 @@ export default function TodayClient({
 
       <ErrorLine>{error}</ErrorLine>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard label="Visits today" value={board.stats.jobsToday} sub={`${board.stats.completedToday} completed`} icon={<Sun size={15} />} />
-        <StatCard
-          label="On site"
-          value={fmtMinutes(board.stats.minutesWorked)}
-          sub={`${fmtMinutes(board.stats.minutesTravel)} travel`}
-          tone="azure"
-          icon={<TimerIcon size={15} />}
-        />
-        <StatCard
-          label="Collected today"
-          value={peso(board.stats.collectedTodayCents)}
-          tone="success"
-          icon={<Wallet size={15} />}
-        />
-        <StatCard
-          label="Outstanding"
-          value={peso(board.stats.outstandingCents)}
-          tone={board.stats.outstandingCents > 0 ? "warn" : "slate"}
-          sub="unpaid invoices"
-          icon={<Gauge size={15} />}
-        />
-        <StatCard
-          label="Open quotes"
-          value={peso(board.stats.openQuotesCents)}
-          tone="violet"
-          sub="lead + quoted jobs"
-          icon={<BellRing size={15} />}
-        />
-      </div>
+      {/* Needs attention — what to act on before anything else */}
+      <NeedsAttention board={board} />
+
+      {/* Stats — tiles with nothing to show collapse into one quiet line */}
+      <Stats board={board} />
 
       {/* Running timers */}
       {board.running.length > 0 && (
@@ -222,7 +197,7 @@ export default function TodayClient({
                               className="text-[14px] font-medium hover:underline truncate"
                               style={{ color: "var(--color-svc-text)" }}
                             >
-                              {job.title}
+                              {jobHeading(job.title, job.serviceType).heading}
                             </Link>
                             <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>
                               {JOB_STATUS_LABEL[job.status] ?? job.status}
@@ -315,7 +290,9 @@ export default function TodayClient({
                           )}
                         </div>
                         <div className="text-right shrink-0">
-                          <Money cents={job.quotedCents} className="text-[13.5px]" />
+                          {hasQuote(job.quotedCents)
+                            ? <Money cents={job.quotedCents} className="text-[13.5px]" />
+                            : <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>No quote</span>}
                           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                             {fmtMinutes(job.estimatedMinutes)} est.
                           </p>
@@ -357,37 +334,6 @@ export default function TodayClient({
 
         {/* Side column */}
         <div className="space-y-6">
-          <SectionCard title="Due for service" action={<Link href="/service/customers" className="text-[11.5px] hover:underline" style={{ color: TONE_TEXT.azure }}>All</Link>}>
-            {board.recalls.length === 0 ? (
-              <EmptyState title="No recalls due" hint="Pianos become due after their tuning interval." />
-            ) : (
-              <div className="svc-divide">
-                {board.recalls.map((r) => (
-                  <div key={r.pianoId} className="px-5 py-3">
-                    <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
-                      {r.customerName}
-                    </p>
-                    <p className="text-[11.5px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
-                      {r.pianoLabel} · {r.area ?? "—"}
-                    </p>
-                    <div className="flex items-center justify-between gap-2 mt-2">
-                      <Chip tone={r.daysUntilDue < 0 ? "danger" : r.daysUntilDue <= 14 ? "warn" : "slate"}>
-                        {r.daysUntilDue < 0 ? `${Math.abs(r.daysUntilDue)}d overdue` : `in ${r.daysUntilDue}d`}
-                      </Chip>
-                      <Link
-                        href={`/service/jobs?customer=${r.customerId}&piano=${r.pianoId}`}
-                        className="text-[11.5px] hover:underline"
-                        style={{ color: TONE_TEXT.azure }}
-                      >
-                        Schedule
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-
           <SectionCard title="Crew">
             {board.technicians.length === 0 ? (
               <EmptyState title="No technicians yet" hint="Add your field crew in Settings." />
@@ -448,6 +394,147 @@ export default function TodayClient({
         onDone={() => setQuickOpen(false)}
         pending={pending}
       />
+    </div>
+  );
+}
+
+function Stats({ board }: { board: TodayBoard }) {
+  const st = board.stats;
+  const quiet: string[] = [];
+  const tiles: React.ReactNode[] = [
+    <StatCard key="visits" label="Visits today" value={st.jobsToday} sub={`${st.completedToday} completed`} icon={<Sun size={15} />} />,
+  ];
+  if (st.minutesWorked > 0 || st.minutesTravel > 0) {
+    tiles.push(<StatCard key="onsite" label="On site" value={fmtMinutes(st.minutesWorked)} sub={`${fmtMinutes(st.minutesTravel)} travel`} tone="azure" icon={<TimerIcon size={15} />} />);
+  } else quiet.push("no time logged yet");
+  if (st.collectedTodayCents > 0) {
+    tiles.push(<StatCard key="collected" label="Collected today" value={peso(st.collectedTodayCents)} tone="success" icon={<Wallet size={15} />} />);
+  } else quiet.push("₱0 collected today");
+  if (st.outstandingCents > 0) {
+    tiles.push(
+      <StatCard
+        key="out" href="/service/invoices?filter=open" label="Outstanding" value={peso(st.outstandingCents)} tone="warn" icon={<Gauge size={15} />}
+        sub={`${st.outstandingCount} unpaid · ${peso(st.overdueCents)} overdue`}
+      />,
+    );
+  } else quiet.push("nothing outstanding");
+  if (st.openQuotesCents > 0) {
+    tiles.push(<StatCard key="quotes" label="Open quotes" value={peso(st.openQuotesCents)} tone="violet" sub="lead + quoted jobs" icon={<BellRing size={15} />} />);
+  } else quiet.push("no open quotes");
+
+  return (
+    <div className="space-y-2.5">
+      <div className="svc-tiles">{tiles}</div>
+      {quiet.length > 0 && (
+        <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>Nothing yet: {quiet.join(" · ")}.</p>
+      )}
+      {st.draftCount > 0 && (
+        <Link href="/service/invoices?filter=draft" className="inline-flex items-center gap-2 min-h-10 text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text-dim)" }}>
+          <FileClock size={14} /> <span className="svc-num">{st.draftCount} draft{st.draftCount === 1 ? "" : "s"} · {peso(st.draftCents)} not yet sent</span>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function NeedsAttention({ board }: { board: TodayBoard }) {
+  const unfinished = board.unfinished;
+  const followUps = board.followUps;
+  const recalls = board.recalls;
+  if (unfinished.length === 0 && followUps.length === 0 && recalls.length === 0) {
+    return (
+      <p className="flex items-center gap-2 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <CheckCircle2 size={16} style={{ color: "var(--color-svc-success)" }} /> All clear — no unfinished jobs, invoices to chase, or recalls due.
+      </p>
+    );
+  }
+  const sections = [unfinished.length, followUps.length, recalls.length].filter(Boolean).length;
+  return (
+    <div className={`grid grid-cols-1 gap-4 ${sections >= 3 ? "xl:grid-cols-3" : sections === 2 ? "lg:grid-cols-2" : ""}`}>
+      {unfinished.length > 0 && (
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><AlertTriangle size={14} style={{ color: "var(--color-svc-warn)" }} /> Unfinished · {unfinished.length}</span>}
+          action={<span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>past visits not closed out</span>}
+        >
+          <ul className="svc-divide">
+            {unfinished.slice(0, 6).map((j) => {
+              const h = jobHeading(j.title, j.serviceType);
+              return (
+                <li key={j.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <Link href={`/service/jobs/${j.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{h.heading}</Link>
+                    <p className="text-[12px] mt-0.5 truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+                      {j.customerName} · {fmtDate(new Date(j.scheduledStart!))}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <Chip tone="warn">Needs closing</Chip>
+                      <Chip tone={JOB_STATUS_TONE[j.status] ?? "slate"}>{JOB_STATUS_LABEL[j.status] ?? j.status}</Chip>
+                    </div>
+                  </div>
+                  <Link href={`/service/jobs/${j.id}`} className="btn-svc-ghost rounded-lg px-3 min-h-10 inline-flex items-center text-[12px] shrink-0">Close out</Link>
+                </li>
+              );
+            })}
+          </ul>
+          {unfinished.length > 6 && (
+            <Link href="/service/jobs?filter=closing" className="block px-5 py-2.5 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>
+              + {unfinished.length - 6} more
+            </Link>
+          )}
+        </SectionCard>
+      )}
+
+      {followUps.length > 0 && (
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><Wallet size={14} style={{ color: "var(--color-svc-warn)" }} /> Invoices to follow up · {followUps.length}</span>}
+          action={<Link href="/service/invoices?filter=open" className="text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>All unpaid</Link>}
+        >
+          <ul className="svc-divide">
+            {followUps.slice(0, 6).map((inv) => (
+              <li key={inv.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <Link href={`/service/invoices/${inv.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{inv.customerName}</Link>
+                  <p className="text-[12px] mt-0.5" style={{ color: inv.daysOverdue > 0 ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
+                    {inv.daysOverdue > 0 ? `${inv.daysOverdue}d overdue` : inv.dueDate ? `due ${fmtDate(new Date(inv.dueDate))}` : "no due date"}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <Money cents={inv.balanceCents} className="text-[13px]" />
+                  {inv.customerPhone && (
+                    <a href={`tel:${inv.customerPhone.replace(/[^\d+]/g, "")}`} className="mt-0.5 flex items-center justify-end gap-1 text-[12px] hover:underline min-h-8" style={{ color: TONE_TEXT.azure }}>
+                      <Phone size={11} /> Call
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
+      {recalls.length > 0 && (
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><CalendarClock size={14} style={{ color: TONE_TEXT.azure }} /> Recalls due · {recalls.length}</span>}
+          action={<Link href="/service/customers" className="text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>All</Link>}
+        >
+          <ul className="svc-divide">
+            {recalls.slice(0, 6).map((r) => (
+              <li key={r.pianoId} className="flex items-start justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text)" }}>{r.customerName}</p>
+                  <p className="text-[12px] mt-0.5 truncate" style={{ color: "var(--color-svc-text-dim)" }}>{r.pianoLabel} · {r.area ?? "—"}</p>
+                  <div className="mt-1.5">
+                    <Chip tone={r.daysUntilDue < 0 ? "danger" : r.daysUntilDue <= 14 ? "warn" : "slate"}>
+                      {r.daysUntilDue < 0 ? `${Math.abs(r.daysUntilDue)}d overdue` : `in ${r.daysUntilDue}d`}
+                    </Chip>
+                  </div>
+                </div>
+                <Link href={`/service/jobs?customer=${r.customerId}&piano=${r.pianoId}`} className="btn-svc-ghost rounded-lg px-3 min-h-10 inline-flex items-center text-[12px] shrink-0">Schedule</Link>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
     </div>
   );
 }
