@@ -308,6 +308,7 @@ export default function JobDetailClient({
                             <input
                               type="number"
                               min={1}
+                              aria-label={`Quantity for ${item.description}`}
                               defaultValue={item.qty}
                               onBlur={(e) => {
                                 const qty = Number(e.target.value);
@@ -320,6 +321,7 @@ export default function JobDetailClient({
                             <UnitInput
                               type="number"
                               prefix="₱"
+                              aria-label={`Unit price for ${item.description}`}
                               min={0}
                               step="50"
                               defaultValue={item.unitPriceCents / 100}
@@ -667,12 +669,13 @@ export default function JobDetailClient({
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-[0.16em] mb-1" style={{ color: "var(--color-svc-text-faint)" }}>
+      <p className="text-[11px] uppercase tracking-[0.1em] mb-1" style={{ color: "var(--color-svc-text-faint)" }}>
         {label}
       </p>
-      <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+      {/* a div, not a p: some values contain their own paragraphs (access notes) */}
+      <div className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
         {children}
-      </p>
+      </div>
     </div>
   );
 }

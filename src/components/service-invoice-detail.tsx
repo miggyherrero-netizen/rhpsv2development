@@ -225,7 +225,7 @@ export default function InvoiceDetailClient({
             </p>
             <div className="flex gap-2">
               <GhostButton onClick={cancelEdit} disabled={pending} className="inline-flex items-center gap-1.5 !min-h-10"><X size={13} /> Cancel</GhostButton>
-              <PrimaryButton pending={pending} onClick={saveEdit} className="!min-h-10"><Check size={14} /> Save changes</PrimaryButton>
+              <PrimaryButton pending={pending} onClick={saveEdit} className="!min-h-10 !text-white"><Check size={14} /> Save changes</PrimaryButton>
             </div>
           </div>
         )}
@@ -250,8 +250,9 @@ export default function InvoiceDetailClient({
                 const price = editing && d ? parsePesoInput(d.price) : item.unitPriceCents / 100;
                 const amountCents = Number.isInteger(qty) && qty > 0 && price !== null ? Math.round(qty * price * 100) : item.qty * item.unitPriceCents;
                 return (
-                  <tr key={item.id} style={{ borderTop: "1px solid var(--color-svc-border)", opacity: removed ? 0.45 : 1 }}>
-                    <td className="py-2.5 pr-4 text-[13px]" style={{ color: "var(--color-svc-text)", textDecoration: removed ? "line-through" : undefined }}>
+                  // A removed line is struck through and greyed with a colour (not opacity) so it stays readable.
+                  <tr key={item.id} style={{ borderTop: "1px solid var(--color-svc-border)", color: removed ? "var(--color-svc-text-faint)" : undefined, textDecoration: removed ? "line-through" : undefined }}>
+                    <td className="py-2.5 pr-4 text-[13px]" style={{ color: removed ? "var(--color-svc-text-faint)" : "var(--color-svc-text)" }}>
                       {item.description}
                       {hasVat && !item.taxable ? (
                         <span className="ml-2 text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>VAT exempt</span>
