@@ -93,7 +93,7 @@ export default function ScheduleClient({
           <GhostButton onClick={() => goWeek(1)} aria-label="Next week">
             <ChevronRight size={15} />
           </GhostButton>
-          <Select value={technician} onChange={(e) => setTechnician(e.target.value)} className="!w-auto">
+          <Select value={technician} onChange={(e) => setTechnician(e.target.value)} aria-label="Filter by crew" className="!w-auto">
             <option value="all">All crew</option>
             {board.technicians.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>

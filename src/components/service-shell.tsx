@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
   Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis,
@@ -59,13 +59,24 @@ export default function ServiceShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  // Drawer behaves like a dialog: focus moves in, Escape closes, focus returns to "More".
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); moreRef.current?.focus(); } };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [open]);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const groups = showFinance
     ? GROUPS
     : GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.href !== "/service/finance") }));
 
+  const onTab = TABS.some((t) => isActive(t.href));
   const nav = (
-    <nav className="flex-1 px-3 py-2 space-y-5 overflow-y-auto thin-scroll">
+    <nav aria-label="Home Service sections" className="flex-1 px-3 py-2 space-y-5 overflow-y-auto thin-scroll">
       {groups.map((group) => (
         <div key={group.label}>
           <p
@@ -106,14 +117,14 @@ export default function ServiceShell({
         <div className="space-y-0.5">
           <Link
             href="/admin"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05]"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <LayoutDashboard size={16} strokeWidth={1.8} /> Piano Management
           </Link>
           <Link
             href="/owner/today"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05]"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <Calendar size={16} strokeWidth={1.8} /> Personal Workspace
@@ -160,7 +171,7 @@ export default function ServiceShell({
           </span>
           <button
             onClick={() => setOpen(true)}
-            className="p-2"
+            className={`p-3 ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
             aria-label="Open menu"
           >
@@ -172,12 +183,12 @@ export default function ServiceShell({
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm anim-fade-in" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-72 svc-sidebar flex flex-col p-4 anim-drawer">
+          <div role="dialog" aria-modal="true" aria-label="Menu" className="absolute left-0 top-0 h-full w-72 svc-sidebar flex flex-col p-4 anim-drawer">
             <div className="flex items-center justify-between px-2 pt-2 pb-4">
               <p className="font-serif text-lg" style={{ color: "var(--color-svc-text)" }}>
                 Home Service
               </p>
-              <button onClick={() => setOpen(false)} aria-label="Close menu" className={`p-2.5 ${FOCUS}`} style={{ color: "var(--color-svc-text-dim)" }}>
+              <button ref={closeRef} onClick={() => { setOpen(false); moreRef.current?.focus(); }} aria-label="Close menu" className={`p-2.5 ${FOCUS}`} style={{ color: "var(--color-svc-text-dim)" }}>
                 <X size={18} />
               </button>
             </div>
@@ -200,7 +211,7 @@ export default function ServiceShell({
       {/* Phone: persistent bottom tab bar (the sidebar takes over from 1024px) */}
       <nav
         data-print-hide
-        aria-label="Home Service"
+        aria-label="Main tabs"
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 svc-sidebar border-t grid grid-cols-5"
         style={{ borderColor: "var(--color-svc-border)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
@@ -220,12 +231,14 @@ export default function ServiceShell({
           );
         })}
         <button
+          ref={moreRef}
           type="button"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={open}
+          aria-current={!onTab ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[11px] ${FOCUS}`}
-          style={{ color: "var(--color-svc-text-dim)" }}
+          style={{ color: !onTab ? "var(--color-svc-accent)" : "var(--color-svc-text-dim)" }}
         >
           <Ellipsis size={19} strokeWidth={1.8} />
           More

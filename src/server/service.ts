@@ -83,7 +83,7 @@ export async function updateCustomer(id: string, patch: CustomerInput): Promise<
       phone: str(patch.phone, 60),
       source: oneOf(patch.source, CUSTOMER_SOURCES.map((s) => s.key), "referral"),
       // Only touch tags when the caller sends them — an edit form that omits them must never wipe them.
-      ...(patch.tags !== undefined ? { tags: patch.tags.map((t) => str(t, 40)).filter((t): t is string => !!t) } : {}),
+      ...(Array.isArray(patch.tags) ? { tags: patch.tags.map((t) => str(t, 40)).filter((t): t is string => !!t) } : {}),
       notes: str(patch.notes, 4_000),
       updatedAt: new Date(),
     })

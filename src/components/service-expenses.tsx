@@ -94,6 +94,12 @@ export default function ExpensesClient({
         </p>
       </div>
 
+      {expenses.length >= 1000 && (
+        <p className="text-[12.5px]" style={{ color: "var(--color-svc-warn)" }}>
+          Showing the latest 1,000 entries — pick a shorter range for exact totals.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="col-span-2 sm:col-span-1">
           <StatCard
@@ -121,7 +127,7 @@ export default function ExpensesClient({
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
               <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="!pl-9 w-52" />
             </div>
-            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="!w-auto">
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category" className="!w-auto">
               <option value="all">All categories</option>
               {EXPENSE_CATEGORIES.map((c) => (
                 <option key={c.key} value={c.key}>{c.label}</option>

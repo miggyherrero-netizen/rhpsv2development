@@ -83,19 +83,22 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
 
       <SectionCard title={`Cashflow · ${range.label.toLowerCase()}`} action={<Legend />}>
         <div className="px-4 sm:px-5 py-5">
+          {range.key === "all" && months.length >= 24 && (
+            <p className="text-[12px] mb-3" style={FAINT}>Chart shows the latest 24 months; the totals above cover all time.</p>
+          )}
           {months.length === 0 ? (
             <p className="text-[12.5px]" style={FAINT}>Nothing to plot yet.</p>
           ) : (
             <div className="flex gap-2" role="group" aria-label={`Cashflow by ${granularity}, ${range.label}. Use Tab to hear each ${granularity}.`}>
               {/* y-axis */}
-              <div className="relative w-12 shrink-0 h-56 mb-6" aria-hidden="true">
+              <div className="relative w-12 shrink-0 h-56 mt-3 mb-6" aria-hidden="true">
                 {scale.ticks.map((t) => (
                   <span key={t} className="svc-num absolute right-0 -translate-y-1/2 text-[11px]" style={{ bottom: `${(t / scale.max) * 100}%`, ...FAINT }}>
                     {compactPeso(t)}
                   </span>
                 ))}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 mt-3">
                 <div className="relative h-56">
                   {scale.ticks.map((t) => (
                     <div key={t} className="absolute inset-x-0 border-t" aria-hidden="true"
@@ -105,7 +108,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
                     {months.map((m) => {
                       const summary = `${m.label}: invoiced ${peso(m.invoicedCents)}, collected ${peso(m.collectedCents)}, expenses ${peso(m.expenseCents)}`;
                       return (
-                        <div key={m.key} tabIndex={0} title={summary} aria-label={summary}
+                        <div key={m.key} role="group" tabIndex={0} title={summary} aria-label={summary}
                           className="group relative flex-1 h-full flex items-end justify-center gap-px rounded-sm hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]">
                           {SERIES.map((s) => (
                             <div key={s.key} className="flex-1 max-w-4 rounded-t-sm"

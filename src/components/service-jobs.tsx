@@ -127,13 +127,13 @@ export default function JobsClient({
             className="!pl-9 w-64"
           />
         </div>
-        <Select value={type} onChange={(e) => setType(e.target.value)} className="!w-auto">
+        <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Filter by job type" className="!w-auto">
           <option value="all">All types</option>
           {SERVICE_TYPES.map((s) => (
             <option key={s.key} value={s.key}>{s.label}</option>
           ))}
         </Select>
-        <Select value={tech} onChange={(e) => setTech(e.target.value)} className="!w-auto">
+        <Select value={tech} onChange={(e) => setTech(e.target.value)} aria-label="Filter by crew" className="!w-auto">
           <option value="all">All crew</option>
           {technicians.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -356,7 +356,7 @@ function NewJobModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Scheduled start" hint="Manila time">
-            <TextInput type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} defaultValue={toLocalInput(new Date()).slice(0, 16)} />
+            <TextInput type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
           </Field>
           <Field label="Travel fee" hint="Pesos">
             <TextInput type="number" min={0} step="50" value={travelFee} onChange={(e) => setTravelFee(e.target.value)} placeholder="0" />

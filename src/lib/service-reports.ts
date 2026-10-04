@@ -265,7 +265,7 @@ const HONORIFICS: Record<string, string> = {
 };
 
 /** Common acronyms (banks, schools, suffixes) that must stay upper-case inside an all-caps name. */
-const ACRONYMS = new Set(["BDO", "BPI", "PNB", "SM", "UP", "USC", "UST", "USEP", "ADMU", "DLSU", "NGO", "LLC", "INC", "PH", "USA", "CDO", "GMA"]);
+const ACRONYMS = new Set(["BDO", "BPI", "PNB", "SM", "UP", "USC", "UST", "USEP", "ADMU", "DLSU", "NGO", "LLC", "INC", "PH", "USA", "CDO", "GMA", "II", "III", "IV", "VI", "VII"]);
 
 /**
  * Title Case only when the name is entirely lower- or UPPER-case. Mixed-case names
@@ -284,7 +284,7 @@ export function titleCaseName(name: string | null | undefined): string {
       const bare = word.replace(/\.$/, "").toLowerCase();
       if (HONORIFICS[bare]) return HONORIFICS[bare];
       if (wasUpper && (ACRONYMS.has(word) || (/^[A-Z]{2,3}$/.test(word) && !/[AEIOU]/.test(word)))) return word;
-      return word.toLowerCase().replace(/(^|[-'’/])([a-z])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+      return word.toLowerCase().replace(/(^|[-'’/])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase());
     })
     .join(" ");
 }

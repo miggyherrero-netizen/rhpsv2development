@@ -264,6 +264,7 @@ export default function SettingsClient({
                     <>
                       <TextInput
                         type="time"
+                        aria-label={`${day} opening time`}
                         value={minToTime(value[0])}
                         onChange={(e) =>
                           setHours((prev) => ({ ...prev, [index]: [timeToMin(e.target.value), value[1]] }))
@@ -273,6 +274,7 @@ export default function SettingsClient({
                       <span style={{ color: "var(--color-svc-text-faint)" }}>to</span>
                       <TextInput
                         type="time"
+                        aria-label={`${day} closing time`}
                         value={minToTime(value[1])}
                         onChange={(e) =>
                           setHours((prev) => ({ ...prev, [index]: [value[0], timeToMin(e.target.value)] }))
@@ -294,9 +296,9 @@ export default function SettingsClient({
       {/* Appears only when something changed */}
       {dirty && (
         <div
-          role="region"
+          role="status"
           aria-label="Unsaved changes"
-          className="fixed inset-x-0 bottom-16 lg:bottom-0 lg:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
+          className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] lg:bottom-0 lg:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
           style={{ background: "var(--color-svc-surface)", borderColor: "var(--color-svc-border-strong)", boxShadow: "0 -10px 30px rgba(0,0,0,0.35)" }}
         >
           <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>

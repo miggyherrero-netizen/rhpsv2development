@@ -7,7 +7,7 @@ import { fmtDate, peso } from "@/lib/format";
 import {
   AGING_BUCKETS, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, invoiceCode,
 } from "@/lib/service";
-import { billedCents, isCountable } from "@/lib/service-reports";
+import { isCountable } from "@/lib/service-reports";
 import type { InvoiceRow } from "@/server/service-data";
 import { createInvoice, recordPayment, setInvoiceStatus } from "@/server/service";
 import {
@@ -31,8 +31,10 @@ export default function InvoicesClient({
   vatEnabled,
   aging,
   drafts,
+  totals,
   initialFilter = "open",
 }: {
+  totals: { invoiced: number; collected: number; outstanding: number };
   drafts: { count: number; totalCents: number };
   initialFilter?: string;
   invoices: InvoiceRow[];
@@ -73,12 +75,6 @@ export default function InvoicesClient({
       })
       .filter((inv) => !q || `${inv.customerName} ${invoiceCode(invoicePrefix, inv.invoiceNumber, inv.issueDate)} ${inv.jobTitle ?? ""}`.toLowerCase().includes(q));
   }, [invoices, filter, query, invoicePrefix]);
-
-  const totals = useMemo(() => {
-    const invoiced = billedCents(invoices);
-    const collected = invoices.filter((i) => isCountable(i)).reduce((s, i) => s + i.amountPaidCents, 0);
-    return { invoiced, collected, outstanding: aging.totalOutstandingCents };
-  }, [invoices, aging.totalOutstandingCents]);
 
   const maxBucket = Math.max(1, ...aging.buckets.map((b) => b.amountCents));
 
@@ -302,7 +298,7 @@ export default function InvoicesClient({
 function InvoiceActions({ inv, pending, onPay, onSend }: { inv: InvoiceRow; pending: boolean; onPay: () => void; onSend: () => void }) {
   return (
     <>
-      {inv.balanceCents > 0 && !inv.voidedAt && inv.status !== "draft" && (
+      {inv.balanceCents > 0 && !inv.voidedAt && (
         <GhostButton disabled={pending} onClick={onPay} className="!min-h-10 !text-[12px]">Record payment</GhostButton>
       )}
       {inv.status === "draft" && (

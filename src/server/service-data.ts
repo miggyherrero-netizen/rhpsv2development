@@ -22,7 +22,7 @@ import {
   type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
 import {
-  titleCaseName, countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
+  titleCaseName, billedCents, countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
   resolveRange, type RangeKey, type ResolvedRange, type SeriesPoint,
 } from "@/lib/service-reports";
 
@@ -451,7 +451,7 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
   const dayStart = startOfManilaDayUTC(now);
   const dayEnd = addDays(dayStart, 1);
 
-  const [jobs, technicians, recalls, running, moneyToday, timeToday, pastDue, invoices] = await Promise.all([
+  const [jobs, technicians, recalls, running, moneyToday, timeToday, pastDue, snapshot] = await Promise.all([
     getJobs({ from: dayStart, to: dayEnd, limit: 200 }),
     getTechnicians(),
     getRecalls(now),
@@ -475,13 +475,19 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
       .from(serviceTimeLogs)
       .where(and(isNotNull(serviceTimeLogs.endedAt), gte(serviceTimeLogs.startedAt, dayStart), lt(serviceTimeLogs.startedAt, dayEnd)))
       .groupBy(serviceTimeLogs.kind),
-    getJobs({ statuses: ["scheduled", "en_route", "in_progress"], to: dayStart, limit: 60 }),
-    getInvoices({ limit: 400 }, now),
+    getJobs({ statuses: ["scheduled", "en_route", "in_progress"], to: dayStart, limit: 200 }),
+    getReceivablesSnapshot(now),
   ]);
+  const followUps = snapshot.followUpIds.length
+    ? await getInvoices({ ids: snapshot.followUpIds }, now).then((rows) => {
+        const order = new Map(snapshot.followUpIds.map((id, i) => [id, i]));
+        return rows.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+      })
+    : [];
 
   const unfinished = pastDue.filter((j) => needsClosing(j, now));
-  const rec = receivables(invoices, now);
-  const drafts = draftSummary(invoices, now);
+  const rec = snapshot.aging;
+  const drafts = snapshot.drafts;
 
   const openQuotes = await db
     .select({ total: sql<number>`coalesce(sum(${serviceJobs.quotedCents}), 0)::int` })
@@ -498,7 +504,7 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
     technicians,
     recalls: recalls.slice(0, 8),
     unfinished,
-    followUps: needsFollowUp(invoices, now).slice(0, 8),
+    followUps,
     stats: {
       jobsToday: jobs.length,
       completedToday: jobs.filter((j) => j.status === "completed" || j.status === "invoiced" || j.status === "paid").length,
@@ -529,11 +535,12 @@ export type InvoiceRow = ServiceInvoice & {
   daysOverdue: number;
 };
 
-export type InvoiceFilter = { statuses?: string[]; customerId?: string; from?: Date; to?: Date; limit?: number };
+export type InvoiceFilter = { statuses?: string[]; ids?: string[]; customerId?: string; from?: Date; to?: Date; limit?: number };
 
 export async function getInvoices(filter: InvoiceFilter = {}, now: Date = new Date()): Promise<InvoiceRow[]> {
   const clauses: (SQL | undefined)[] = [];
   if (filter.statuses?.length) clauses.push(inArray(serviceInvoices.status, filter.statuses));
+  if (filter.ids) clauses.push(filter.ids.length ? inArray(serviceInvoices.id, filter.ids) : sql`false`);
   if (filter.customerId) clauses.push(eq(serviceInvoices.customerId, filter.customerId));
   if (filter.from) clauses.push(gte(serviceInvoices.issueDate, filter.from));
   if (filter.to) clauses.push(lt(serviceInvoices.issueDate, filter.to));
@@ -568,6 +575,28 @@ export async function getInvoices(filter: InvoiceFilter = {}, now: Date = new Da
       daysOverdue: daysOverdue(r.invoice, now),
     };
   });
+}
+
+/**
+ * Receivables as of today, computed over EVERY invoice (a slim select) — never over a
+ * paginated list, so old unpaid invoices can't silently drop out of Outstanding / Overdue.
+ */
+export async function getReceivablesSnapshot(now: Date = new Date()) {
+  const rows = await db
+    .select({
+      id: serviceInvoices.id, status: serviceInvoices.status, totalCents: serviceInvoices.totalCents,
+      amountPaidCents: serviceInvoices.amountPaidCents, dueDate: serviceInvoices.dueDate,
+      sentAt: serviceInvoices.sentAt, voidedAt: serviceInvoices.voidedAt,
+    })
+    .from(serviceInvoices);
+  const live = countable(rows, now);
+  return {
+    aging: receivables(rows, now),
+    drafts: draftSummary(rows, now),
+    billedCents: billedCents(rows, now),
+    collectedCents: live.reduce((s, i) => s + i.amountPaidCents, 0),
+    followUpIds: needsFollowUp(rows, now).slice(0, 8).map((i) => i.id),
+  };
 }
 
 export type InvoiceDetail = {

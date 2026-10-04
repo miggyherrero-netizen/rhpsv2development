@@ -94,7 +94,7 @@ export default function TimeClient({
 
       <ErrorLine>{error}</ErrorLine>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="svc-tiles">
         <StatCard label="On site" value={fmtMinutes(totals.work)} tone="azure" icon={<Timer size={15} />} />
         <StatCard label="Travel" value={fmtMinutes(totals.travel)} tone="violet" icon={<Navigation size={15} />} />
         <StatCard label="Breaks" value={fmtMinutes(totals.breaks)} />

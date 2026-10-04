@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
 import { hasQuote, jobHeading } from "@/lib/service-reports";
+import { telHref } from "@/lib/dashboard";
 import {
   JOB_STATUS_LABEL, JOB_STATUS_TONE, SERVICE_TYPE_LABEL, fmtMinutes,
 } from "@/lib/service";
@@ -235,7 +236,7 @@ export default function TodayClient({
                               </a>
                             )}
                             {job.customerPhone && (
-                              <a href={`tel:${job.customerPhone}`} className="inline-flex items-center gap-1 hover:underline">
+                              <a href={telHref(job.customerPhone) ?? undefined} className="inline-flex items-center gap-1 hover:underline">
                                 <Phone size={12} /> {job.customerPhone}
                               </a>
                             )}
@@ -501,7 +502,7 @@ function NeedsAttention({ board }: { board: TodayBoard }) {
                 <div className="text-right shrink-0">
                   <Money cents={inv.balanceCents} className="text-[13px]" />
                   {inv.customerPhone && (
-                    <a href={`tel:${inv.customerPhone.replace(/[^\d+]/g, "")}`} className="mt-0.5 flex items-center justify-end gap-1 text-[12px] hover:underline min-h-8" style={{ color: TONE_TEXT.azure }}>
+                    <a href={telHref(inv.customerPhone) ?? undefined} className="mt-0.5 flex items-center justify-end gap-1 text-[12px] hover:underline min-h-8" style={{ color: TONE_TEXT.azure }}>
                       <Phone size={11} /> Call
                     </a>
                   )}

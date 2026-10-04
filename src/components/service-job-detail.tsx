@@ -13,6 +13,7 @@ import {
   TIME_KINDS, TIME_KIND_LABEL, ITEM_KINDS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL,
   computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents, taxLineLabel,
 } from "@/lib/service";
+import { countable } from "@/lib/service-reports";
 import type { JobDetail } from "@/server/service-data";
 import {
   updateJob, setJobStatus, assignJob, addJobItem, updateJobItem, deleteJobItem, addJobNote,
@@ -63,7 +64,8 @@ export default function JobDetailClient({
   const workMinutes = detail.timeLogs.filter((l) => l.kind === "work").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const travelMinutes = detail.timeLogs.filter((l) => l.kind === "travel").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const expenseCents = detail.expenses.reduce((s, e) => s + e.amountCents, 0);
-  const liveInvoices = detail.invoices.filter((i) => !i.voidedAt);
+  // Drafts never count as invoiced — same rule as Finance job margins.
+  const liveInvoices = countable(detail.invoices);
   const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
   // Saved VAT on each invoice — historical invoices keep whatever rate they were issued at.
   const invoicedTaxCents = liveInvoices.reduce((s, i) => s + i.taxCents, 0);
