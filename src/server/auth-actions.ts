@@ -8,6 +8,8 @@ import { createSession, endSession, requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { LOGIN_GATE_COOKIE } from "@/lib/auth-constants";
+import { afterFailure, isLocked, LOCK_MESSAGE } from "@/lib/gos/lockout";
+import { clearAttemptState, getAttemptState, saveAttemptState } from "@/server/gos/login-attempts";
 
 const LOGIN_GATE_PIN_KEY = "loginGatePinHash";
 const DEFAULT_LOGIN_GATE_PIN = "0000";
@@ -22,10 +24,19 @@ async function getLoginGatePinHash() {
 }
 
 export async function login(email: string, password: string): Promise<{ ok: boolean; error?: string }> {
-  const [user] = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return { ok: false, error: "Incorrect email or password." };
+  const key = email.trim().toLowerCase();
+  const now = new Date();
+  const attempts = await getAttemptState(key);
+  if (isLocked(attempts, now)) {
+    return { ok: false, error: LOCK_MESSAGE };
   }
+  const [user] = await db.select().from(users).where(eq(users.email, key)).limit(1);
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    const next = afterFailure(attempts, now);
+    await saveAttemptState(key, next);
+    return { ok: false, error: isLocked(next, now) ? LOCK_MESSAGE : "Incorrect email or password." };
+  }
+  await clearAttemptState(key);
   await createSession(user.id);
   return { ok: true };
 }
