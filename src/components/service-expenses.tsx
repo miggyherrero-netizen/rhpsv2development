@@ -10,7 +10,7 @@ import {
   EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, PAYMENT_METHODS, PAYMENT_METHOD_LABEL,
 } from "@/lib/service";
 import type { ExpenseRow } from "@/server/service-data";
-import { createExpense, deleteExpense } from "@/server/service";
+import { createExpense, deleteExpense, getExpenseReceipt } from "@/server/service";
 import {
   Bar, Chip, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
   RangePicker, SectionCard, Select, StatCard, SvcModal, TextInput, TONE_BAR,
@@ -35,7 +35,12 @@ export default function ExpensesClient({
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [receiptView, setReceiptView] = useState<{ url: string; title: string } | null>(null);
+  const [receiptView, setReceiptView] = useState<{ url: string | null; title: string; error?: string } | null>(null);
+  const openReceipt = async (id: string, title: string) => {
+    setReceiptView({ url: null, title });
+    const res = await getExpenseReceipt(id);
+    setReceiptView({ url: res.ok ? res.data?.url ?? null : null, title, error: res.ok ? undefined : res.error });
+  };
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -174,9 +179,9 @@ export default function ExpensesClient({
                         {e.reimbursable ? (
                           <span className="text-[11px] ml-2" style={{ color: "var(--color-svc-violet)" }}>reimbursable</span>
                         ) : null}
-                        {e.receiptUrl ? (
+                        {e.hasReceipt ? (
                           <button
-                            type="button" onClick={() => setReceiptView({ url: e.receiptUrl!, title: e.description })}
+                            type="button" onClick={() => openReceipt(e.id, e.description)}
                             className="ml-2 inline-flex items-center gap-1 text-[12px] hover:underline min-h-8 align-middle"
                             style={{ color: "var(--color-svc-accent)" }} aria-label={`View receipt for ${e.description}`}
                           >
@@ -243,7 +248,10 @@ export default function ExpensesClient({
       </div>
 
       <SvcModal open={!!receiptView} onClose={() => setReceiptView(null)} title="Receipt" subtitle={receiptView?.title} wide>
-        {receiptView && (
+        {receiptView && !receiptView.url && (
+          <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{receiptView.error ?? "Loading receipt…"}</p>
+        )}
+        {receiptView?.url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={receiptView.url} alt={`Receipt for ${receiptView.title}`} className="w-full max-h-[70vh] object-contain rounded-lg bg-black/30" />
         )}

@@ -15,7 +15,8 @@ const key = (status: string, c = ctx) => nextJobStep(status, c)?.key ?? null;
 
 console.log("job next step");
 check("lead with quote lines -> send quote", key("lead"), "send_quote");
-check("lead with nothing yet -> schedule", key("lead", { ...ctx, hasLineItems: false }), "schedule");
+check("lead with nothing yet -> schedule", key("lead", { ...ctx, hasLineItems: false, hasSchedule: false }), "schedule");
+check("lead already scheduled, no quote -> start travel (no dead end)", key("lead", { ...ctx, hasLineItems: false }), "start_travel");
 check("quoted -> accept", key("quoted"), "accept_quote");
 check("scheduled -> start travel; unscheduled -> schedule", [key("scheduled"), key("scheduled", { ...ctx, hasSchedule: false })], ["start_travel", "schedule"]);
 check("travel -> arrived -> complete", [key("en_route"), key("in_progress")], ["arrive", "complete"]);
@@ -76,3 +77,10 @@ check("owner only", [canViewFinance({ role: "owner" }), canViewFinance({ role: "
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nall service flow checks passed");
+
+check("quote re-sent after acceptance shows Sent", quoteStatus("quoted", [{ type: "quote_accepted" }]), "sent");
+check("reopened quote (lead) shows Draft", quoteStatus("lead", [{ type: "quote_accepted" }]), "draft");
+check("accepted quote stays accepted once scheduled", quoteStatus("scheduled", [{ type: "quote_accepted" }]), "accepted");
+check("messenger rejects profile.php", parseMessengerHandle("https://facebook.com/profile.php?id=123"), null);
+check("messenger rejects trailing dot", parseMessengerHandle("juan."), null);
+check("messenger accepts m.me link", parseMessengerHandle("https://m.me/juan.dela.cruz"), "juan.dela.cruz");

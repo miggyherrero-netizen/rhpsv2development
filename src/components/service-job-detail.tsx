@@ -92,11 +92,13 @@ export default function JobDetailClient({
     });
   };
 
-  const runTo = async (fn: () => Promise<{ ok: true; data?: { id: string } } | { ok: false; error: string }>) => {
+  const runTo = (fn: () => Promise<{ ok: true; data?: { id: string } } | { ok: false; error: string }>) => {
     setError(null);
-    const res = await fn();
-    if (res.ok && res.data?.id) router.push(`/service/invoices/${res.data.id}`);
-    else if (!res.ok) setError(res.error);
+    startTransition(async () => {
+      const res = await fn();
+      if (res.ok && res.data?.id) router.push(`/service/invoices/${res.data.id}`);
+      else if (!res.ok) setError(res.error);
+    });
   };
 
   const statusTone = JOB_STATUS_TONE[job.status] ?? "slate";

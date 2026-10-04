@@ -21,8 +21,10 @@ export type StepContext = { hasLineItems: boolean; hasInvoice: boolean; hasSched
 export function nextJobStep(status: string, ctx: StepContext): NextStep | null {
   switch (status) {
     case "lead":
-      return ctx.hasLineItems
-        ? { key: "send_quote", label: "Send quote", hint: "Marks the job as quoted and opens the quote to share" }
+      if (ctx.hasLineItems) return { key: "send_quote", label: "Send quote", hint: "Marks the job as quoted and opens the quote to share" };
+      // A lead that already has a visit time and no quote to send goes straight to the visit.
+      return ctx.hasSchedule
+        ? { key: "start_travel", label: "Start travel", hint: "Starts the travel timer" }
         : { key: "schedule", label: "Schedule visit", hint: "Pick a date and time" };
     case "quoted":
       return { key: "accept_quote", label: "Mark quote accepted", hint: "The customer said yes" };
@@ -144,7 +146,8 @@ export function parseMessengerHandle(input: string): string | null {
   // A pasted link to any other website is not a Messenger handle.
   if (/^https?:\/\//i.test(raw) && !KNOWN.test(raw)) return null;
   const h = (raw.replace(KNOWN, "").replace(/^@/, "").split(/[/?#]/)[0]) ?? "";
-  return /^[A-Za-z0-9._-]{3,60}$/.test(h) ? h : null;
+  if (/^(profile\.php|people|pages|groups|share|sharer)$/i.test(h)) return null;
+  return /^[A-Za-z0-9](?:[A-Za-z0-9._-]{1,58})[A-Za-z0-9]$/.test(h) ? h : null;
 }
 
 /** Stored in the existing `tags` column (no schema change). */
@@ -165,8 +168,10 @@ export type QuoteStatus = "draft" | "sent" | "accepted" | "converted";
 /** A quote is derived from its job: no separate record, so it can never disagree with the job it prices. */
 export function quoteStatus(jobStatus: string, events: { type: string }[]): QuoteStatus {
   if (jobStatus === "invoiced" || jobStatus === "paid") return "converted";
-  if (events.some((e) => e.type === "quote_accepted")) return "accepted";
+  // Back at lead/quoted means the quote was reopened or re-sent: an older acceptance no longer counts.
   if (jobStatus === "quoted") return "sent";
+  if (jobStatus === "lead") return "draft";
+  if (events.some((e) => e.type === "quote_accepted")) return "accepted";
   return "draft";
 }
 

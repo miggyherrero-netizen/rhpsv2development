@@ -654,21 +654,23 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
  * Expenses + time
  * ============================================================ */
 
-export type ExpenseRow = ServiceExpense & { jobCode: string | null; jobTitle: string | null };
+/** Receipt images are data URLs (~MBs): lists carry only `hasReceipt`; the viewer fetches one on demand. */
+export type ExpenseRow = Omit<ServiceExpense, "receiptUrl"> & { hasReceipt: boolean; jobCode: string | null; jobTitle: string | null };
 
 export async function getExpenses(from?: Date, to?: Date, limit = 300): Promise<ExpenseRow[]> {
   const clauses: (SQL | undefined)[] = [];
   if (from) clauses.push(gte(serviceExpenses.spentAt, from));
   if (to) clauses.push(lt(serviceExpenses.spentAt, to));
   const rows = await db
-    .select({ expense: serviceExpenses, jobNumber: serviceJobs.jobNumber, jobTitle: serviceJobs.title, jobCreatedAt: serviceJobs.createdAt })
+    .select({ expense: serviceExpenses, hasReceipt: sql<boolean>`${serviceExpenses.receiptUrl} is not null`, jobNumber: serviceJobs.jobNumber, jobTitle: serviceJobs.title, jobCreatedAt: serviceJobs.createdAt })
     .from(serviceExpenses)
     .leftJoin(serviceJobs, eq(serviceJobs.id, serviceExpenses.jobId))
     .where(clauses.length ? and(...clauses) : undefined)
     .orderBy(desc(serviceExpenses.spentAt))
     .limit(limit);
-  return rows.map((r) => ({
-    ...r.expense,
+  return rows.map(({ expense: { receiptUrl: _receipt, ...expense }, ...r }) => ({
+    ...expense,
+    hasReceipt: !!r.hasReceipt,
     jobCode: r.jobNumber ? jobCode("WO", r.jobNumber, r.jobCreatedAt) : null,
     jobTitle: r.jobTitle,
   }));

@@ -77,7 +77,7 @@ export async function createCustomer(input: CustomerInput): Promise<Result<{ id:
       email: str(input.email, 200),
       phone: str(input.phone, 60),
       source: oneOf(input.source, CUSTOMER_SOURCES.map((s) => s.key), "referral"),
-      tags: (input.tags ?? []).map((t) => str(t, 40)).filter((t): t is string => !!t),
+      tags: (input.tags ?? []).map((t) => str(t, 80)).filter((t): t is string => !!t),
       notes: str(input.notes, 4_000),
     })
     .returning({ id: serviceCustomers.id });
@@ -99,7 +99,7 @@ export async function updateCustomer(id: string, patch: CustomerInput): Promise<
       phone: str(patch.phone, 60),
       source: oneOf(patch.source, CUSTOMER_SOURCES.map((s) => s.key), "referral"),
       // Only touch tags when the caller sends them — an edit form that omits them must never wipe them.
-      ...(Array.isArray(patch.tags) ? { tags: patch.tags.map((t) => str(t, 40)).filter((t): t is string => !!t) } : {}),
+      ...(Array.isArray(patch.tags) ? { tags: patch.tags.map((t) => str(t, 80)).filter((t): t is string => !!t) } : {}),
       notes: str(patch.notes, 4_000),
       updatedAt: new Date(),
     })
@@ -515,6 +515,15 @@ export async function setJobStatus(id: string, status: string, note?: string): P
 
   await db.update(serviceJobs).set(patch).where(eq(serviceJobs.id, id));
 
+  // Leaving the field (done, paused, cancelled, billed) can't leave a timer running and cost accruing.
+  if (["completed", "cancelled", "on_hold", "invoiced", "paid"].includes(next)) {
+    const running = await db.select().from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, id), isNull(serviceTimeLogs.endedAt)));
+    for (const log of running) {
+      await db.update(serviceTimeLogs).set({ endedAt: now, minutes: elapsedMinutes(log.startedAt, now) }).where(eq(serviceTimeLogs.id, log.id));
+    }
+    if (running.length) await recalcJobLabor(id);
+  }
+
   if (next === "completed") {
     await recalcJobLabor(id);
     await recalcJobMoney(id);
@@ -545,29 +554,27 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
   await requireUser();
   const effect = stepEffect(step as StepKey);
   if (!effect) return fail("That step isn't an action.");
-  const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
-  if (!job) return fail("Job not found.");
 
-  const [[items], [invoice]] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId)).then((r) => [r[0]!]),
-    db.select({ id: serviceInvoices.id }).from(serviceInvoices)
-      .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1).then((r) => [r[0]]),
-  ]);
-  // Only the step the job is actually on may run: a stale tab or double-click can't skip ahead.
-  const expected = nextJobStep(job.status, { hasLineItems: items.n > 0, hasInvoice: !!invoice, hasSchedule: !!job.scheduledStart });
-  if (expected?.key !== step) return fail("This job has moved on — refresh to see the next step.");
+  // Guard + writes share one transaction with the job row locked, so a double-click or stale tab can't run a step twice.
+  const outcome = await db.transaction(async (tx): Promise<Result> => {
+    const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).for("update").limit(1);
+    if (!job) return fail("Job not found.");
+    const [items] = await tx.select({ n: sql<number>`count(*)::int` }).from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
+    const [invoice] = await tx.select({ id: serviceInvoices.id }).from(serviceInvoices)
+      .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1);
+    // Only the step the job is actually on may run.
+    const expected = nextJobStep(job.status, { hasLineItems: (items?.n ?? 0) > 0, hasInvoice: !!invoice, hasSchedule: !!job.scheduledStart });
+    if (expected?.key !== step) return fail("This job has moved on — refresh to see the next step.");
 
-  const now = new Date();
-  if (effect.startTimer && job.technicianId) {
-    const [busy] = await db.select({ id: serviceTimeLogs.id, jobId: serviceTimeLogs.jobId }).from(serviceTimeLogs)
-      .where(and(eq(serviceTimeLogs.technicianId, job.technicianId), isNull(serviceTimeLogs.endedAt))).limit(1);
-    if (busy && busy.jobId !== jobId) return fail("That technician already has a timer running on another job — stop it first.");
-  }
-  const rate = effect.startTimer && job.technicianId
-    ? (await db.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1))[0]?.r ?? 0
-    : 0;
-
-  await db.transaction(async (tx) => {
+    const now = new Date();
+    let rate = 0;
+    if (effect.startTimer && job.technicianId) {
+      const [busy] = await tx.select({ jobId: serviceTimeLogs.jobId }).from(serviceTimeLogs)
+        .where(and(eq(serviceTimeLogs.technicianId, job.technicianId), isNull(serviceTimeLogs.endedAt))).limit(1);
+      if (busy && busy.jobId !== jobId) return fail("That technician already has a timer running on another job — stop it first.");
+      const [tech] = await tx.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1);
+      rate = tech?.r ?? 0;
+    }
     if (effect.stopTimers) {
       const running = await tx.select().from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, jobId), isNull(serviceTimeLogs.endedAt)));
       for (const log of running) {
@@ -584,14 +591,21 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
       updatedAt: now,
     }).where(eq(serviceJobs.id, jobId));
     await tx.insert(serviceJobEvents).values({ jobId, type: effect.event.type, message: effect.event.message, actorName: "Owner" });
+    return ok();
   });
+  if (!outcome.ok) return outcome;
 
-  if (effect.status === "completed") {
-    await recalcJobLabor(jobId);
-    await recalcJobMoney(jobId);
-    await advanceRecall(jobId);
-  } else if (effect.stopTimers) {
-    await recalcJobLabor(jobId);
+  // Derived totals are recomputed from the saved logs; a failure here must not hide that the step itself succeeded.
+  try {
+    if (effect.status === "completed") {
+      await recalcJobLabor(jobId);
+      await recalcJobMoney(jobId);
+      await advanceRecall(jobId);
+    } else if (effect.stopTimers) {
+      await recalcJobLabor(jobId);
+    }
+  } catch (err) {
+    console.error("advanceJob recalculation failed", jobId, err);
   }
   touch();
   return ok();
@@ -886,6 +900,11 @@ async function createInvoiceRows(input: {
   terms?: string | null; notes?: string | null; dueDate?: Date | null; discountCents?: number;
 }): Promise<Result<{ id: string }>> {
   const user = await requireUser();
+  if (input.jobId) {
+    const [linked] = await db.select({ customerId: serviceJobs.customerId }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
+    if (!linked) return fail("That job no longer exists.");
+    if (linked.customerId !== input.customerId) return fail("That job belongs to a different customer.");
+  }
   const [settings] = await db.select().from(serviceSettings).where(eq(serviceSettings.ownerId, user.id)).limit(1);
   const terms = input.terms ?? null;
   const issueDate = new Date();
@@ -923,10 +942,11 @@ async function createInvoiceRows(input: {
   await recalcInvoice(invoice!.id);
 
   if (input.jobId) {
+    // Only a finished job becomes "invoiced"; billing a lead/quote/scheduled job early leaves its status alone.
     await db
       .update(serviceJobs)
       .set({ status: "invoiced", invoicedAt: issueDate, updatedAt: new Date() })
-      .where(eq(serviceJobs.id, input.jobId));
+      .where(and(eq(serviceJobs.id, input.jobId), eq(serviceJobs.status, "completed")));
     await db.insert(serviceJobEvents).values({
       jobId: input.jobId, type: "invoiced", message: "Invoice created", actorName: "Owner",
     });
@@ -940,6 +960,11 @@ export async function createInvoiceFromJob(jobId: string, opts: { discountCents?
   await requireUser();
   const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
   if (!job) return fail("Job not found.");
+  if (job.status === "cancelled") return fail("This job is cancelled — reopen it before invoicing.");
+  // Double-click / second tab: hand back the invoice that already exists instead of billing twice.
+  const [existing] = await db.select({ id: serviceInvoices.id }).from(serviceInvoices)
+    .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1);
+  if (existing) return ok({ id: existing.id });
   const items = await db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
   const lines: {
     description: string; qty: number; unitPriceCents: number; taxable: boolean; jobItemId: string | null;
@@ -1207,6 +1232,15 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
     .returning({ id: serviceExpenses.id });
   touch();
   return ok({ id: row!.id });
+}
+
+/** Loads one receipt image for the viewer (finance-gated; never shipped in list payloads). */
+export async function getExpenseReceipt(id: string): Promise<Result<{ url: string }>> {
+  await requireUser();
+  if (!(await requireFinance())) return FINANCE_DENIED;
+  const [row] = await db.select({ url: serviceExpenses.receiptUrl }).from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1);
+  if (!row?.url) return fail("No receipt on this expense.");
+  return ok({ url: row.url });
 }
 
 export async function updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Result> {

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Receipt photos travel inside Server Action bodies (downsized in the browser, capped server-side at ~3.2MB of text).
+  experimental: { serverActions: { bodySizeLimit: "4mb" } },
   async headers() {
     return [{
       source: "/share/service/:path*",
