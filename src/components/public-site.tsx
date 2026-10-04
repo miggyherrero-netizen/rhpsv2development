@@ -93,7 +93,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       {/* ================= HERO ================= */}
       <section id="top" className="relative min-h-[100svh] flex items-end overflow-hidden bg-coal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={HERO_IMAGE.src} alt={HERO_IMAGE.alt} style={{ objectPosition: HERO_IMAGE.position }} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={content.hero.imageVersion ? `/hero-image?v=${content.hero.imageVersion}` : HERO_IMAGE.src} alt={content.hero.imageAlt || HERO_IMAGE.alt} style={{ objectPosition: HERO_IMAGE.position }} className="absolute inset-0 h-full w-full object-cover" />
         {/* Two layers: a bottom-up fade for the whole block, plus a left-side scrim directly behind the text. */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/45" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />

@@ -4,13 +4,13 @@
  */
 
 /**
- * TODO(owner): hero photo. Drop a real showroom/workshop photo into /public/img/
- * (e.g. /public/img/hero-showroom.jpg), then change `src` and `alt` below.
- * `position` is the CSS object-position — nudge it (e.g. "60% 40%") so the piano isn't cropped.
+ * Default hero photo, used until you upload one in Admin → Website → Hero photo
+ * (an uploaded photo always wins). `position` is the CSS object-position — nudge it
+ * (e.g. "60% 40%") so the piano isn't cropped.
  */
 export const HERO_IMAGE = {
   src: "/img/hero.jpg",
-  alt: "Interior of the Herrero Pianos atelier with a grand piano", // TODO(owner): describe the new photo
+  alt: "Interior of the Herrero Pianos atelier with a grand piano",
   position: "center",
 };
 

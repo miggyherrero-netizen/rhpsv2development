@@ -9,7 +9,8 @@ import {
 import { requireUser } from "@/lib/auth";
 import { hashPin } from "@/lib/security";
 import { randomUUID } from "crypto";
-import { getProjectDetail, getWorkerDetail } from "@/server/data";
+import { getProjectDetail, getWorkerDetail, getWebsiteContent } from "@/server/data";
+import { HERO_IMAGE_KEY, HERO_IMAGE_MAX_CHARS, HERO_IMAGE_RE } from "@/lib/hero-image";
 import { normalizeWebsiteContent, WEBSITE_CONTENT_KEY, type WebsiteContent } from "@/lib/website-content";
 
 const touch = () => revalidatePath("/admin", "layout");
@@ -453,12 +454,47 @@ export async function saveStaleDays(days: number) {
 
 export async function saveWebsiteContent(input: WebsiteContent) {
   await requireUser();
-  const value = JSON.stringify(normalizeWebsiteContent(input));
+  // The hero-photo version is owned by saveHeroImage/removeHeroImage — never trust it from the editor payload.
+  const current = await getWebsiteContent();
+  const next = normalizeWebsiteContent(input);
+  next.hero.imageVersion = current.hero.imageVersion;
+  const value = JSON.stringify(next);
   await db.insert(settings).values({ key: WEBSITE_CONTENT_KEY, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } });
   touch();
   revalidatePath("/");
   revalidatePath("/admin/website");
+  return { ok: true as const };
+}
+
+export async function saveHeroImage(dataUrl: string, alt: string) {
+  await requireUser();
+  if (typeof dataUrl !== "string" || dataUrl.length > HERO_IMAGE_MAX_CHARS || !HERO_IMAGE_RE.test(dataUrl)) {
+    return { ok: false as const, error: "Please upload a JPG, PNG or WebP image under 4MB." };
+  }
+  const content = await getWebsiteContent();
+  const version = String(Date.now());
+  const next = normalizeWebsiteContent({ ...content, hero: { ...content.hero, imageVersion: version, imageAlt: alt.trim() || content.hero.imageAlt } });
+  await db.insert(settings).values({ key: HERO_IMAGE_KEY, value: dataUrl })
+    .onConflictDoUpdate({ target: settings.key, set: { value: dataUrl } });
+  const value = JSON.stringify(next);
+  await db.insert(settings).values({ key: WEBSITE_CONTENT_KEY, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
+  touch();
+  revalidatePath("/");
+  return { ok: true as const, version, alt: next.hero.imageAlt ?? "" };
+}
+
+export async function removeHeroImage() {
+  await requireUser();
+  const content = await getWebsiteContent();
+  const next = normalizeWebsiteContent({ ...content, hero: { ...content.hero, imageVersion: undefined, imageAlt: undefined } });
+  await db.delete(settings).where(eq(settings.key, HERO_IMAGE_KEY));
+  const value = JSON.stringify(next);
+  await db.insert(settings).values({ key: WEBSITE_CONTENT_KEY, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
+  touch();
+  revalidatePath("/");
   return { ok: true as const };
 }
 

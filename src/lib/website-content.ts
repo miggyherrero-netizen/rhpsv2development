@@ -20,6 +20,9 @@ export type WebsiteContent = {
     body: string;
     primaryCta: string;
     secondaryCta: string;
+    /** Set by the hero-photo uploader (changes on every upload, used as a cache-buster). Not hand-edited. */
+    imageVersion?: string;
+    imageAlt?: string;
   };
   contact: {
     address: string;
@@ -145,6 +148,8 @@ export function normalizeWebsiteContent(input: unknown): WebsiteContent {
       body: asString(raw.hero?.body, defaultWebsiteContent.hero.body),
       primaryCta: asString(raw.hero?.primaryCta, defaultWebsiteContent.hero.primaryCta),
       secondaryCta: asString(raw.hero?.secondaryCta, defaultWebsiteContent.hero.secondaryCta),
+      imageVersion: optString(raw.hero?.imageVersion, 40),
+      imageAlt: optString(raw.hero?.imageAlt, 200),
     },
     contact: {
       address: asString(raw.contact?.address, defaultWebsiteContent.contact.address),

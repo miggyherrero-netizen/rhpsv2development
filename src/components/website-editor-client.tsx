@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { BadgeCheck, Contact, FileText, ListChecks, Quote, Save, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
+import { BadgeCheck, Contact, FileText, ImageIcon, ListChecks, Quote, Save, Sparkles, Trash2, Upload } from "lucide-react";
 import type { WebsiteContent } from "@/lib/website-content";
-import { saveWebsiteContent } from "@/server/admin";
+import { removeHeroImage, saveHeroImage, saveWebsiteContent } from "@/server/admin";
+import { HERO_IMAGE } from "@/lib/site-config";
 import { Spinner } from "@/components/ui";
 
 type Step = WebsiteContent["process"]["steps"][number];
@@ -47,6 +48,85 @@ function TextArea({
       <span className={label}>{title}</span>
       <textarea className={`${input} resize-y`} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
+  );
+}
+
+/** Shrinks any photo to <=2400px JPEG in the browser so phone photos upload fast and stay small. */
+function downsize(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 2400 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read")); };
+    img.src = url;
+  });
+}
+
+function HeroPhoto({ version, alt, onChange }: { version?: string; alt: string; onChange: (v: { version?: string; alt: string }) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState(alt);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const current = version ? `/hero-image?v=${version}` : HERO_IMAGE.src;
+
+  async function pick(file?: File) {
+    setMsg("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setMsg("Please choose an image file.");
+    setBusy(true);
+    try {
+      const res = await saveHeroImage(await downsize(file), text);
+      if (res.ok) { onChange({ version: res.version, alt: res.alt }); setMsg("Uploaded — the homepage is updated."); }
+      else setMsg(res.error);
+    } catch {
+      setMsg("Couldn't read that file — try a JPG or PNG.");
+    }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function remove() {
+    setBusy(true);
+    await removeHeroImage();
+    onChange({ version: undefined, alt: "" });
+    setText("");
+    setMsg("Removed — the default image is showing again.");
+    setBusy(false);
+  }
+
+  return (
+    <div className="grid sm:grid-cols-[220px_minmax(0,1fr)] gap-5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={current} alt="Current hero photo" className="w-full aspect-[4/3] object-cover rounded-xl border border-white/10" />
+      <div className="space-y-3">
+        <p className="text-[12.5px] text-chrome/80 leading-relaxed">
+          Upload a real showroom or workshop photo (landscape works best, with the piano toward the centre). It replaces the homepage hero straight away.
+        </p>
+        <TextInput title="Describe the photo (alt text)" value={text} onChange={setText} placeholder="e.g. Grand piano in the Herrero showroom, Davao" />
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+          <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center gap-2 bg-white text-black text-[13px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition disabled:opacity-60">
+            {busy ? <Spinner className="text-black" /> : <Upload size={14} />} {version ? "Replace photo" : "Upload photo"}
+          </button>
+          {version && (
+            <button type="button" disabled={busy} onClick={remove}
+              className="inline-flex items-center gap-2 text-[13px] rounded-xl px-4 py-2.5 border border-white/10 text-chrome hover:bg-white/5 transition disabled:opacity-60">
+              <Trash2 size={14} /> Use default
+            </button>
+          )}
+        </div>
+        {msg && <p role="status" className="text-[12px] text-chrome/80">{msg}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -125,6 +205,15 @@ export default function WebsiteEditorClient({ initialContent }: { initialContent
             </div>
             <TextInput title="Secondary CTA" value={content.hero.secondaryCta} onChange={(secondaryCta) => setHero({ secondaryCta })} />
           </div>
+        </Section>
+
+        <Section icon={ImageIcon} eyebrow="Public homepage" title="Hero photo">
+          <HeroPhoto
+            version={content.hero.imageVersion}
+            alt={content.hero.imageAlt ?? ""}
+            onChange={({ version, alt }) => setContent((cur) => ({ ...cur, hero: { ...cur.hero, imageVersion: version, imageAlt: alt || undefined } }))}
+          />
+          <p className="text-[11.5px] text-mist mt-3">The alt text is saved with the photo. Other website text still needs “Save website”.</p>
         </Section>
 
         <Section icon={Contact} eyebrow="Assessment section" title="Contact details">
