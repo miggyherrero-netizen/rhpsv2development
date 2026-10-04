@@ -2,13 +2,26 @@ import GosEmpty from "@/components/gos/empty";
 import TodayReply from "@/components/gos/today-reply";
 import { fillTemplate, replyDue, replyState } from "@/lib/gos/customers";
 import { manilaTime } from "@/lib/gos/format";
+import { describeError } from "@/lib/gos/diagnose";
 import { listCustomers, listWaiting } from "@/server/gos/customers";
 import { loadGosSettings } from "@/server/gos/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [waiting, all, settings] = await Promise.all([listWaiting(), listCustomers(), loadGosSettings()]);
+  let loaded;
+  try {
+    loaded = await Promise.all([listWaiting(), listCustomers(), loadGosSettings()]);
+  } catch (err) {
+    console.error("[gos] today failed:", describeError(err));
+    return (
+      <p role="alert" className="gos-card mt-4">
+        Couldn&apos;t update. Try again (reload this page).
+        <span className="mt-1 block text-sm">{describeError(err)}</span>
+      </p>
+    );
+  }
+  const [waiting, all, settings] = loaded;
   if (!waiting.ok || !all.ok || !settings.ok) {
     return (
       <p role="alert" className="gos-card mt-4">
