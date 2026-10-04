@@ -28,7 +28,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
 
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [q, setQ] = useState("");
-  const [stageFilter, setStageFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState(() => { const s = sp.get("stage"); return s && PROJECT_STAGES.some((x) => x.key === s) ? s : "all"; });
   const [sort, setSort] = useState<"updated" | "due" | "client">("updated");
   const [modal, setModal] = useState<null | { id?: string; data: ProjectInput }>(() => (sp.get("new") === "1" ? { data: BLANK } : null));
   const [busy, setBusy] = useState(false);

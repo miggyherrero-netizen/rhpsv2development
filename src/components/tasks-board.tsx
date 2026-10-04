@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { LayoutGrid, Rows3, Search, Plus, Clock3, CalendarDays, Trash2, X } from "lucide-react";
 import type { TaskRow } from "@/server/data";
 import type { Worker } from "@/db/schema";
 import { TASK_COLUMNS, TASK_LABEL, PRIORITY_STYLE } from "@/lib/config";
 import { fmtDate, fmtDuration, toDateInput } from "@/lib/format";
+import { matchesTaskFilter, parseTaskFilter } from "@/lib/dashboard";
 import { Modal, Field, Spinner, EmptyState, Avatar } from "@/components/ui";
 import {
   createTask, updateTask, deleteTask, archiveTask, restoreTask, setTaskStatus, type TaskInput,
@@ -35,10 +37,13 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
   const sp = useSearchParams();
   const selected = tasks.find((t) => t.id === sp.get("sel"));
 
-  const [view, setView] = useState<"kanban" | "list">("kanban");
+  // Dashboard links arrive as /admin/tasks?status=available|overdue|parts — a cross-cutting list view.
+  const urlFilter = parseTaskFilter(sp.get("status"));
+  const [nowMs] = useState(() => Date.now());
+  const [view, setView] = useState<"kanban" | "list">(urlFilter ? "list" : "kanban");
   const [q, setQ] = useState("");
-  const [kind, setKind] = useState<"standalone" | "project">(selected?.projectId ? "project" : "standalone");
-  const [archived, setArchived] = useState(!!selected?.archivedAt);
+  const [kind, setKind] = useState<"standalone" | "project">(!urlFilter && selected?.projectId ? "project" : "standalone");
+  const [archived, setArchived] = useState(!urlFilter && !!selected?.archivedAt);
   const [error, setError] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [workerFilter, setWorkerFilter] = useState("all");
@@ -60,14 +65,16 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return tasks.filter((t) => {
-      if (!!t.projectId !== (kind === "project") || !!t.archivedAt !== archived) return false;
+      if (urlFilter) {
+        if (t.archivedAt || !matchesTaskFilter(t, urlFilter, nowMs)) return false;
+      } else if (!!t.projectId !== (kind === "project") || !!t.archivedAt !== archived) return false;
       if (kind === "project" && projectFilter !== "all" && t.projectId !== projectFilter) return false;
       if (workerFilter !== "all" && t.assignedWorkerId !== workerFilter && t.claimedByWorkerId !== workerFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (!needle) return true;
       return [t.title, t.description, t.projectName, t.pianoName].filter(Boolean).join(" ").toLowerCase().includes(needle);
     });
-  }, [tasks, q, projectFilter, workerFilter, priorityFilter, kind, archived]);
+  }, [tasks, q, projectFilter, workerFilter, priorityFilter, kind, archived, urlFilter, nowMs]);
 
   async function moveTask(id: string, status: string) {
     if (busy || archived) return;
@@ -165,7 +172,17 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      {urlFilter && (
+        <div className="flex flex-wrap items-center gap-3 mb-5 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px]">
+          <span className="text-chrome">
+            Showing {{ available: "unclaimed tasks", overdue: "overdue tasks", parts: "tasks waiting on parts" }[urlFilter]} · {filtered.length}
+          </span>
+          <Link href="/admin/tasks" className="ml-auto inline-flex items-center gap-1.5 text-white underline underline-offset-4 decoration-white/30 hover:decoration-white">
+            <X size={13} /> Show all tasks
+          </Link>
+        </div>
+      )}
+      <div className={`flex flex-wrap items-center gap-3 mb-5 ${urlFilter ? "hidden" : ""}`}>
         <div className="flex rounded-xl border border-white/10 bg-white/[0.04] p-1" aria-label="Task type">
           {([['standalone', 'Task'], ['project', 'Project + Task']] as const).map(([value, label]) => (
             <button key={value} aria-pressed={kind === value} onClick={() => { setKind(value); setProjectFilter("all"); setError(""); }}

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Workflow, ListChecks, Boxes, Users, BookImage, Palette,
-  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut,
+  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut, Piano,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/projects", label: "Projects", icon: Workflow },
   { href: "/admin/tasks", label: "Tasks", icon: ListChecks },
   { href: "/admin/inventory", label: "Inventory", icon: Boxes },
+  { href: "/admin/showroom", label: "Showroom", icon: Piano },
   { href: "/admin/workers", label: "Workers", icon: Users },
   { href: "/admin/website", label: "Website", icon: Palette },
   { href: "/admin/curator", label: "Client Curator", icon: BookImage },
@@ -44,7 +45,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
           {item.label}
         </Link>
       ))}
-      <div className="pt-5 pb-2 px-3.5 text-[9.5px] uppercase tracking-[0.26em] text-mist/50">Beyond the shop</div>
+      <div className="pt-5 pb-2 px-3.5 text-[10.5px] uppercase tracking-[0.18em] text-subtle">Beyond the shop</div>
       {[
         { href: "/service/today", label: "Home Service", icon: Home },
         { href: "/owner/today", label: "Personal Workspace", icon: CalendarDays },
@@ -66,13 +67,13 @@ export default function AdminShell({ children, userName }: { children: ReactNode
         <div className="px-5 pt-6 pb-5">
           <Link href="/admin">
             <p className="font-serif text-lg text-white tracking-wide leading-none">HERRERO</p>
-            <p className="text-[8.5px] uppercase tracking-[0.34em] text-mist mt-1.5">Command Center</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-subtle mt-1.5">Command Center</p>
           </Link>
         </div>
         {navList}
         <div className="p-4 border-t border-white/[0.07]">
           <p className="px-1.5 text-[12px] text-white truncate">{userName}</p>
-          <p className="px-1.5 text-[10px] text-mist/60 mb-2.5">Owner · Herrero Pianos Davao</p>
+          <p className="px-1.5 text-[11px] text-subtle mb-2.5">Owner · Herrero Pianos Davao</p>
           <button onClick={() => logout()} className="flex items-center gap-2.5 px-1.5 text-[12px] text-mist hover:text-white transition-colors">
             <LogOut size={14} /> Sign out
           </button>
@@ -83,7 +84,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
       <div className="lg:hidden sticky top-0 z-40 glass-top">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/admin" className="font-serif text-base text-white">HERRERO</Link>
-          <button onClick={() => setMobileOpen(true)} className="p-2 text-chrome" aria-label="Open menu"><Menu size={20} /></button>
+          <button onClick={() => setMobileOpen(true)} className="p-2.5 text-chrome" aria-label="Open menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
         </div>
       </div>
       {mobileOpen && (
@@ -92,7 +93,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
           <div className="absolute left-0 top-0 h-full w-72 bg-[#0b0e13] border-r border-white/10 flex flex-col p-4 anim-drawer" style={{ animationName: "drawerIn", transform: "none" }}>
             <div className="flex items-center justify-between px-2 pt-2 pb-4">
               <p className="font-serif text-lg text-white">HERRERO</p>
-              <button onClick={() => setMobileOpen(false)} className="p-2 text-mist"><X size={18} /></button>
+              <button onClick={() => setMobileOpen(false)} className="p-2.5 text-chrome" aria-label="Close menu"><X size={18} /></button>
             </div>
             {navList}
             <div className="p-3 border-t border-white/[0.07] mt-2">

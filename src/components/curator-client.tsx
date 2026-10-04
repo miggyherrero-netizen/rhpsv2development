@@ -17,7 +17,7 @@ type Proj = { id: string; clientName: string; pianoBrand: string; pianoModel: st
 
 export default function CuratorClient({ projects }: { projects: Proj[] }) {
   const sp = useSearchParams();
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
+  const [projectId, setProjectId] = useState(() => projects.find((p) => p.id === sp.get("project"))?.id ?? projects[0]?.id ?? "");
   const [updates, setUpdates] = useState<Update[]>([]);
   const [loading, setLoading] = useState(() => Boolean(projects[0]?.id));
   const [modal, setModal] = useState(() => sp.get("new") === "1");

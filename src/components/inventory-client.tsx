@@ -14,7 +14,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
   const sp = useSearchParams();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
-  const [onlyLow, setOnlyLow] = useState(false);
+  const [onlyLow, setOnlyLow] = useState(() => sp.get("low") === "1");
   const [modal, setModal] = useState<null | { id?: string; data: InventoryInput & { price?: string } }>(() => (sp.get("new") === "1" ? { data: BLANK } : null));
   const [busy, setBusy] = useState(false);
 
