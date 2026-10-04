@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Wallet, Search, Trash2 } from "lucide-react";
+import { RANGES, type RangeKey } from "@/lib/service-reports";
 import { fmtDate, peso } from "@/lib/format";
 import {
   EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, PAYMENT_METHODS, PAYMENT_METHOD_LABEL,
@@ -10,32 +11,24 @@ import {
 import type { ExpenseRow } from "@/server/service-data";
 import { createExpense, deleteExpense } from "@/server/service";
 import {
-  Bar, Chip, EmptyState, ErrorLine, Field, FilterPills, GhostButton, Money, PrimaryButton,
-  SectionCard, Select, StatCard, SvcModal, TextInput, TONE_BAR,
+  Bar, Chip, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
+  RangePicker, SectionCard, Select, StatCard, SvcModal, TextInput, TONE_BAR,
 } from "@/components/service-ui";
-
-const RANGES = [
-  { key: "month", label: "This month" },
-  { key: "quarter", label: "Last 90 days" },
-  { key: "all", label: "All time" },
-];
 
 export default function ExpensesClient({
   expenses,
-  categoryTotals,
-  monthTotalCents,
-  monthCount,
+  rangeKey,
+  rangeLabel,
   showFinance,
 }: {
+  /** Already limited to the selected range by the server. */
   expenses: ExpenseRow[];
-  categoryTotals: { category: string; amountCents: number; count: number }[];
-  monthTotalCents: number;
-  monthCount: number;
+  rangeKey: RangeKey;
+  rangeLabel: string;
   showFinance: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [range, setRange] = useState("month");
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -48,23 +41,28 @@ export default function ExpensesClient({
     });
   };
 
-  const cutoff = useMemo(() => {
-    const now = new Date();
-    if (range === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
-    if (range === "quarter") return new Date(now.getTime() - 90 * 86_400_000);
-    return null;
-  }, [range]);
+  // The category breakdown follows the range only (not the search / category box), so it always
+  // adds up to the range total shown above.
+  const categoryTotals = useMemo(() => {
+    const m = new Map<string, { amountCents: number; count: number }>();
+    for (const e of expenses) {
+      const c = m.get(e.category) ?? { amountCents: 0, count: 0 };
+      c.amountCents += e.amountCents; c.count += 1; m.set(e.category, c);
+    }
+    return [...m.entries()].map(([category, v]) => ({ category, ...v })).sort((x, y) => y.amountCents - x.amountCents);
+  }, [expenses]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return expenses
-      .filter((e) => (cutoff ? new Date(e.spentAt) >= cutoff : true))
       .filter((e) => (category === "all" ? true : e.category === category))
       .filter((e) => !q || `${e.description} ${e.vendor ?? ""}`.toLowerCase().includes(q));
-  }, [expenses, cutoff, category, query]);
+  }, [expenses, category, query]);
 
+  const rangeTotal = expenses.reduce((s, e) => s + e.amountCents, 0);
   const total = filtered.reduce((s, e) => s + e.amountCents, 0);
-  const reimbursable = filtered.filter((e) => e.reimbursable).reduce((s, e) => s + e.amountCents, 0);
+  const narrowed = filtered.length !== expenses.length;
+  const reimbursable = expenses.filter((e) => e.reimbursable).reduce((s, e) => s + e.amountCents, 0);
   const maxCat = Math.max(1, ...categoryTotals.map((c) => c.amountCents));
 
   return (
@@ -88,9 +86,24 @@ export default function ExpensesClient({
 
       <ErrorLine>{error}</ErrorLine>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="This month" value={<Money cents={monthTotalCents} />} icon={<Wallet size={15} />} sub={`${monthCount} entries`} />
-        <StatCard label="Shown" value={<Money cents={total} />} tone="azure" sub={`${filtered.length} entries`} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RangePicker options={RANGES} value={rangeKey} />
+        <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+          Showing <b className="font-medium">{rangeLabel.toLowerCase()}</b>
+          {narrowed ? <> · <span className="svc-num">{filtered.length} of {expenses.length}</span> entries match your search</> : null}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="col-span-2 sm:col-span-1">
+          <StatCard
+            label={`Total · ${rangeLabel.toLowerCase()}`}
+            value={<Money cents={narrowed ? total : rangeTotal} />}
+            icon={<Wallet size={15} />}
+            tone="azure"
+            sub={narrowed ? `${filtered.length} matching entries` : `${expenses.length} entries`}
+          />
+        </div>
         <StatCard label="Reimbursable" value={<Money cents={reimbursable} />} tone="violet" sub="owed back to crew" />
         <StatCard
           label="Top category"
@@ -103,7 +116,6 @@ export default function ExpensesClient({
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-5">
         <SectionCard>
           <div className="flex flex-wrap items-center gap-3 px-5 py-3" style={{ borderBottom: "1px solid var(--color-svc-border)" }}>
-            <FilterPills options={RANGES} value={range} onChange={setRange} />
             <div className="flex-1" />
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
@@ -129,7 +141,7 @@ export default function ExpensesClient({
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
                     {["Date", "Category", "Description", "Job", "Method", "Amount", ""].map((h) => (
-                      <th key={h} className="px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] font-normal">{h}</th>
+                      <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -182,10 +194,10 @@ export default function ExpensesClient({
           )}
         </SectionCard>
 
-        <SectionCard title="By category">
+        <SectionCard title={`By category · ${rangeLabel.toLowerCase()}`}>
           <div className="px-5 py-4 space-y-4">
             {categoryTotals.length === 0 ? (
-              <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>No data yet.</p>
+              <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>No expenses in this range.</p>
             ) : (
               categoryTotals.map((c) => (
                 <div key={c.category}>

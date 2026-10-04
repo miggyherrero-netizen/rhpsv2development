@@ -5,7 +5,9 @@
  * `--color-svc-*` tokens so the theme stays separate from admin/owner/public.
  */
 
-import { useEffect, useId, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, Loader2, Inbox, AlertCircle, CheckCircle2 } from "lucide-react";
 import { peso } from "@/lib/format";
 import type { Tone } from "@/lib/service";
@@ -57,7 +59,7 @@ export function Money({
   const value = peso(Math.abs(cents));
   const negative = cents < 0;
   return (
-    <span className={`tnum ${className}`} style={{ color: negative ? TONE_TEXT.danger : undefined }}>
+    <span className={`svc-num ${className}`} style={{ color: negative ? TONE_TEXT.danger : undefined }}>
       {negative ? "−" : signed && cents > 0 ? "+" : ""}
       {value}
     </span>
@@ -111,34 +113,48 @@ export function StatCard({
   sub,
   tone,
   icon,
+  href,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   tone?: Tone;
   icon?: ReactNode;
+  /** Makes the whole tile a link (e.g. Outstanding → the filtered invoice list). */
+  href?: string;
 }) {
-  return (
-    <div className="card-svc p-4">
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--color-svc-text-faint)" }}>
+        <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>
           {label}
         </p>
         {icon ? <span style={{ color: tone ? TONE_TEXT[tone] : "var(--color-svc-text-faint)" }}>{icon}</span> : null}
       </div>
       <p
-        className="font-serif text-2xl mt-2 tnum"
+        className="svc-num text-2xl font-semibold mt-2"
         style={{ color: tone ? TONE_TEXT[tone] : "var(--color-svc-text)" }}
       >
         {value}
       </p>
       {sub ? (
-        <p className="text-[11.5px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+        <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
           {sub}
         </p>
       ) : null}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="card-svc card-svc-hover block p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+      >
+        {body}
+      </Link>
+    );
+  }
+  return <div className="card-svc p-4">{body}</div>;
 }
 
 export function SectionCard({
@@ -482,8 +498,10 @@ export function FilterPills<T extends string>({
       {options.map((o) => (
         <button
           key={o.key}
+          type="button"
+          aria-pressed={value === o.key}
           onClick={() => onChange(o.key)}
-          className="px-3 py-1.5 rounded-full text-[11.5px] transition"
+          className="px-3.5 min-h-10 rounded-full text-[12.5px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
           style={{
             background: value === o.key ? "var(--color-svc-accent-soft)" : "var(--color-svc-surface-2)",
             color: value === o.key ? TONE_TEXT.azure : "var(--color-svc-text-dim)",
@@ -493,6 +511,27 @@ export function FilterPills<T extends string>({
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * One date-range control for a whole page. The range lives in the URL (`?range=`), so the
+ * server computes every tile, chart and breakdown from the same window and links can be shared.
+ */
+export function RangePicker<T extends string>({ options, value, param = "range" }: { options: readonly { key: T; label: string }[]; value: T; param?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
+  const [pending, start] = useTransition();
+  const go = (key: T) => {
+    const next = new URLSearchParams(sp.toString());
+    next.set(param, key);
+    start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
+  };
+  return (
+    <div role="group" aria-label="Date range" aria-busy={pending} className={pending ? "opacity-70 transition-opacity" : "transition-opacity"}>
+      <FilterPills options={[...options]} value={value} onChange={go} />
     </div>
   );
 }

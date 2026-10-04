@@ -1,27 +1,19 @@
 import { requireUser } from "@/lib/auth";
-import { addDays } from "@/lib/dates";
-import { getExpenses, getExpenseTotalsByCategory, getServiceSettings } from "@/server/service-data";
+import { parseRange, resolveRange } from "@/lib/service-reports";
+import { getExpenses, getServiceSettings } from "@/server/service-data";
 import ExpensesClient from "@/components/service-expenses";
 
 export const dynamic = "force-dynamic";
 
-export default async function ServiceExpensesPage() {
+export default async function ServiceExpensesPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const user = await requireUser();
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [expenses, categoryTotals, monthRows, settings] = await Promise.all([
-    getExpenses(undefined, undefined, 500),
-    getExpenseTotalsByCategory(addDays(now, -90), addDays(now, 1)),
-    getExpenses(monthStart, addDays(now, 1), 500),
+  const { range: rawRange } = await searchParams;
+  const rangeKey = parseRange(rawRange);
+  const range = resolveRange(rangeKey);
+  // One range drives the list, the totals and the category breakdown — they can never disagree.
+  const [expenses, settings] = await Promise.all([
+    getExpenses(range.from ?? undefined, range.to, 1000),
     getServiceSettings(user.id),
   ]);
-  return (
-    <ExpensesClient
-      expenses={expenses}
-      categoryTotals={categoryTotals}
-      monthTotalCents={monthRows.reduce((s, e) => s + e.amountCents, 0)}
-      monthCount={monthRows.length}
-      showFinance={settings.showFinance}
-    />
-  );
+  return <ExpensesClient expenses={expenses} rangeKey={rangeKey} rangeLabel={range.label} showFinance={settings.showFinance} />;
 }

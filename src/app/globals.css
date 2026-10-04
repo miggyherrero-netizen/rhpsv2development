@@ -47,7 +47,7 @@
   --color-svc-border-strong: rgba(255,255,255,0.14);
   --color-svc-text: #e7edf5;          /* primary text */
   --color-svc-text-dim: #94a3b8;      /* secondary text / labels */
-  --color-svc-text-faint: #6b7a8d;    /* placeholders / tertiary */
+  --color-svc-text-faint: #8191a5;    /* tertiary text + small labels — 5.0:1 on the lightest svc surface (WCAG AA) */
   --color-svc-accent: #4d8df0;        /* azure — scheduled, primary actions, active nav */
   --color-svc-accent-soft: rgba(77,141,240,0.14);
   --color-svc-success: #3fb984;       /* paid, completed */
@@ -363,6 +363,8 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
 
 /* number ticker tabular */
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+/* Data values in the Home Service workspace: sans + tabular numerals (serif "0m" reads as "om"). Serif stays for headings. */
+.svc-num { font-family: var(--font-sans); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.005em; }
 
 /* calendar hour lines */
 .hour-line { border-top: 1px solid rgba(15, 23, 42, 0.06); }

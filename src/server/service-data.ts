@@ -17,10 +17,14 @@ import {
 import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, type SQL } from "drizzle-orm";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import {
-  agingSummary, avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceStatus, jobCode,
+  avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceStatus, jobCode,
   jobMargin, DEFAULT_WORKING_HOURS, COMPLETED_JOB_STATUSES,
   type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
+import {
+  countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
+  resolveRange, type RangeKey, type ResolvedRange, type SeriesPoint,
+} from "@/lib/service-reports";
 
 /* ============================================================
  * Settings, crew, price book
@@ -74,6 +78,9 @@ export type CustomerCard = ServiceCustomer & {
   billedCents: number;
   paidCents: number;
   outstandingCents: number;
+  /** Invoices created but never sent — reported apart from billed / outstanding. */
+  draftCount: number;
+  draftCents: number;
 };
 
 export async function getCustomersBundle(includeArchived = false): Promise<CustomerCard[]> {
@@ -95,24 +102,35 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
     .from(serviceJobs)
     .groupBy(serviceJobs.customerId);
 
-  const moneyStats = await db
+  // Drafts and voids are not receivables: only sent / part-paid / paid invoices count as billed.
+  const invoiceRows = await db
     .select({
-      customerId: serviceInvoices.customerId,
-      billed: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
-      paid: sql<number>`coalesce(sum(${serviceInvoices.amountPaidCents}), 0)::int`,
+      customerId: serviceInvoices.customerId, status: serviceInvoices.status,
+      totalCents: serviceInvoices.totalCents, amountPaidCents: serviceInvoices.amountPaidCents,
+      dueDate: serviceInvoices.dueDate, sentAt: serviceInvoices.sentAt, voidedAt: serviceInvoices.voidedAt,
     })
-    .from(serviceInvoices)
-    .groupBy(serviceInvoices.customerId);
+    .from(serviceInvoices);
+  const now = new Date();
+  const moneyStats = new Map<string, { billed: number; paid: number; outstanding: number; draftCount: number; draftCents: number }>();
+  for (const inv of invoiceRows) {
+    const m = moneyStats.get(inv.customerId) ?? { billed: 0, paid: 0, outstanding: 0, draftCount: 0, draftCents: 0 };
+    if (isCountable(inv, now)) {
+      m.billed += inv.totalCents;
+      m.paid += inv.amountPaidCents;
+      m.outstanding += balanceCents(inv);
+    } else if (invoiceStatus(inv, now) === "draft") {
+      m.draftCount += 1;
+      m.draftCents += inv.totalCents;
+    }
+    moneyStats.set(inv.customerId, m);
+  }
 
   const jobMap = new Map(jobStats.map((j) => [j.customerId, j]));
-  const moneyMap = new Map(moneyStats.map((m) => [m.customerId, m]));
   const locationMap = new Map(locations.map((l) => [l.id, l]));
 
   return customers.map((c) => {
     const jobs = jobMap.get(c.id);
-    const money = moneyMap.get(c.id);
-    const billed = money?.billed ?? 0;
-    const paid = money?.paid ?? 0;
+    const money = moneyStats.get(c.id);
     return {
       ...c,
       locations: locations.filter((l) => l.customerId === c.id),
@@ -122,9 +140,11 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
       jobCount: jobs?.total ?? 0,
       openJobCount: jobs?.open ?? 0,
       lastServiceAt: jobs?.lastServiceAt ?? null,
-      billedCents: billed,
-      paidCents: paid,
-      outstandingCents: Math.max(0, billed - paid),
+      billedCents: money?.billed ?? 0,
+      paidCents: money?.paid ?? 0,
+      outstandingCents: money?.outstanding ?? 0,
+      draftCount: money?.draftCount ?? 0,
+      draftCents: money?.draftCents ?? 0,
     };
   });
 }
@@ -402,13 +422,22 @@ export type TodayBoard = {
   running: (ServiceTimeLog & { jobTitle: string; customerName: string; technicianName: string | null })[];
   technicians: ServiceTechnician[];
   recalls: RecallRow[];
+  /** Past-due visits still marked scheduled / en route / on site — need closing out. */
+  unfinished: JobRow[];
+  /** Sent, unpaid invoices (oldest due first) — who to chase. */
+  followUps: InvoiceRow[];
   stats: {
     jobsToday: number;
     completedToday: number;
     minutesWorked: number;
     minutesTravel: number;
     collectedTodayCents: number;
+    /** Sent, unpaid balance as of today. Drafts and voids are excluded. */
     outstandingCents: number;
+    overdueCents: number;
+    outstandingCount: number;
+    draftCount: number;
+    draftCents: number;
     openQuotesCents: number;
   };
 };
@@ -417,7 +446,7 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
   const dayStart = startOfManilaDayUTC(now);
   const dayEnd = addDays(dayStart, 1);
 
-  const [jobs, technicians, recalls, running, moneyToday, timeToday] = await Promise.all([
+  const [jobs, technicians, recalls, running, moneyToday, timeToday, pastDue, invoices] = await Promise.all([
     getJobs({ from: dayStart, to: dayEnd, limit: 200 }),
     getTechnicians(),
     getRecalls(now),
@@ -441,14 +470,13 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
       .from(serviceTimeLogs)
       .where(and(isNotNull(serviceTimeLogs.endedAt), gte(serviceTimeLogs.startedAt, dayStart), lt(serviceTimeLogs.startedAt, dayEnd)))
       .groupBy(serviceTimeLogs.kind),
+    getJobs({ statuses: ["scheduled", "en_route", "in_progress"], to: dayStart, limit: 60 }),
+    getInvoices({ limit: 400 }, now),
   ]);
 
-  const outstanding = await db
-    .select({
-      billed: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
-      paid: sql<number>`coalesce(sum(${serviceInvoices.amountPaidCents}), 0)::int`,
-    })
-    .from(serviceInvoices);
+  const unfinished = pastDue.filter((j) => needsClosing(j, now));
+  const rec = receivables(invoices, now);
+  const drafts = draftSummary(invoices, now);
 
   const openQuotes = await db
     .select({ total: sql<number>`coalesce(sum(${serviceJobs.quotedCents}), 0)::int` })
@@ -464,13 +492,19 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
     running: running.map((r) => ({ ...r.log, jobTitle: r.jobTitle, customerName: r.customerName, technicianName: r.technicianName })),
     technicians,
     recalls: recalls.slice(0, 8),
+    unfinished,
+    followUps: needsFollowUp(invoices, now).slice(0, 8),
     stats: {
       jobsToday: jobs.length,
       completedToday: jobs.filter((j) => j.status === "completed" || j.status === "invoiced" || j.status === "paid").length,
       minutesWorked,
       minutesTravel,
       collectedTodayCents: moneyToday[0]?.collected ?? 0,
-      outstandingCents: Math.max(0, (outstanding[0]?.billed ?? 0) - (outstanding[0]?.paid ?? 0)),
+      outstandingCents: rec.totalOutstandingCents,
+      overdueCents: rec.overdueCents,
+      outstandingCount: rec.buckets.reduce((n, b) => n + b.count, 0),
+      draftCount: drafts.count,
+      draftCents: drafts.totalCents,
       openQuotesCents: openQuotes[0]?.total ?? 0,
     },
   };
@@ -657,31 +691,30 @@ export async function getTimeLogs(from: Date, to: Date, technicianId?: string): 
  * Finance
  * ============================================================ */
 
-export type MonthKey = { year: number; month: number; label: string };
-
-export type MonthlyPoint = {
-  key: string;
-  label: string;
-  invoicedCents: number;
-  collectedCents: number;
-  expenseCents: number;
-  jobCount: number;
-};
+export type MonthlyPoint = SeriesPoint;
 
 export type FinanceReport = {
+  range: ResolvedRange;
+  /** "day" buckets for This month, otherwise "month". */
+  granularity: "day" | "month";
   months: MonthlyPoint[];
   kpis: {
     invoicedCents: number;
+    invoiceCount: number;
     collectedCents: number;
     expenseCents: number;
     netCents: number;
+    /** As of today — not range-dependent. Sent / part-paid invoices only. */
     outstandingCents: number;
     overdueCents: number;
-    /** Invoiced ÷ non-void invoices, or ÷ all completed jobs — see `options.avgInvoiceBasis`. */
+    /** Invoiced ÷ invoices issued in the range, or ÷ jobs completed in the range — see `options.avgInvoiceBasis`. */
     avgInvoiceCents: number;
+    /** Paid so far on what was invoiced in the range. */
     collectionRatePct: number;
   };
   aging: AgingSummary;
+  /** Created but never sent: reported apart from invoiced / outstanding. */
+  drafts: { count: number; totalCents: number };
   expenseByCategory: { category: string; amountCents: number; count: number }[];
   topCustomers: { customerId: string; name: string; billedCents: number; paidCents: number }[];
   /** Empty when the owner has hidden job margins (`options.showJobMargins` false). */
@@ -699,65 +732,37 @@ export type FinanceReportOptions = Pick<
   "avgInvoiceBasis" | "marginExcludesVat" | "includeLaborCost" | "showJobMargins"
 >;
 
-function monthStartUTC(year: number, month: number) {
-  return new Date(Date.UTC(year, month, 1));
-}
+/** SQL twin of `isCountable`: not void, and sent (or at least part-paid). Drafts are excluded. */
+const countableInvoiceSql = sql`${serviceInvoices.voidedAt} is null and (${serviceInvoices.sentAt} is not null or ${serviceInvoices.amountPaidCents} > 0)`;
 
 export async function getFinanceReport(
   options: FinanceReportOptions,
-  months = 6,
+  rangeKey: RangeKey = "90d",
   now: Date = new Date(),
 ): Promise<FinanceReport> {
-  const first = monthStartUTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1));
-  const seriesStart = startOfManilaDayUTC(first);
+  const range = resolveRange(rangeKey, now);
+  const completedIn = (col: SQL | typeof serviceJobs.completedAt) => and(
+    range.from ? gte(sql`coalesce(${col}, ${serviceJobs.updatedAt})`, range.from) : undefined,
+    lt(sql`coalesce(${col}, ${serviceJobs.updatedAt})`, range.to),
+  );
 
-  const [invoiceRows, paymentRows, expenseRows, allInvoices, categoryRows, customerRows, jobRows, completedJobs] = await Promise.all([
+  const [allInvoices, paymentRows, expenseRows, jobRows, completedJobs] = await Promise.all([
     db
       .select({
-        month: sql<string>`to_char(${serviceInvoices.issueDate}, 'YYYY-MM')`,
-        amount: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
-        jobCount: sql<number>`count(*)::int`,
-      })
-      .from(serviceInvoices)
-      .where(gte(serviceInvoices.issueDate, seriesStart))
-      .groupBy(sql`to_char(${serviceInvoices.issueDate}, 'YYYY-MM')`),
-    db
-      .select({
-        month: sql<string>`to_char(${servicePayments.receivedAt}, 'YYYY-MM')`,
-        amount: sql<number>`coalesce(sum(${servicePayments.amountCents}), 0)::int`,
-      })
-      .from(servicePayments)
-      .where(gte(servicePayments.receivedAt, seriesStart))
-      .groupBy(sql`to_char(${servicePayments.receivedAt}, 'YYYY-MM')`),
-    db
-      .select({
-        month: sql<string>`to_char(${serviceExpenses.spentAt}, 'YYYY-MM')`,
-        amount: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int`,
-      })
-      .from(serviceExpenses)
-      .where(gte(serviceExpenses.spentAt, seriesStart))
-      .groupBy(sql`to_char(${serviceExpenses.spentAt}, 'YYYY-MM')`),
-    db
-      .select({
-        id: serviceInvoices.id, totalCents: serviceInvoices.totalCents,
+        id: serviceInvoices.id, customerId: serviceInvoices.customerId, totalCents: serviceInvoices.totalCents,
         amountPaidCents: serviceInvoices.amountPaidCents, dueDate: serviceInvoices.dueDate,
         issueDate: serviceInvoices.issueDate, sentAt: serviceInvoices.sentAt,
         voidedAt: serviceInvoices.voidedAt, status: serviceInvoices.status,
       })
       .from(serviceInvoices),
-    getExpenseTotalsByCategory(seriesStart, addDays(now, 1)),
     db
-      .select({
-        customerId: serviceInvoices.customerId,
-        name: serviceCustomers.name,
-        billed: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
-        paid: sql<number>`coalesce(sum(${serviceInvoices.amountPaidCents}), 0)::int`,
-      })
-      .from(serviceInvoices)
-      .innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceInvoices.customerId))
-      .groupBy(serviceInvoices.customerId, serviceCustomers.name)
-      .orderBy(desc(sql`sum(${serviceInvoices.totalCents})`))
-      .limit(6),
+      .select({ receivedAt: servicePayments.receivedAt, amountCents: servicePayments.amountCents })
+      .from(servicePayments)
+      .where(and(range.from ? gte(servicePayments.receivedAt, range.from) : undefined, lt(servicePayments.receivedAt, range.to))),
+    db
+      .select({ spentAt: serviceExpenses.spentAt, amountCents: serviceExpenses.amountCents, category: serviceExpenses.category })
+      .from(serviceExpenses)
+      .where(and(range.from ? gte(serviceExpenses.spentAt, range.from) : undefined, lt(serviceExpenses.spentAt, range.to))),
     // Margins hidden in settings → skip the per-job queries entirely.
     options.showJobMargins
       ? db
@@ -772,14 +777,14 @@ export async function getFinanceReport(
             and(
               ne(serviceJobs.status, "cancelled"),
               or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+              completedIn(serviceJobs.completedAt),
             ),
           )
           .orderBy(desc(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`))
           .limit(25)
       : Promise.resolve([]),
-    // All-time completed jobs (invoiced or not) — the "job" basis denominator for the
-    // average. Deliberately separate from the 25-row margins list above. Status counts too:
-    // invoicing a job moves it to "invoiced" without necessarily stamping completedAt.
+    // Completed jobs in the range — the "job" basis denominator for the average.
+    // Status counts too: invoicing a job moves it to "invoiced" without necessarily stamping completedAt.
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(serviceJobs)
@@ -787,9 +792,25 @@ export async function getFinanceReport(
         and(
           ne(serviceJobs.status, "cancelled"),
           or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+          completedIn(serviceJobs.completedAt),
         ),
       ),
   ]);
+
+  const rollup = financeRollup({ invoices: allInvoices, payments: paymentRows, expenses: expenseRows }, rangeKey, now);
+
+  // Top customers: billed on invoices issued in the range (countable only).
+  const inRangeInvoices = countable(allInvoices, now).filter((i) => inRange(i.issueDate, range));
+  const byCustomer = new Map<string, { billed: number; paid: number }>();
+  for (const i of inRangeInvoices) {
+    const c = byCustomer.get(i.customerId) ?? { billed: 0, paid: 0 };
+    c.billed += i.totalCents; c.paid += i.amountPaidCents; byCustomer.set(i.customerId, c);
+  }
+  const topIds = [...byCustomer.entries()].sort((a, b) => b[1].billed - a[1].billed).slice(0, 6).map(([id]) => id);
+  const nameRows = topIds.length
+    ? await db.select({ id: serviceCustomers.id, name: serviceCustomers.name }).from(serviceCustomers).where(inArray(serviceCustomers.id, topIds))
+    : [];
+  const nameMap = new Map(nameRows.map((r) => [r.id, r.name]));
 
   const jobIds = jobRows.map((j) => j.jobId);
   const [invoiceByJob, expenseByJob] = await Promise.all([
@@ -797,9 +818,9 @@ export async function getFinanceReport(
       ? db
           .select({
             jobId: serviceInvoices.jobId,
-            invoiced: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
-            // Saved VAT on the same non-void invoices — never re-estimated from today's rate.
-            tax: sql<number>`coalesce(sum(case when ${serviceInvoices.voidedAt} is null then ${serviceInvoices.taxCents} else 0 end), 0)::int`,
+            invoiced: sql<number>`coalesce(sum(case when ${countableInvoiceSql} then ${serviceInvoices.totalCents} else 0 end), 0)::int`,
+            // Saved VAT on the same countable invoices — never re-estimated from today's rate.
+            tax: sql<number>`coalesce(sum(case when ${countableInvoiceSql} then ${serviceInvoices.taxCents} else 0 end), 0)::int`,
           })
           .from(serviceInvoices)
           .where(inArray(serviceInvoices.jobId, jobIds))
@@ -817,39 +838,7 @@ export async function getFinanceReport(
   const invoicedMap = new Map(invoiceByJob.map((r) => [r.jobId!, r]));
   const expenseMap = new Map(expenseByJob.map((r) => [r.jobId!, r.amount]));
 
-  // Build the monthly series in Asia/Manila month buckets.
-  const monthKeys: string[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    monthKeys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
-  }
-  const invMap = new Map(invoiceRows.map((r) => [r.month, r]));
-  const payMap = new Map(paymentRows.map((r) => [r.month, r.amount]));
-  const expMap = new Map(expenseRows.map((r) => [r.month, r.amount]));
-
-  const monthsOut: MonthlyPoint[] = monthKeys.map((key) => {
-    const [y, m] = key.split("-").map(Number);
-    const label = new Date(Date.UTC(y!, m! - 1, 1)).toLocaleDateString("en-US", {
-      month: "short", year: "2-digit", timeZone: "UTC",
-    });
-    return {
-      key,
-      label,
-      invoicedCents: invMap.get(key)?.amount ?? 0,
-      collectedCents: payMap.get(key) ?? 0,
-      expenseCents: expMap.get(key) ?? 0,
-      jobCount: invMap.get(key)?.jobCount ?? 0,
-    };
-  });
-
-  const aging = agingSummary(allInvoices, now);
-  const liveInvoices = allInvoices.filter((i) => !i.voidedAt);
-  const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
-  const collectedCents = allInvoices.reduce((s, i) => s + i.amountPaidCents, 0);
-  const expenseCents = categoryRows.reduce((s, c) => s + c.amountCents, 0);
-  const avgDenominator = options.avgInvoiceBasis === "job"
-    ? completedJobs[0]?.count ?? 0
-    : liveInvoices.length;
+  const avgDenominator = options.avgInvoiceBasis === "job" ? completedJobs[0]?.count ?? 0 : rollup.invoiceCount;
 
   const jobMargins = jobRows.map((j) => {
     const money = invoicedMap.get(j.jobId);
@@ -879,21 +868,25 @@ export async function getFinanceReport(
   });
 
   return {
-    months: monthsOut,
+    range,
+    granularity: rollup.granularity,
+    months: rollup.series,
     kpis: {
-      invoicedCents,
-      collectedCents,
-      expenseCents,
-      netCents: collectedCents - expenseCents,
-      outstandingCents: aging.totalOutstandingCents,
-      overdueCents: aging.overdueCents,
-      avgInvoiceCents: avgInvoiceCents(invoicedCents, avgDenominator),
-      collectionRatePct: invoicedCents > 0 ? Math.round((collectedCents / invoicedCents) * 100) : 0,
+      invoicedCents: rollup.invoicedCents,
+      invoiceCount: rollup.invoiceCount,
+      collectedCents: rollup.collectedCents,
+      expenseCents: rollup.expenseCents,
+      netCents: rollup.netCents,
+      outstandingCents: rollup.aging.totalOutstandingCents,
+      overdueCents: rollup.aging.overdueCents,
+      avgInvoiceCents: avgInvoiceCents(rollup.invoicedCents, avgDenominator),
+      collectionRatePct: rollup.collectionRatePct,
     },
-    aging,
-    expenseByCategory: categoryRows,
-    topCustomers: customerRows.map((c) => ({
-      customerId: c.customerId, name: c.name, billedCents: c.billed, paidCents: c.paid,
+    aging: rollup.aging,
+    drafts: rollup.drafts,
+    expenseByCategory: rollup.expenseByCategory,
+    topCustomers: topIds.map((id) => ({
+      customerId: id, name: nameMap.get(id) ?? "—", billedCents: byCustomer.get(id)!.billed, paidCents: byCustomer.get(id)!.paid,
     })),
     jobMargins,
     options: {
