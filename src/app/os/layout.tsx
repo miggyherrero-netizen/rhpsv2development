@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Atkinson_Hyperlegible, Bricolage_Grotesque } from "next/font/google";
 import { requireOwnerPage } from "@/server/gos/guard";
 import GosShell from "@/components/gos/shell";
+import { replyState } from "@/lib/gos/customers";
+import { listWaiting } from "@/server/gos/customers";
 import "./gos.css";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +24,14 @@ export default async function GosLayout({ children }: { children: ReactNode }) {
       </main>
     );
   }
+  const waiting = await listWaiting();
+  const now = new Date();
+  const overdue = waiting.ok
+    ? waiting.value.rows.filter((c) => replyState(c.inquiryAt, waiting.value.noReplyMinutes, now) !== "waiting").length
+    : 0;
   return (
     <div className={`gos ${body.variable} ${head.variable}`}>
-      <GosShell userName={user.name}>{children}</GosShell>
+      <GosShell userName={user.name} overdue={overdue}>{children}</GosShell>
     </div>
   );
 }
