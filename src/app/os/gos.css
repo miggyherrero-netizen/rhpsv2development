@@ -1,0 +1,23 @@
+.gos {
+  --gos-bg: #f7f7f6;
+  --gos-surface: #ffffff;
+  --gos-ink: #161616;
+  --gos-ink-dim: #4a4a4a;
+  --gos-line: #e3e3e0;
+  --gos-black: #161616;
+  --gos-gold: #c9a24a;        /* only on black */
+  --gos-gold-text: #80601a;   /* gold text on light backgrounds */
+  --gos-focus: #1d4ed8;
+  --gos-danger: #b42318;
+  --gos-ok: #1f7a3a;
+  background: var(--gos-bg);
+  color: var(--gos-ink);
+  min-height: 100dvh;
+  font-family: var(--font-gos-body), system-ui, sans-serif;
+}
+.gos h1, .gos h2 { font-family: var(--font-gos-head), system-ui, sans-serif; }
+.gos :focus-visible { outline: 3px solid var(--gos-focus); outline-offset: 2px; }
+.gos .gos-tap { min-height: 44px; min-width: 44px; }
+.gos .gos-card { background: var(--gos-surface); border: 1px solid var(--gos-line); border-radius: 14px; padding: 16px; }
+.gos .gos-input { width: 100%; min-height: 44px; border: 1px solid #9a9a96; border-radius: 10px; padding: 8px 12px; background: #fff; color: var(--gos-ink); }
+.gos .gos-btn-black { background: var(--gos-black); color: var(--gos-gold); border-radius: 999px; min-height: 44px; padding: 0 18px; font-weight: 600; }
