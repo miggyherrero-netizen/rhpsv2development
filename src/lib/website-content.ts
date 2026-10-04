@@ -1,5 +1,18 @@
 export const WEBSITE_CONTENT_KEY = "publicWebsiteContent";
 
+/** Optional proof details — left undefined (and hidden on the site) until you add real ones. */
+export type Testimonial = {
+  quote: string;
+  name: string;
+  role: string;
+  /** Photo URL (https://… or /img/…). */
+  photo?: string;
+  location?: string;
+  year?: string;
+  /** Link to the original Facebook review. */
+  reviewUrl?: string;
+};
+
 export type WebsiteContent = {
   hero: {
     eyebrow: string;
@@ -20,7 +33,7 @@ export type WebsiteContent = {
     steps: { label: string; title: string; body: string }[];
     checks: string[];
   };
-  testimonials: { quote: string; name: string; role: string }[];
+  testimonials: Testimonial[];
 };
 
 export const defaultWebsiteContent: WebsiteContent = {
@@ -59,6 +72,8 @@ export const defaultWebsiteContent: WebsiteContent = {
     ],
     checks: ["Pinblock & tuning torque", "Soundboard & crown", "Bridges & strings", "Action geometry", "Keyboard & bushings", "Pedal system", "Cabinet & hinges", "Room environment"],
   },
+  // TODO(owner): for each testimonial add the real photo, location, year and Facebook review link
+  // (Admin → Website → Testimonials, or here as photo / location / year / reviewUrl). Blank = hidden.
   testimonials: [
     {
       quote: "They didn't sell me a piano. They assessed what we had, told us honestly what it was worth, and restored my mother's Steinway into the instrument she remembered.",
@@ -76,6 +91,15 @@ export const defaultWebsiteContent: WebsiteContent = {
       role: "Fazioli F156 client, Singapore",
     },
   ],
+};
+
+const optString = (value: unknown, max = 200) =>
+  typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
+
+/** Only http(s) links or site-relative paths — never javascript:/data: from an editable field. */
+const optUrl = (value: unknown) => {
+  const v = optString(value, 500);
+  return v && (/^https?:\/\//i.test(v) || /^\/(?!\/)/.test(v)) ? v : undefined;
 };
 
 const asString = (value: unknown, fallback: string) =>
@@ -97,12 +121,16 @@ function normalizeTestimonials(value: unknown): WebsiteContent["testimonials"] {
   const source = Array.isArray(value) ? value : [];
   const rows = source
     .slice(0, 6)
-    .map((item) => item as Partial<WebsiteContent["testimonials"][number]>)
+    .map((item) => item as Partial<Testimonial>)
     .filter((item) => item.quote || item.name || item.role)
     .map((item) => ({
       quote: asString(item.quote, ""),
       name: asString(item.name, "Client"),
       role: asString(item.role, "Herrero Pianos client"),
+      photo: optUrl(item.photo),
+      location: optString(item.location, 80),
+      year: optString(item.year, 12),
+      reviewUrl: optUrl(item.reviewUrl),
     }))
     .filter((item) => item.quote);
   return rows.length ? rows : defaultWebsiteContent.testimonials;

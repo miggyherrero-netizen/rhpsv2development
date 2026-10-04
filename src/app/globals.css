@@ -17,6 +17,7 @@
   --color-edge: #1a2028;
   --color-chrome: #c7ceda;
   --color-mist: #8a93a3;
+  --color-subtle: #aab2bf; /* public-site small labels: 8.5:1 on paper, 7.9:1 on parchment (WCAG AA needs 4.5:1) */
   --color-gold: #caa257;
   --color-ember: #c2410c;
 

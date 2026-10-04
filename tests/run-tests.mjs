@@ -23,6 +23,7 @@ const testFiles = [
   { name: "service-money", file: "tests/service-money.ts" },
   { name: "service-mock", file: "tests/service-mock.ts" },
   { name: "service-documents", file: "tests/service-documents.ts" },
+  { name: "showroom-grouping", file: "tests/showroom-grouping.ts" },
 ];
 
 function runTest(name, file) {

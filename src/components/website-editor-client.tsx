@@ -170,6 +170,12 @@ export default function WebsiteEditorClient({ initialContent }: { initialContent
                 <TextArea title="Quote" value={item.quote} onChange={(quote) => updateTestimonial(index, { quote })} rows={5} />
                 <TextInput title="Name" value={item.name} onChange={(name) => updateTestimonial(index, { name })} />
                 <TextInput title="Role" value={item.role} onChange={(role) => updateTestimonial(index, { role })} />
+                <TextInput title="Photo URL (optional)" value={item.photo ?? ""} onChange={(photo) => updateTestimonial(index, { photo })} />
+                <div className="grid grid-cols-2 gap-3">
+                  <TextInput title="Location (optional)" value={item.location ?? ""} onChange={(location) => updateTestimonial(index, { location })} />
+                  <TextInput title="Year (optional)" value={item.year ?? ""} onChange={(year) => updateTestimonial(index, { year })} />
+                </div>
+                <TextInput title="Facebook review link (optional)" value={item.reviewUrl ?? ""} onChange={(reviewUrl) => updateTestimonial(index, { reviewUrl })} />
               </div>
             ))}
           </div>
