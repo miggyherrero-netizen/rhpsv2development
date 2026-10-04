@@ -14,7 +14,7 @@ import {
   computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents, taxLineLabel,
 } from "@/lib/service";
 import { countable } from "@/lib/service-reports";
-import { nextJobStep } from "@/lib/service-flow";
+import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
 import { ExpenseFormModal, JobFormModal } from "@/components/service-forms";
 import type { JobDetail } from "@/server/service-data";
 import {
@@ -23,8 +23,8 @@ import {
   deleteExpense, deleteJob,
 } from "@/server/service";
 import {
-  Chip, ConfirmTypeDialog, Dot, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PrimaryButton,
-  SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT, type MoreItem,
+  Chip, ConfirmTypeDialog, DateField, Dot, PesoInput, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PrimaryButton,
+  SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT, UnitInput, type MoreItem,
 } from "@/components/service-ui";
 
 export default function JobDetailClient({
@@ -317,8 +317,9 @@ export default function JobDetailClient({
                             />
                           </td>
                           <td className="px-5 py-2.5">
-                            <input
+                            <UnitInput
                               type="number"
+                              prefix="₱"
                               min={0}
                               step="50"
                               defaultValue={item.unitPriceCents / 100}
@@ -746,7 +747,7 @@ function AddItemModal({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Unit price" hint="Pesos">
-            <TextInput type="number" step="50" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="2500" />
+            <PesoInput value={price} onChange={setPrice} />
           </Field>
           {vatEnabled ? (
             <Field label="VAT">
@@ -767,7 +768,7 @@ function AddItemModal({
                 kind,
                 description: description.trim(),
                 qty: Number(qty) || 1,
-                unitPrice: Number(price) || 0,
+                unitPrice: parsePesoInput(price) ?? 0,
                 taxable,
               });
               onClose();
@@ -823,10 +824,10 @@ function ManualTimeModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Start">
-            <TextInput type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            <DateField kind="datetime-local" value={start} onChange={setStart} />
           </Field>
           <Field label="End">
-            <TextInput type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <DateField kind="datetime-local" value={end} onChange={setEnd} />
           </Field>
         </div>
         <Field label="Note">

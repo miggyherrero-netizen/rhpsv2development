@@ -1,7 +1,7 @@
 /** Job flow, type-to-confirm, due dates, money input, access. No database. Run: npx tsx tests/service-flow.ts */
 import {
   nextJobStep, stepEffect, confirmMatches, demoLoadAllowed, quoteCode, defaultDueDate, manilaDateTimeLocal,
-  parsePesoInput, billedHeadline, canViewFinance, type StepKey,
+  parsePesoInput, billedHeadline, canViewFinance, parseMessengerHandle, messengerHandle, withMessenger, quoteStatus, quoteLines, type StepKey,
 } from "../src/lib/service-flow";
 
 let failures = 0;
@@ -55,6 +55,21 @@ console.log("money input");
 check("peso formats parse", ["2,500", "₱2,500.50", " 2500 ", "0.5", ".75"].map(parsePesoInput), [2500, 2500.5, 2500, 0.5, 0.75]);
 check("garbage is rejected", ["", "abc", "12a", "1.2.3", "-5"].map(parsePesoInput), [null, null, null, null, null]);
 check("customer headline", [billedHeadline(4, 25_400_000), billedHeadline(1, 0)], ["4 jobs · ₱254,000 billed", "1 job · ₱0 billed"]);
+
+console.log("messenger link");
+check("handles from links and @names", ["m.me/herrero.pianos", "https://www.facebook.com/herrero.pianos?ref=x", "@herrero_pianos", "herrero.pianos"].map(parseMessengerHandle), ["herrero.pianos", "herrero.pianos", "herrero_pianos", "herrero.pianos"]);
+check("junk is rejected", ["", "a b", "ab", "javascript:alert(1)", "https://evil.com/x y"].map(parseMessengerHandle), [null, null, null, null, null]);
+check("stored in tags, other tags kept", [messengerHandle(withMessenger(["vip"], "abc.def")), withMessenger(["vip", "messenger:old"], "new.one")], ["abc.def", ["vip", "messenger:new.one"]]);
+check("clearing removes it", withMessenger(["vip", "messenger:old"], null), ["vip"]);
+
+console.log("quote lifecycle");
+check("lead = draft, quoted = sent", [quoteStatus("lead", []), quoteStatus("quoted", [])], ["draft", "sent"]);
+check("accepted event wins until it is invoiced", [quoteStatus("scheduled", [{ type: "quote_accepted" }]), quoteStatus("completed", [{ type: "quote_accepted" }])], ["accepted", "accepted"]);
+check("invoiced / paid = converted", [quoteStatus("invoiced", [{ type: "quote_accepted" }]), quoteStatus("paid", [])], ["converted", "converted"]);
+const li = [{ kind: "service", description: "Tuning", qty: 1, unitPriceCents: 250_000, taxable: true }];
+check("travel fee appears as a line when the job has no fee line", quoteLines(li, 30_000).map((l) => l.description), ["Tuning", "Travel / service call"]);
+check("no double travel charge when a fee line exists", quoteLines([...li, { kind: "fee", description: "Call-out", qty: 1, unitPriceCents: 30_000, taxable: true }], 30_000).length, 2);
+check("no travel fee -> items untouched", quoteLines(li, 0).length, 1);
 
 console.log("finance access");
 check("owner only", [canViewFinance({ role: "owner" }), canViewFinance({ role: "technician" }), canViewFinance({ role: null }), canViewFinance(null)], [true, false, false, false]);

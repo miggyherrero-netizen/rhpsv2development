@@ -15,7 +15,7 @@ import {
 import type { TodayBoard } from "@/server/service-data";
 import { startTimer, stopTimer, setJobStatus, createJob } from "@/server/service";
 import {
-  Chip, Dot, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard,
+  Chip, DateField, Dot, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard,
   Select, StatCard, SvcModal, TextInput, TONE_TEXT, useNow,
 } from "@/components/service-ui";
 
@@ -623,7 +623,7 @@ function QuickJobModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date">
-            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField kind="date" value={date} onChange={setDate} />
           </Field>
           <Field label="Start">
             <TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} />

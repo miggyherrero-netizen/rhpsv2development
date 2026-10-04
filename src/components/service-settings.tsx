@@ -5,6 +5,7 @@ import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database, Receipt,
 import { peso } from "@/lib/format";
 import { DAYS_SHORT } from "@/lib/config";
 import { ITEM_KINDS, type AvgInvoiceBasis } from "@/lib/service";
+import { parsePesoInput } from "@/lib/service-flow";
 import type { ServiceSettings } from "@/server/service-data";
 import type { ServiceCatalogItem, ServiceTechnician } from "@/db/schema";
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/server/service";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
-  SectionCard, Select, SuccessLine, SvcModal, TextInput, ToggleRow, TONE_TEXT, UnitInput,
+  SectionCard, Select, SuccessLine, SvcModal, TextInput, ToggleRow, TONE_TEXT, UnitInput, PesoInput,
 } from "@/components/service-ui";
 
 const minToTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -66,6 +67,20 @@ export default function SettingsClient({
   );
   const [baseline, setBaseline] = useState(current);
   const dirty = current !== baseline;
+  // Which part of the page changed — the save bar names it so "Save" is never ambiguous.
+  const changedSections = (() => {
+    if (!dirty) return [] as string[];
+    const a = JSON.parse(baseline) as Record<string, unknown>;
+    const b = JSON.parse(current) as Record<string, unknown>;
+    const differs = (keys: string[]) => keys.some((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+    return [
+      differs(["businessName", "invoicePrefix", "jobPrefix", "terms", "hourly", "travelFee", "interval", "lead"]) && "Business & invoicing",
+      differs(["vatEnabled", "taxLabel", "taxRate"]) && "Tax & invoices",
+      differs(["marginExcludesVat", "includeLaborCost", "avgInvoiceBasis"]) && "Profit & reports",
+      differs(["showFinance", "showJobMargins"]) && "Workspace visibility",
+      differs(["hours"]) && "Dispatch hours",
+    ].filter((x): x is string => !!x);
+  })();
   const discard = () => {
     const b = JSON.parse(baseline) as Record<string, never>;
     setBusinessName(b.businessName); setInvoicePrefix(b.invoicePrefix); setJobPrefix(b.jobPrefix); setTaxRate(b.taxRate);
@@ -143,7 +158,7 @@ export default function SettingsClient({
       <SuccessLine>{saved ? "Settings saved." : null}</SuccessLine>
 
       {/* Business + invoicing */}
-      <SectionCard title="Business & invoicing" className="overflow-hidden">
+      <SectionCard title={<>Business &amp; invoicing <span className="font-normal text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>· tax, reports, visibility and hours below save with “Save changes”</span></>} className="overflow-hidden">
         <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Business name" className="sm:col-span-2">
             <TextInput value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
@@ -303,7 +318,7 @@ export default function SettingsClient({
         >
           <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
             <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: "var(--color-svc-warn)" }} />
-            You have unsaved changes
+            You have unsaved changes{changedSections.length ? <span style={{ color: "var(--color-svc-text-dim)" }}> in {changedSections.join(", ")}</span> : null}
           </p>
           <div className="flex items-center gap-2">
             <GhostButton onClick={discard} className="!min-h-10">Discard</GhostButton>
@@ -316,7 +331,7 @@ export default function SettingsClient({
 
       {/* Crew */}
       <SectionCard
-        title="Field crew"
+        title={<>Field crew <span className="font-normal text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>· saves instantly</span></>}
         action={
           <GhostButton onClick={() => setTechOpen(true)} className="inline-flex items-center gap-1.5">
             <Plus size={13} /> Add technician
@@ -343,8 +358,9 @@ export default function SettingsClient({
                 </div>
                 <label className="text-[11.5px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
                   Cost
-                  <input
+                  <UnitInput
                     type="number"
+                    prefix="₱"
                     step="50"
                     defaultValue={t.hourlyRateCents / 100}
                     onBlur={(e) => run(() => updateTechnician(t.id, { hourlyRate: Number(e.target.value) }))}
@@ -353,8 +369,9 @@ export default function SettingsClient({
                 </label>
                 <label className="text-[11.5px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
                   Charge
-                  <input
+                  <UnitInput
                     type="number"
+                    prefix="₱"
                     step="50"
                     defaultValue={t.billableRateCents / 100}
                     onBlur={(e) => run(() => updateTechnician(t.id, { billableRate: Number(e.target.value) }))}
@@ -382,7 +399,7 @@ export default function SettingsClient({
       </SectionCard>
 
       {/* Price book */}
-      <SectionCard title="Price book">
+      <SectionCard title={<>Price book <span className="font-normal text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>· saves instantly</span></>}>
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_120px_90px_auto] gap-2 items-end">
             <Field label="Item name">
@@ -400,13 +417,7 @@ export default function SettingsClient({
               </Select>
             </Field>
             <Field label="Price">
-              <TextInput
-                type="number"
-                step="50"
-                value={newItem.price}
-                onChange={(e) => setNewItem((s) => ({ ...s, price: e.target.value }))}
-                placeholder="2500"
-              />
+              <PesoInput value={newItem.price} onChange={(v) => setNewItem((s) => ({ ...s, price: v }))} />
             </Field>
             <Field label="Minutes">
               <TextInput
@@ -424,7 +435,7 @@ export default function SettingsClient({
                   createCatalogItem({
                     name: newItem.name.trim(),
                     kind: newItem.kind,
-                    unitPrice: Number(newItem.price) || 0,
+                    unitPrice: parsePesoInput(newItem.price) ?? 0,
                     estimatedMinutes: Number(newItem.minutes) || 60,
                   }),
                 );
@@ -475,8 +486,9 @@ export default function SettingsClient({
                         </Select>
                       </td>
                       <td className="py-2 pr-4">
-                        <input
+                        <UnitInput
                           type="number"
+                          prefix="₱"
                           step="50"
                           defaultValue={item.unitPriceCents / 100}
                           onBlur={(e) => run(() => updateCatalogItem(item.id, { unitPrice: Number(e.target.value) }))}
@@ -512,27 +524,21 @@ export default function SettingsClient({
       </SectionCard>
 
       {/* Demo data */}
-      <SectionCard title="Sample data">
-        <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
-              {hasData ? "Your workspace already has data" : "Load a realistic sample dataset"}
-            </p>
-            <p className="text-[11.5px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
-              {hasData
-                ? "The demo seed is disabled so your real records stay untouched."
-                : "Four customers, two technicians, a price book, jobs, time logs, and expenses."}
-            </p>
+      {!hasData && (
+        <SectionCard title="Sample data" action={<span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>only offered while the workspace is empty</span>}>
+          <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>Load a realistic sample dataset</p>
+              <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+                Four customers, two technicians, a price book, jobs, time logs, and expenses.
+              </p>
+            </div>
+            <GhostButton disabled={pending} onClick={() => run(() => seedServiceDemo())} className="inline-flex items-center gap-1.5 !min-h-10">
+              <Database size={14} /> Load sample data
+            </GhostButton>
           </div>
-          <GhostButton
-            disabled={pending || hasData}
-            onClick={() => run(() => seedServiceDemo())}
-            className="inline-flex items-center gap-1.5"
-          >
-            <Database size={14} /> Load sample data
-          </GhostButton>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      )}
 
       <AddTechnicianModal open={techOpen} onClose={() => setTechOpen(false)} pending={pending} onCreate={(i) => run(() => createTechnician(i))} />
 
@@ -598,11 +604,11 @@ function AddTechnicianModal({
           </Field>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Field label="Cost / hour" hint="Pesos">
-            <TextInput type="number" step="50" value={hourly} onChange={(e) => setHourly(e.target.value)} />
+          <Field label="Cost / hour" hint="What you pay">
+            <PesoInput value={hourly} onChange={setHourly} suffix="/hr" placeholder="e.g. 250" />
           </Field>
-          <Field label="Charge / hour" hint="Pesos">
-            <TextInput type="number" step="50" value={billable} onChange={(e) => setBillable(e.target.value)} />
+          <Field label="Charge / hour" hint="What you bill">
+            <PesoInput value={billable} onChange={setBillable} suffix="/hr" placeholder="e.g. 600" />
           </Field>
           <Field label="Colour">
             <TextInput type="color" value={color} onChange={(e) => setColor(e.target.value)} className="!p-1 h-[38px]" />
@@ -616,8 +622,8 @@ function AddTechnicianModal({
             onClick={() => {
               onCreate({
                 name: name.trim(), title, phone, color,
-                hourlyRate: Number(hourly) || 0,
-                billableRate: Number(billable) || 0,
+                hourlyRate: parsePesoInput(hourly) ?? 0,
+                billableRate: parsePesoInput(billable) ?? 0,
               });
               onClose();
               setName(""); setPhone("");

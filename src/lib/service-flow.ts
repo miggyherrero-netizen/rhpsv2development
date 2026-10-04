@@ -132,3 +132,55 @@ export function billedHeadline(jobCount: number, billedCents: number): string {
 export function canViewFinance(user: { role?: string | null } | null | undefined): boolean {
   return user?.role === "owner";
 }
+
+/* ---------------------------------------------------------------- messenger */
+
+const MESSENGER_PREFIX = "messenger:";
+
+/** "m.me/herrero.pianos", "https://facebook.com/herrero.pianos?ref=x", "@herrero.pianos" → "herrero.pianos"; junk → null. */
+export function parseMessengerHandle(input: string): string | null {
+  const raw = input.trim();
+  const KNOWN = /^(?:https?:\/\/)?(?:www\.)?(?:m\.me|facebook\.com|fb\.com|messenger\.com\/t)\//i;
+  // A pasted link to any other website is not a Messenger handle.
+  if (/^https?:\/\//i.test(raw) && !KNOWN.test(raw)) return null;
+  const h = (raw.replace(KNOWN, "").replace(/^@/, "").split(/[/?#]/)[0]) ?? "";
+  return /^[A-Za-z0-9._-]{3,60}$/.test(h) ? h : null;
+}
+
+/** Stored in the existing `tags` column (no schema change). */
+export const messengerHandle = (tags: unknown): string | null => {
+  const t = (Array.isArray(tags) ? tags : []).find((x) => typeof x === "string" && x.startsWith(MESSENGER_PREFIX));
+  return t ? (t as string).slice(MESSENGER_PREFIX.length) : null;
+};
+
+export function withMessenger(tags: unknown, handle: string | null): string[] {
+  const rest = (Array.isArray(tags) ? tags : []).filter((x): x is string => typeof x === "string" && !x.startsWith(MESSENGER_PREFIX));
+  return handle ? [...rest, `${MESSENGER_PREFIX}${handle}`] : rest;
+}
+
+/* -------------------------------------------------------------------- quotes */
+
+export type QuoteStatus = "draft" | "sent" | "accepted" | "converted";
+
+/** A quote is derived from its job: no separate record, so it can never disagree with the job it prices. */
+export function quoteStatus(jobStatus: string, events: { type: string }[]): QuoteStatus {
+  if (jobStatus === "invoiced" || jobStatus === "paid") return "converted";
+  if (events.some((e) => e.type === "quote_accepted")) return "accepted";
+  if (jobStatus === "quoted") return "sent";
+  return "draft";
+}
+
+export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = { draft: "Draft", sent: "Sent", accepted: "Accepted", converted: "Converted to invoice" };
+
+type QuoteItem = { id?: string; kind?: string; description: string; qty: number; unitPriceCents: number; taxable: boolean };
+
+/**
+ * Lines shown on a quote — exactly what "Create invoice" will bill: the job's items, plus the call-out fee
+ * only when the job doesn't already carry a fee line (so the travel charge is never counted twice).
+ */
+export function quoteLines(items: QuoteItem[], travelFeeCents: number): QuoteItem[] {
+  const hasFee = items.some((i) => i.kind === "fee");
+  return travelFeeCents > 0 && !hasFee
+    ? [...items, { description: "Travel / service call", qty: 1, unitPriceCents: travelFeeCents, taxable: true, kind: "fee" }]
+    : items;
+}

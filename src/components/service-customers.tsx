@@ -8,13 +8,14 @@ import {
   CUSTOMER_SOURCES, CUSTOMER_SOURCE_LABEL, PIANO_TYPES, EXPENSE_CATEGORIES,
 } from "@/lib/service";
 import { isBatchCustomer, withCustomerType } from "@/lib/service-reports";
+import { parsePesoInput } from "@/lib/service-flow";
 import type { CustomerCard, RecallRow } from "@/server/service-data";
 import {
   createCustomer, updateCustomer, archiveCustomer, createLocation, deleteLocation,
   createPiano, updatePiano, deletePiano,
 } from "@/server/service";
 import {
-  Chip, ConfirmDialog, EmptyState, ErrorLine, Field, FilterPills, GhostButton, Money,
+  Chip, ConfirmDialog, EmptyState, PesoInput, ErrorLine, Field, FilterPills, GhostButton, Money,
   PrimaryButton, SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT,
 } from "@/components/service-ui";
 
@@ -31,8 +32,6 @@ export default function CustomersClient({
   const [filter, setFilter] = useState("active");
   const [sort, setSort] = useState<"name" | "billed" | "recent">("name");
   const [newOpen, setNewOpen] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<{ kind: "location" | "piano"; id: string } | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -58,8 +57,6 @@ export default function CustomersClient({
         : sort === "recent" ? when(b) - when(a) || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
   }, [customers, query, filter, sort]);
-
-  const open = customers.find((c) => c.id === openId) ?? null;
 
   const totals = useMemo(
     () => ({
@@ -184,9 +181,9 @@ export default function CustomersClient({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
           {filtered.map((c) => (
-            <button
+            <Link
               key={c.id}
-              onClick={() => setOpenId(c.id)}
+              href={`/service/customers/${c.id}`}
               className="card-svc card-svc-hover p-5 text-left h-full flex flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
             >
               <div className="flex items-start justify-between gap-3">
@@ -231,43 +228,13 @@ export default function CustomersClient({
               <p className="text-[12px] mt-2 min-h-[18px]" style={{ color: c.openJobCount > 0 ? TONE_TEXT.azure : "var(--color-svc-text-faint)" }}>
                 {c.openJobCount > 0 ? `${c.openJobCount} open job${c.openJobCount === 1 ? "" : "s"}` : "No open jobs"}
               </p>
-            </button>
+            </Link>
           ))}
         </div>
       )}
 
       <NewCustomerModal open={newOpen} onClose={() => setNewOpen(false)} pending={pending} onCreate={(i) => run(() => createCustomer(i))} />
 
-      {open && (
-        <CustomerSheet
-          customer={open}
-          onClose={() => setOpenId(null)}
-          pending={pending}
-          onSave={(patch) => run(() => updateCustomer(open.id, patch))}
-          onArchive={() => {
-            run(() => archiveCustomer(open.id, true));
-            setOpenId(null);
-          }}
-          onRestore={() => run(() => archiveCustomer(open.id, false))}
-          onAddLocation={(input) => run(() => createLocation({ ...input, customerId: open.id }))}
-          onDeleteLocation={(id) => setConfirm({ kind: "location", id })}
-          onAddPiano={(input) => run(() => createPiano({ ...input, customerId: open.id }))}
-          onUpdatePiano={(id, patch) => run(() => updatePiano(id, patch))}
-          onDeletePiano={(id) => setConfirm({ kind: "piano", id })}
-        />
-      )}
-
-      <ConfirmDialog
-        open={!!confirm}
-        title={confirm?.kind === "piano" ? "Remove this instrument?" : "Remove this location?"}
-        message="Jobs already recorded keep their history."
-        onCancel={() => setConfirm(null)}
-        onConfirm={() => {
-          if (confirm?.kind === "piano") run(() => deletePiano(confirm.id));
-          if (confirm?.kind === "location") run(() => deleteLocation(confirm.id));
-          setConfirm(null);
-        }}
-      />
     </div>
   );
 }
@@ -357,7 +324,7 @@ function NewCustomerModal({
   );
 }
 
-function CustomerSheet({
+export function CustomerSheet({
   customer,
   onClose,
   pending,
@@ -655,7 +622,7 @@ function AddLocationModal({
             <TextInput type="number" min={0} value={travelMinutes} onChange={(e) => setTravelMinutes(e.target.value)} />
           </Field>
           <Field label="Travel fee" hint="Pesos">
-            <TextInput type="number" min={0} step="50" value={travelFee} onChange={(e) => setTravelFee(e.target.value)} />
+            <PesoInput value={travelFee} onChange={setTravelFee} placeholder="e.g. 300" />
           </Field>
         </div>
         <Field label="Access notes" hint="Gate code, stairs, parking">
@@ -670,7 +637,7 @@ function AddLocationModal({
               onCreate({
                 label, addressLine, city, area, accessNotes,
                 travelMinutes: Number(travelMinutes) || 0,
-                travelFee: Number(travelFee) || 0,
+                travelFee: parsePesoInput(travelFee) ?? 0,
               })
             }
           >
