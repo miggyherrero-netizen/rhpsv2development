@@ -21,10 +21,10 @@ export const HERO_IMAGE = {
 export const SERVING_SINCE_YEAR: number | null = null;
 
 /**
- * TODO(owner): your Facebook page username — the part after facebook.com/ (e.g. "herreropianos").
- * Messenger buttons open m.me/<username>. While empty they fall back to a Facebook search for the page.
+ * Facebook page: facebook.com/rhpsns — the username is the part after facebook.com/.
+ * Messenger buttons open m.me/<username>; if this is ever emptied they fall back to a Facebook search.
  */
-export const FACEBOOK_PAGE_USERNAME = "";
+export const FACEBOOK_PAGE_USERNAME = "rhpsns";
 
 export const MESSENGER_URL = FACEBOOK_PAGE_USERNAME
   ? `https://m.me/${FACEBOOK_PAGE_USERNAME}`
