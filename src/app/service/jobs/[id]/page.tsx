@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { canViewFinance } from "@/lib/service-flow";
 import { getJobDetail, getServiceSettings } from "@/server/service-data";
 import JobDetailClient from "@/components/service-job-detail";
 
@@ -20,7 +21,7 @@ export default async function ServiceJobPage({ params }: { params: Promise<{ id:
       vatEnabled={settings.vatEnabled}
       marginExcludesVat={settings.marginExcludesVat}
       includeLaborCost={settings.includeLaborCost}
-      showJobMargins={settings.showJobMargins}
+      showJobMargins={settings.showJobMargins && canViewFinance(user)}
     />
   );
 }

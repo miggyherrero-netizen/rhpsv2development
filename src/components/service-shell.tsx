@@ -51,7 +51,10 @@ export default function ServiceShell({
   children,
   businessName,
   showFinance = true,
+  canFinance = true,
 }: {
+  /** Role check (server-enforced separately): non-finance roles never see Finance or Expenses. */
+  canFinance?: boolean;
   children: ReactNode;
   businessName: string;
   /** Owner setting: hides the Finance link only — the route itself is not blocked. */
@@ -70,9 +73,11 @@ export default function ServiceShell({
     return () => document.removeEventListener("keydown", esc);
   }, [open]);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const groups = showFinance
-    ? GROUPS
-    : GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.href !== "/service/finance") }));
+  const hidden = new Set<string>([
+    ...(showFinance ? [] : ["/service/finance"]),
+    ...(canFinance ? [] : ["/service/finance", "/service/expenses"]),
+  ]);
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hidden.has(i.href)) }));
 
   const onTab = TABS.some((t) => isActive(t.href));
   const nav = (

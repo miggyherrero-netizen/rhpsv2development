@@ -23,6 +23,11 @@ import {
   type AvgInvoiceBasis, type ReportSettingsPatch,
 } from "@/lib/service";
 import { titleCaseName } from "@/lib/service-reports";
+import {
+  canViewFinance, confirmMatches, nextJobStep, stepEffect, type StepKey,
+} from "@/lib/service-flow";
+import { getServiceSettings } from "@/server/service-data";
+import { invoiceCode, jobCode } from "@/lib/service";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -34,6 +39,17 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
  * stored value untouched instead of writing an empty string.
  */
 const strU = (value: unknown, max = 2_000): string | undefined => str(value, max) ?? undefined;
+
+/** Finance, margins and expenses are owner-only; any other (future) role is denied by default. */
+async function requireFinance() {
+  const user = await requireUser();
+  return canViewFinance(user) ? user : null;
+}
+const FINANCE_DENIED = fail("Only the owner can use finance and expenses.");
+
+/** Receipt photos arrive as small image data URLs (the browser downsizes them first). */
+const RECEIPT_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+const RECEIPT_MAX_CHARS = 3_200_000;
 
 /** Every mutation revalidates the whole workspace so lists, boards, and totals agree. */
 function touch() {
@@ -100,6 +116,23 @@ export async function archiveCustomer(id: string, archived: boolean): Promise<Re
     .where(eq(serviceCustomers.id, id));
   touch();
   return ok();
+}
+
+/** Lets a form show "this customer's addresses and pianos" without shipping every record to the browser. */
+export async function loadCustomerPlaces(customerId: string): Promise<Result<{
+  locations: { id: string; label: string; addressLine: string; city: string | null; area: string | null; travelFeeCents: number }[];
+  pianos: { id: string; label: string; type: string }[];
+}>> {
+  await requireUser();
+  if (!customerId) return ok({ locations: [], pianos: [] });
+  const [locations, pianos] = await Promise.all([
+    db.select().from(serviceLocations).where(eq(serviceLocations.customerId, customerId)).orderBy(serviceLocations.label),
+    db.select().from(servicePianos).where(eq(servicePianos.customerId, customerId)).orderBy(servicePianos.brand),
+  ]);
+  return ok({
+    locations: locations.map((l) => ({ id: l.id, label: l.label, addressLine: l.addressLine, city: l.city, area: l.area, travelFeeCents: l.travelFeeCents })),
+    pianos: pianos.map((p) => ({ id: p.id, label: [p.brand, p.model].filter(Boolean).join(" ") || p.type, type: p.type })),
+  });
 }
 
 export type LocationInput = {
@@ -507,9 +540,73 @@ export async function addJobNote(id: string, message: string): Promise<Result> {
   return ok();
 }
 
-export async function deleteJob(id: string): Promise<Result> {
+/** Next-step button: moves the job along AND drives the timers, so status and labor time never drift apart. */
+export async function advanceJob(jobId: string, step: string): Promise<Result> {
   await requireUser();
+  const effect = stepEffect(step as StepKey);
+  if (!effect) return fail("That step isn't an action.");
+  const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
+  if (!job) return fail("Job not found.");
+
+  const [[items], [invoice]] = await Promise.all([
+    db.select({ n: sql<number>`count(*)::int` }).from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId)).then((r) => [r[0]!]),
+    db.select({ id: serviceInvoices.id }).from(serviceInvoices)
+      .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1).then((r) => [r[0]]),
+  ]);
+  // Only the step the job is actually on may run: a stale tab or double-click can't skip ahead.
+  const expected = nextJobStep(job.status, { hasLineItems: items.n > 0, hasInvoice: !!invoice, hasSchedule: !!job.scheduledStart });
+  if (expected?.key !== step) return fail("This job has moved on — refresh to see the next step.");
+
+  const now = new Date();
+  if (effect.startTimer && job.technicianId) {
+    const [busy] = await db.select({ id: serviceTimeLogs.id, jobId: serviceTimeLogs.jobId }).from(serviceTimeLogs)
+      .where(and(eq(serviceTimeLogs.technicianId, job.technicianId), isNull(serviceTimeLogs.endedAt))).limit(1);
+    if (busy && busy.jobId !== jobId) return fail("That technician already has a timer running on another job — stop it first.");
+  }
+  const rate = effect.startTimer && job.technicianId
+    ? (await db.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1))[0]?.r ?? 0
+    : 0;
+
+  await db.transaction(async (tx) => {
+    if (effect.stopTimers) {
+      const running = await tx.select().from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, jobId), isNull(serviceTimeLogs.endedAt)));
+      for (const log of running) {
+        await tx.update(serviceTimeLogs).set({ endedAt: now, minutes: elapsedMinutes(log.startedAt, now) }).where(eq(serviceTimeLogs.id, log.id));
+      }
+    }
+    if (effect.startTimer) {
+      await tx.insert(serviceTimeLogs).values({ jobId, technicianId: job.technicianId, kind: effect.startTimer, startedAt: now, hourlyRateCents: rate });
+    }
+    await tx.update(serviceJobs).set({
+      status: effect.status,
+      startedAt: effect.status === "en_route" || effect.status === "in_progress" ? job.startedAt ?? now : undefined,
+      completedAt: effect.status === "completed" ? job.completedAt ?? now : undefined,
+      updatedAt: now,
+    }).where(eq(serviceJobs.id, jobId));
+    await tx.insert(serviceJobEvents).values({ jobId, type: effect.event.type, message: effect.event.message, actorName: "Owner" });
+  });
+
+  if (effect.status === "completed") {
+    await recalcJobLabor(jobId);
+    await recalcJobMoney(jobId);
+    await advanceRecall(jobId);
+  } else if (effect.stopTimers) {
+    await recalcJobLabor(jobId);
+  }
+  touch();
+  return ok();
+}
+
+/** Deleting needs the record's code typed back (checked here too, not just in the dialog). */
+export async function deleteJob(id: string, confirmCode: string): Promise<Result> {
+  const user = await requireUser();
   if (!id) return fail("Missing job.");
+  const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, id)).limit(1);
+  if (!job) return ok();
+  const settings = await getServiceSettings(user.id);
+  if (!confirmMatches(confirmCode ?? "", jobCode(settings.jobPrefix, job.jobNumber, job.createdAt))) {
+    return fail("Type the job number exactly to confirm.");
+  }
   await db.delete(serviceJobs).where(eq(serviceJobs.id, id));
   touch();
   return ok();
@@ -1004,10 +1101,19 @@ export async function setInvoiceStatus(id: string, status: string): Promise<Resu
 export async function recordPayment(input: {
   invoiceId: string; amount?: number; method?: string; reference?: string | null;
   receivedAt?: string | null; note?: string | null;
+  /** Needed when the invoice is still a draft: records the payment AND marks it sent in one step. */
+  markSent?: boolean;
 }): Promise<Result> {
   await requireUser();
   const amountCents = moneyToCents(input.amount);
   if (amountCents <= 0) return fail("Enter a payment amount above zero.");
+  const [target] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, input.invoiceId)).limit(1);
+  if (!target) return fail("Invoice not found.");
+  if (target.voidedAt) return fail("This invoice is void — reopen it before recording a payment.");
+  if (!target.sentAt && target.amountPaidCents <= 0) {
+    if (!input.markSent) return fail("This invoice is still a draft. Mark it as sent first, or choose “Mark as sent and record payment”.");
+    await db.update(serviceInvoices).set({ sentAt: new Date(), updatedAt: new Date() }).where(eq(serviceInvoices.id, input.invoiceId));
+  }
   const receivedAt = optionalDate(input.receivedAt) ?? new Date();
   await db.insert(servicePayments).values({
     invoiceId: input.invoiceId,
@@ -1043,8 +1149,14 @@ export async function deletePayment(id: string): Promise<Result> {
   return ok();
 }
 
-export async function deleteInvoice(id: string): Promise<Result> {
-  await requireUser();
+export async function deleteInvoice(id: string, confirmCode: string): Promise<Result> {
+  const user = await requireUser();
+  const [inv] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, id)).limit(1);
+  if (!inv) return ok();
+  const settings = await getServiceSettings(user.id);
+  if (!confirmMatches(confirmCode ?? "", invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate))) {
+    return fail("Type the invoice number exactly to confirm.");
+  }
   await db.delete(serviceInvoices).where(eq(serviceInvoices.id, id));
   touch();
   return ok();
@@ -1058,12 +1170,26 @@ export type ExpenseInput = {
   category?: string; description: string; amount?: number; spentAt?: string | null;
   jobId?: string | null; vendor?: string | null; method?: string;
   reimbursable?: boolean; note?: string | null;
+  /** Optional receipt photo (image data URL, downsized in the browser). */
+  receiptUrl?: string | null;
 };
 
+function validReceipt(value: unknown): { ok: true; url: string | null } | { ok: false } {
+  if (value === undefined || value === null || value === "") return { ok: true, url: null };
+  if (typeof value !== "string" || value.length > RECEIPT_MAX_CHARS || !RECEIPT_RE.test(value)) return { ok: false };
+  return { ok: true, url: value };
+}
+
 export async function createExpense(input: ExpenseInput): Promise<Result<{ id: string }>> {
-  await requireUser();
+  if (!(await requireFinance())) return FINANCE_DENIED;
   const description = str(input.description, 300);
   if (!description) return fail("Describe the expense.");
+  const receipt = validReceipt(input.receiptUrl);
+  if (!receipt.ok) return fail("Receipt must be a JPG, PNG or WebP photo under 3MB.");
+  const linkedJob = str(input.jobId);
+  if (linkedJob && !(await db.select({ id: serviceJobs.id }).from(serviceJobs).where(eq(serviceJobs.id, linkedJob)).limit(1)).length) {
+    return fail("That job no longer exists.");
+  }
   const [row] = await db
     .insert(serviceExpenses)
     .values({
@@ -1076,6 +1202,7 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
       method: oneOf(input.method, PAYMENT_METHODS.map((m) => m.key), "cash"),
       reimbursable: boolOr(input.reimbursable, false),
       note: str(input.note, 1_000),
+      receiptUrl: receipt.url,
     })
     .returning({ id: serviceExpenses.id });
   touch();
@@ -1083,7 +1210,7 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
 }
 
 export async function updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Result> {
-  await requireUser();
+  if (!(await requireFinance())) return FINANCE_DENIED;
   if (!id) return fail("Missing expense.");
   await db
     .update(serviceExpenses)
@@ -1105,7 +1232,7 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
 }
 
 export async function deleteExpense(id: string): Promise<Result> {
-  await requireUser();
+  if (!(await requireFinance())) return FINANCE_DENIED;
   await db.delete(serviceExpenses).where(eq(serviceExpenses.id, id));
   touch();
   return ok();

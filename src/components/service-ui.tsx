@@ -5,11 +5,12 @@
  * `--color-svc-*` tokens so the theme stays separate from admin/owner/public.
  */
 
-import { useEffect, useId, useMemo, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { X, Loader2, Inbox, AlertCircle, CheckCircle2 } from "lucide-react";
-import { peso } from "@/lib/format";
+import { X, Loader2, Inbox, AlertCircle, CheckCircle2, Ellipsis } from "lucide-react";
+import { fmtDate, fmtTime, peso } from "@/lib/format";
+import { confirmMatches, parsePesoInput } from "@/lib/service-flow";
 import type { Tone } from "@/lib/service";
 
 /* ============================================================
@@ -322,9 +323,151 @@ export function ConfirmDialog({
   );
 }
 
+/**
+ * Delete-style confirmation that needs the record's code typed back (WO-2026-0012 / INV-2026-0031).
+ * The server checks the same code again, so a forged call can't skip this.
+ */
+type ConfirmTypeProps = {
+  open: boolean; title: string; message?: string; code: string; confirmLabel?: string;
+  error?: string | null; pending?: boolean; onConfirm: (typed: string) => void; onCancel: () => void;
+};
+
+export function ConfirmTypeDialog(props: ConfirmTypeProps) {
+  // Mounted only while open, so the typed text always starts empty.
+  return props.open ? <ConfirmTypeInner {...props} /> : null;
+}
+
+function ConfirmTypeInner({
+  title, message, code, confirmLabel = "Delete", error, pending, onConfirm, onCancel,
+}: ConfirmTypeProps) {
+  const [typed, setTyped] = useState("");
+  const id = useId();
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [onCancel]);
+  const ready = confirmMatches(typed, code);
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={onCancel} />
+      <form
+        role="alertdialog" aria-modal="true" aria-labelledby={`${id}-t`}
+        onSubmit={(e) => { e.preventDefault(); if (ready && !pending) onConfirm(typed); }}
+        className="relative card-svc max-w-sm w-full p-6 anim-sheet"
+      >
+        <p id={`${id}-t`} className="font-serif text-lg" style={{ color: "var(--color-svc-text)" }}>{title}</p>
+        {message ? <p className="text-[12.5px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{message}</p> : null}
+        <label htmlFor={`${id}-i`} className="block text-[12.5px] mt-4" style={{ color: "var(--color-svc-text-dim)" }}>
+          Type <b className="font-mono font-medium" style={{ color: "var(--color-svc-text)" }}>{code}</b> to confirm
+        </label>
+        <input
+          id={`${id}-i`} autoFocus autoComplete="off" spellCheck={false} value={typed}
+          onChange={(e) => setTyped(e.target.value)} placeholder={code}
+          className="input-svc mt-1.5 font-mono"
+        />
+        {error ? <p role="alert" className="text-[12px] mt-2" style={{ color: TONE_TEXT.danger }}>{error}</p> : null}
+        <div className="flex gap-2 mt-5">
+          <button type="button" onClick={onCancel} className="btn-svc-ghost flex-1 text-[13px] rounded-xl min-h-11">Cancel</button>
+          <button
+            type="submit" disabled={!ready || pending}
+            className="flex-1 text-[13px] rounded-xl min-h-11 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: TONE_SOFT.danger, color: TONE_TEXT.danger }}
+          >
+            {pending ? "Deleting…" : confirmLabel}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export type MoreItem = {
+  label: string;
+  onSelect?: () => void;
+  href?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  icon?: ReactNode;
+  /** Draws a divider above this item (used to set Delete apart). */
+  separated?: boolean;
+};
+
+/** "⋯ More": a disclosure list for secondary and dangerous actions. Esc / outside click / focus-out close it. */
+export function MoreMenu({ items, label = "More" }: { items: MoreItem[]; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const row = "flex w-full items-center gap-2.5 px-3.5 min-h-11 text-left text-[13px] hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[-2px] focus-visible:outline-[var(--color-svc-accent)]";
+  return (
+    <div ref={ref} className="relative" onBlur={(e) => { if (!ref.current?.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
+      <button
+        ref={trigger} type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}
+        className="btn-svc-ghost rounded-xl px-3.5 min-h-10 text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+      >
+        <Ellipsis size={15} /> {label}
+      </button>
+      {open && (
+        <div id={id} className="absolute right-0 top-full mt-2 z-30 w-60 overflow-hidden rounded-xl border bg-[var(--color-svc-surface-2)]" style={{ borderColor: "var(--color-svc-border-strong)", boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }}>
+          {items.map((it) => {
+            const style = { color: it.danger ? TONE_TEXT.danger : "var(--color-svc-text)", borderTop: it.separated ? "1px solid var(--color-svc-border)" : undefined };
+            return it.href ? (
+              <Link key={it.label} href={it.href} onClick={() => setOpen(false)} className={row} style={style}>{it.icon}{it.label}</Link>
+            ) : (
+              <button key={it.label} type="button" disabled={it.disabled} onClick={() => { setOpen(false); it.onSelect?.(); }} className={row} style={style}>
+                {it.icon}{it.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============================================================
  * Form pieces
  * ============================================================ */
+
+/** ₱-prefixed money box that accepts "2,500" / "2500.50" and flags unreadable text. Value stays a string. */
+export function PesoInput({
+  value, onChange, placeholder = "e.g. 2,500", suffix, ...rest
+}: { value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
+  const bad = value.trim() !== "" && parsePesoInput(value) === null;
+  return (
+    <UnitInput
+      {...rest} type="text" inputMode="decimal" autoComplete="off" prefix="₱" suffix={suffix}
+      value={value} placeholder={placeholder} aria-invalid={bad || undefined}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+/** Native date / date-time picker that also spells the chosen date in the app's own format underneath. */
+export function DateField({
+  value, onChange, kind = "date", ...rest
+}: { value: string; onChange: (v: string) => void; kind?: "date" | "datetime-local" } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
+  let caption = "";
+  if (value) {
+    const d = new Date(kind === "date" ? `${value}T12:00:00+08:00` : `${value.length === 16 ? `${value}:00` : value}+08:00`);
+    if (!Number.isNaN(d.getTime())) caption = kind === "date" ? `${fmtDate(d)}, ${d.getUTCFullYear()}` : `${fmtDate(d)} · ${fmtTime(d)}`;
+  }
+  return (
+    <span className="block">
+      <input {...rest} type={kind} value={value} onChange={(e) => onChange(e.target.value)} className="input-svc svc-num" />
+      <span className="block text-[12px] mt-1 min-h-[16px]" style={{ color: "var(--color-svc-text-faint)" }} aria-live="polite">{caption}</span>
+    </span>
+  );
+}
 
 export function Field({
   label,

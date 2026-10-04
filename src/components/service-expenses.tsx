@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Wallet, Search, Trash2 } from "lucide-react";
+import { Plus, Wallet, Search, Trash2, Paperclip } from "lucide-react";
 import { RANGES, type RangeKey } from "@/lib/service-reports";
+import { ExpenseFormModal } from "@/components/service-forms";
 import { fmtDate, peso } from "@/lib/format";
 import {
   EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, PAYMENT_METHODS, PAYMENT_METHOD_LABEL,
@@ -20,7 +21,9 @@ export default function ExpensesClient({
   rangeKey,
   rangeLabel,
   showFinance,
+  jobOptions,
 }: {
+  jobOptions: { id: string; label: string }[];
   /** Already limited to the selected range by the server. */
   expenses: ExpenseRow[];
   rangeKey: RangeKey;
@@ -32,6 +35,7 @@ export default function ExpensesClient({
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [receiptView, setReceiptView] = useState<{ url: string; title: string } | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -168,7 +172,16 @@ export default function ExpensesClient({
                           </span>
                         ) : null}
                         {e.reimbursable ? (
-                          <span className="text-[10.5px] ml-2" style={{ color: "var(--color-svc-violet)" }}>reimbursable</span>
+                          <span className="text-[11px] ml-2" style={{ color: "var(--color-svc-violet)" }}>reimbursable</span>
+                        ) : null}
+                        {e.receiptUrl ? (
+                          <button
+                            type="button" onClick={() => setReceiptView({ url: e.receiptUrl!, title: e.description })}
+                            className="ml-2 inline-flex items-center gap-1 text-[12px] hover:underline min-h-8 align-middle"
+                            style={{ color: "var(--color-svc-accent)" }} aria-label={`View receipt for ${e.description}`}
+                          >
+                            <Paperclip size={12} /> Receipt
+                          </button>
                         ) : null}
                       </td>
                       <td className="px-5 py-2.5 text-[12px] whitespace-nowrap">
@@ -229,97 +242,20 @@ export default function ExpensesClient({
         </SectionCard>
       </div>
 
-      <ExpenseModal
+      <SvcModal open={!!receiptView} onClose={() => setReceiptView(null)} title="Receipt" subtitle={receiptView?.title} wide>
+        {receiptView && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={receiptView.url} alt={`Receipt for ${receiptView.title}`} className="w-full max-h-[70vh] object-contain rounded-lg bg-black/30" />
+        )}
+      </SvcModal>
+
+      <ExpenseFormModal
         open={open}
         onClose={() => setOpen(false)}
         pending={pending}
-        onCreate={(input) => run(() => createExpense(input))}
+        jobOptions={jobOptions}
+        onSubmit={(values) => run(() => createExpense(values))}
       />
     </div>
-  );
-}
-
-function ExpenseModal({
-  open,
-  onClose,
-  pending,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  pending: boolean;
-  onCreate: (input: {
-    category: string; description: string; amount: number; spentAt: string | null;
-    vendor: string; method: string; reimbursable: boolean;
-  }) => void;
-}) {
-  const [category, setCategory] = useState("fuel");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [spentAt, setSpentAt] = useState("");
-  const [vendor, setVendor] = useState("");
-  const [method, setMethod] = useState("cash");
-  const [reimbursable, setReimbursable] = useState(false);
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="Add expense">
-      <div className="space-y-3.5">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Category">
-            <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c.key} value={c.key}>{c.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Amount" hint="Pesos">
-            <TextInput type="number" step="50" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
-          </Field>
-        </div>
-        <Field label="Description">
-          <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Diesel — Buhangin run" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Vendor">
-            <TextInput value={vendor} onChange={(e) => setVendor(e.target.value)} />
-          </Field>
-          <Field label="Date">
-            <TextInput type="datetime-local" value={spentAt} onChange={(e) => setSpentAt(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Paid with">
-            <Select value={method} onChange={(e) => setMethod(e.target.value)}>
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m.key} value={m.key}>{m.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Reimbursable">
-            <Select value={reimbursable ? "yes" : "no"} onChange={(e) => setReimbursable(e.target.value === "yes")}>
-              <option value="no">Business expense</option>
-              <option value="yes">Owed to crew</option>
-            </Select>
-          </Field>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton
-            pending={pending}
-            disabled={!description.trim()}
-            onClick={() => {
-              onCreate({
-                category, description: description.trim(), amount: Number(amount) || 0,
-                spentAt: spentAt || null, vendor, method, reimbursable,
-              });
-              onClose();
-              setDescription(""); setAmount(""); setVendor("");
-            }}
-          >
-            Add expense
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
   );
 }

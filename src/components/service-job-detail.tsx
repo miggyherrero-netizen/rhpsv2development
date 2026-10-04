@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, MapPin, Phone, Receipt, Trash2, Plus, Play, Square, Navigation, Timer as TimerIcon,
+  ArrowLeft, MapPin, Phone, Receipt, Trash2, Plus, ArrowRight, FileText, PauseCircle, Play, Square, Navigation, Timer as TimerIcon,
   Pencil, Wallet, TrendingUp, MessageSquarePlus, ExternalLink, Clock3,
 } from "lucide-react";
 import { fmtDate, fmtTime, toLocalInput, peso } from "@/lib/format";
@@ -14,15 +14,17 @@ import {
   computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents, taxLineLabel,
 } from "@/lib/service";
 import { countable } from "@/lib/service-reports";
+import { nextJobStep } from "@/lib/service-flow";
+import { ExpenseFormModal, JobFormModal } from "@/components/service-forms";
 import type { JobDetail } from "@/server/service-data";
 import {
-  updateJob, setJobStatus, assignJob, addJobItem, updateJobItem, deleteJobItem, addJobNote,
+  advanceJob, updateJob, setJobStatus, addJobItem, updateJobItem, deleteJobItem, addJobNote,
   startTimer, stopTimer, addManualTime, deleteTimeLog, createInvoiceFromJob, createExpense,
   deleteExpense, deleteJob,
 } from "@/server/service";
 import {
-  Chip, ConfirmDialog, Dot, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
-  SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT,
+  Chip, ConfirmTypeDialog, Dot, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PrimaryButton,
+  SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT, type MoreItem,
 } from "@/components/service-ui";
 
 export default function JobDetailClient({
@@ -54,6 +56,7 @@ export default function JobDetailClient({
   const [timeOpen, setTimeOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
   const { job } = detail;
@@ -98,6 +101,31 @@ export default function JobDetailClient({
 
   const statusTone = JOB_STATUS_TONE[job.status] ?? "slate";
 
+  // One primary "next step" instead of a free status dropdown; every status stays reachable under More.
+  const liveInvoice = detail.invoices.find((i) => !i.voidedAt) ?? null;
+  const step = nextJobStep(job.status, { hasLineItems: detail.items.length > 0, hasInvoice: !!liveInvoice, hasSchedule: !!job.scheduledStart });
+  const onStep = () => {
+    if (!step) return;
+    if (step.key === "schedule") return setEditOpen(true);
+    if (step.key === "view_invoice") return liveInvoice && router.push(`/service/invoices/${liveInvoice.id}`);
+    if (step.key === "create_invoice") return void runTo(() => createInvoiceFromJob(job.id, { discountCents: 0, includeTravel: true }));
+    startTransition(async () => {
+      setError(null);
+      const res = await advanceJob(job.id, step.key);
+      if (!res.ok) return setError(res.error);
+      if (step.key === "send_quote") router.push(`/service/jobs/${job.id}/quote`);
+    });
+  };
+  const moreItems: MoreItem[] = [
+    ...(detail.items.length > 0 ? [{ label: "Open quote document", href: `/service/jobs/${job.id}/quote`, icon: <FileText size={14} /> }] : []),
+    ...(job.status === "scheduled" || job.status === "en_route" || job.status === "in_progress"
+      ? [{ label: "Put on hold", onSelect: () => run(() => setJobStatus(job.id, "on_hold")), icon: <PauseCircle size={14} /> }] : []),
+    ...JOB_STATUSES.filter((s) => s.key !== job.status && s.key !== "on_hold").map((s) => ({
+      label: `Set status: ${s.label}`, onSelect: () => run(() => setJobStatus(job.id, s.key)), disabled: pending,
+    })),
+    { label: "Delete job…", danger: true, separated: true, icon: <Trash2 size={14} />, onSelect: () => { setDeleteError(null); setConfirmDelete(true); } },
+  ];
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-5">
       {/* Header */}
@@ -126,38 +154,21 @@ export default function JobDetailClient({
             {job.technicianName ? ` · ${job.technicianName}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={job.status}
-            disabled={pending}
-            onChange={(e) => run(() => setJobStatus(job.id, e.target.value))}
-            className="!w-auto"
-          >
-            {JOB_STATUSES.map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </Select>
-          <Select
-            value={job.technicianId ?? ""}
-            disabled={pending}
-            onChange={(e) => run(() => assignJob(job.id, e.target.value || null))}
-            className="!w-auto"
-          >
-            <option value="">Unassigned</option>
-            {detail.technicians.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </Select>
-          <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5">
-            <Pencil size={13} /> Edit
-          </GhostButton>
-          <GhostButton
-            onClick={() => setConfirmDelete(true)}
-            className="inline-flex items-center gap-1.5"
-            style={{ color: TONE_TEXT.danger }}
-          >
-            <Trash2 size={13} /> Delete
-          </GhostButton>
+        <div className="flex flex-col items-start sm:items-end gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {step ? (
+              <PrimaryButton pending={pending} onClick={onStep} className="!min-h-11 !px-5">
+                {step.label} <ArrowRight size={15} />
+              </PrimaryButton>
+            ) : (
+              <Chip tone="success">Paid — nothing left to do</Chip>
+            )}
+            <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10">
+              <Pencil size={13} /> Edit
+            </GhostButton>
+            <MoreMenu items={moreItems} />
+          </div>
+          {step ? <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>{step.hint}</p> : null}
         </div>
       </div>
 
@@ -590,12 +601,21 @@ export default function JobDetailClient({
       </div>
 
       {/* Modals */}
-      <EditJobModal
+      <JobFormModal
         open={editOpen}
+        mode="edit"
         onClose={() => setEditOpen(false)}
-        job={job}
         pending={pending}
-        onSave={(patch) => run(() => updateJob(job.id, patch))}
+        customers={detail.customers}
+        technicians={detail.technicians.filter((t) => t.active || t.id === job.technicianId).map((t) => ({ id: t.id, name: t.name }))}
+        initial={{
+          customerId: job.customerId, locationId: job.locationId, pianoId: job.pianoId, technicianId: job.technicianId,
+          title: job.title, serviceType: job.serviceType, priority: job.priority,
+          scheduledStart: job.scheduledStart ? toLocalInput(new Date(job.scheduledStart)).slice(0, 16) : "",
+          estimatedMinutes: job.estimatedMinutes, travelFee: job.travelFeeCents / 100,
+          notes: job.notes ?? "", privateNotes: job.privateNotes ?? "",
+        }}
+        onSubmit={(values) => run(() => updateJob(job.id, values))}
       />
       <AddItemModal
         open={itemOpen}
@@ -612,24 +632,28 @@ export default function JobDetailClient({
         pending={pending}
         onCreate={(input) => run(() => addManualTime({ ...input, jobId: job.id }))}
       />
-      <ExpenseModal
+      <ExpenseFormModal
         open={expenseOpen}
         onClose={() => setExpenseOpen(false)}
         pending={pending}
-        onCreate={(input) => run(() => createExpense({ ...input, jobId: job.id }))}
+        fixedJobId={job.id}
+        onSubmit={(values) => run(() => createExpense(values))}
       />
-      <ConfirmDialog
+      <ConfirmTypeDialog
         open={confirmDelete}
         title="Delete this job?"
         message="The job, its line items, timers, and timeline will be removed. Invoices are kept."
+        code={jobCode(jobPrefix, job.jobNumber, job.createdAt)}
+        error={deleteError}
+        pending={pending}
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
-          setConfirmDelete(false);
+        onConfirm={(typed) =>
           startTransition(async () => {
-            await deleteJob(job.id);
-            router.push("/service/jobs");
-          });
-        }}
+            const res = await deleteJob(job.id, typed);
+            if (res.ok) router.push("/service/jobs");
+            else setDeleteError(res.error);
+          })
+        }
       />
     </div>
   );
@@ -658,97 +682,6 @@ function Row({ label, children, strong }: { label: string; children: React.React
       <span style={{ color: strong ? "var(--color-svc-text)" : "var(--color-svc-text-dim)" }}>{label}</span>
       <span className={strong ? "font-medium" : ""}>{children}</span>
     </div>
-  );
-}
-
-function EditJobModal({
-  open,
-  onClose,
-  job,
-  pending,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  job: JobDetail["job"];
-  pending: boolean;
-  onSave: (patch: {
-    title: string; serviceType: string; priority: string; scheduledStart: string | null;
-    estimatedMinutes: number; travelFee: number; notes: string; privateNotes: string;
-  }) => void;
-}) {
-  const [title, setTitle] = useState(job.title);
-  const [serviceType, setServiceType] = useState(job.serviceType);
-  const [priority, setPriority] = useState(job.priority);
-  const [start, setStart] = useState(job.scheduledStart ? toLocalInput(new Date(job.scheduledStart)).slice(0, 16) : "");
-  const [minutes, setMinutes] = useState(String(job.estimatedMinutes));
-  const [travel, setTravel] = useState(String(job.travelFeeCents / 100));
-  const [notes, setNotes] = useState(job.notes ?? "");
-  const [privateNotes, setPrivateNotes] = useState(job.privateNotes ?? "");
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="Edit visit" wide>
-      <div className="space-y-3.5">
-        <Field label="Job title">
-          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} />
-        </Field>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Service type">
-            <Select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-              {SERVICE_TYPES.map((s) => (
-                <option key={s.key} value={s.key}>{s.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Priority">
-            <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </Select>
-          </Field>
-          <Field label="Duration (min)">
-            <TextInput type="number" min={15} step={15} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Scheduled start" hint="Manila time">
-            <TextInput type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-          </Field>
-          <Field label="Travel fee" hint="Pesos">
-            <TextInput type="number" min={0} step={50} value={travel} onChange={(e) => setTravel(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Notes (visible to client)">
-          <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-        <Field label="Private notes">
-          <TextArea rows={2} value={privateNotes} onChange={(e) => setPrivateNotes(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton
-            pending={pending}
-            onClick={() => {
-              onSave({
-                title,
-                serviceType,
-                priority,
-                scheduledStart: start || null,
-                estimatedMinutes: Number(minutes) || 60,
-                travelFee: Number(travel) || 0,
-                notes,
-                privateNotes,
-              });
-              onClose();
-            }}
-          >
-            Save changes
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
   );
 }
 
@@ -923,58 +856,3 @@ function ManualTimeModal({
   );
 }
 
-function ExpenseModal({
-  open,
-  onClose,
-  pending,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  pending: boolean;
-  onCreate: (input: { category: string; description: string; amount: number; spentAt: string | null }) => void;
-}) {
-  const [category, setCategory] = useState("materials");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [spentAt, setSpentAt] = useState("");
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="Add job expense">
-      <div className="space-y-3.5">
-        <Field label="Category">
-          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {EXPENSE_CATEGORIES.map((c) => (
-              <option key={c.key} value={c.key}>{c.label}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Description">
-          <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Damper felt stock" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Amount" hint="Pesos">
-            <TextInput type="number" step="50" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </Field>
-          <Field label="Date">
-            <TextInput type="datetime-local" value={spentAt} onChange={(e) => setSpentAt(e.target.value)} />
-          </Field>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton
-            pending={pending}
-            disabled={!description.trim()}
-            onClick={() => {
-              onCreate({ category, description: description.trim(), amount: Number(amount) || 0, spentAt: spentAt || null });
-              onClose();
-              setDescription(""); setAmount("");
-            }}
-          >
-            Add expense
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
-  );
-}

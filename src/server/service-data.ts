@@ -933,6 +933,34 @@ export async function getFinanceReport(
 }
 
 /* ============================================================
+ * Customer detail page
+ * ============================================================ */
+
+export type CustomerDetail = NonNullable<Awaited<ReturnType<typeof getCustomerDetail>>>;
+
+export async function getCustomerDetail(id: string, now: Date = new Date()) {
+  const [row] = await db.select().from(serviceCustomers).where(eq(serviceCustomers.id, id)).limit(1);
+  if (!row) return null;
+  const [locations, pianos, jobs, invoices] = await Promise.all([
+    db.select().from(serviceLocations).where(eq(serviceLocations.customerId, id)).orderBy(asc(serviceLocations.label)),
+    db.select().from(servicePianos).where(eq(servicePianos.customerId, id)).orderBy(asc(servicePianos.brand)),
+    getJobs({ customerId: id, limit: 200 }),
+    getInvoices({ customerId: id, limit: 300 }, now),
+  ]);
+  const when = (j: JobRow) => new Date(j.scheduledStart ?? j.createdAt).getTime();
+  return {
+    customer: { ...row, name: titleCaseName(row.name) },
+    locations,
+    pianos,
+    jobs: [...jobs].sort((a, b) => when(b) - when(a)),
+    invoices,
+    billedCents: billedCents(invoices, now),
+    outstandingCents: receivables(invoices, now).totalOutstandingCents,
+    drafts: draftSummary(invoices, now),
+  };
+}
+
+/* ============================================================
  * Lookup helpers used by forms
  * ============================================================ */
 

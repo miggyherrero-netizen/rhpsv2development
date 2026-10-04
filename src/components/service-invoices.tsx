@@ -2,16 +2,18 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Receipt, Search, ArrowUpRight, Wallet2, FileClock } from "lucide-react";
+import { Plus, Receipt, Search, ArrowUpRight, Wallet2, FileClock, X } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
 import {
   AGING_BUCKETS, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, invoiceCode,
 } from "@/lib/service";
 import { isCountable } from "@/lib/service-reports";
+import { defaultDueDate, parsePesoInput } from "@/lib/service-flow";
+import { CustomerPicker } from "@/components/service-forms";
 import type { InvoiceRow } from "@/server/service-data";
 import { createInvoice, recordPayment, setInvoiceStatus } from "@/server/service";
 import {
-  Bar, Chip, EmptyState, ErrorLine, Field, FilterPills, GhostButton, Money, PrimaryButton,
+  Bar, Chip, DateField, EmptyState, ErrorLine, Field, FilterPills, GhostButton, Money, PesoInput, PrimaryButton,
   SectionCard, Select, StatCard, SvcModal, TextInput, TONE_BAR, TONE_TEXT,
 } from "@/components/service-ui";
 
@@ -29,6 +31,9 @@ export default function InvoicesClient({
   customers,
   invoicePrefix,
   vatEnabled,
+  catalog,
+  jobOptions,
+  termsDays,
   aging,
   drafts,
   totals,
@@ -40,6 +45,10 @@ export default function InvoicesClient({
   invoices: InvoiceRow[];
   customers: { id: string; name: string }[];
   invoicePrefix: string;
+  catalog: { id: string; name: string; unitPriceCents: number; taxable: boolean }[];
+  jobOptions: { id: string; customerId: string; label: string }[];
+  /** Payment-terms setting — new invoices default their due date to today + this. */
+  termsDays: number;
   /** Owner setting: new invoices carry no VAT, so the per-line taxable choice is hidden. */
   vatEnabled: boolean;
   aging: {
@@ -280,6 +289,9 @@ export default function InvoicesClient({
         open={newOpen}
         onClose={() => setNewOpen(false)}
         customers={customers}
+        catalog={catalog}
+        jobOptions={jobOptions}
+        termsDays={termsDays}
         vatEnabled={vatEnabled}
         pending={pending}
         onCreate={(input) => run(() => createInvoice(input))}
@@ -311,93 +323,134 @@ function InvoiceActions({ inv, pending, onPay, onSend }: { inv: InvoiceRow; pend
   );
 }
 
-function NewInvoiceModal({
-  open,
-  onClose,
-  customers,
-  vatEnabled,
-  pending,
-  onCreate,
-}: {
+type NewInvoiceProps = {
   open: boolean;
   onClose: () => void;
   customers: { id: string; name: string }[];
+  catalog: { id: string; name: string; unitPriceCents: number; taxable: boolean }[];
+  jobOptions: { id: string; customerId: string; label: string }[];
+  termsDays: number;
   vatEnabled: boolean;
   pending: boolean;
   onCreate: (input: {
-    customerId: string;
+    customerId: string; jobId: string | null;
     items: { description: string; qty: number; unitPrice: number; taxable: boolean }[];
-    dueDate: string | null;
-    notes: string;
+    dueDate: string | null; notes: string;
   }) => void;
-}) {
+};
+
+function NewInvoiceModal(props: NewInvoiceProps) {
+  return (
+    <SvcModal open={props.open} onClose={props.onClose} title="New invoice" subtitle="Add as many lines as you need — a job link is optional." wide>
+      {props.open && <NewInvoiceBody {...props} />}
+    </SvcModal>
+  );
+}
+
+type DraftLine = { key: number; description: string; qty: string; price: string; taxable: boolean };
+
+function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, vatEnabled, pending, onCreate }: NewInvoiceProps) {
   const [customerId, setCustomerId] = useState("");
-  const [description, setDescription] = useState("");
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
-  const [taxable, setTaxable] = useState(true);
-  const [dueDate, setDueDate] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [lines, setLines] = useState<DraftLine[]>([{ key: 1, description: "", qty: "1", price: "", taxable: true }]);
+  // Due date starts at today + the payment-terms setting, so the usual case needs no typing.
+  const [dueDate, setDueDate] = useState(() => defaultDueDate(new Date(), termsDays));
   const [notes, setNotes] = useState("");
+  const [nextKey, setNextKey] = useState(2);
+
+  const customerJobs = jobOptions.filter((j) => j.customerId === customerId);
+  const patch = (key: number, next: Partial<DraftLine>) => setLines((cur) => cur.map((l) => (l.key === key ? { ...l, ...next } : l)));
+  const addLine = (init: Partial<DraftLine> = {}) => {
+    setLines((cur) => [...cur, { key: nextKey, description: "", qty: "1", price: "", taxable: true, ...init }]);
+    setNextKey((k) => k + 1);
+  };
+  const usable = lines.filter((l) => l.description.trim());
+  const priceBad = usable.some((l) => l.price.trim() !== "" && parsePesoInput(l.price) === null);
+  const totalCents = usable.reduce((sum, l) => sum + Math.round((Number(l.qty) || 1) * (parsePesoInput(l.price) ?? 0) * 100), 0);
 
   return (
-    <SvcModal open={open} onClose={onClose} title="New invoice" subtitle="Ad hoc invoice — no job required">
-      <div className="space-y-3.5">
-        <Field label="Customer">
-          <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            <option value="">Select a customer…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+    <div className="space-y-4">
+      <Field label="Customer"><CustomerPicker customers={customers} value={customerId} onChange={(id) => { setCustomerId(id); setJobId(""); }} autoFocus /></Field>
+      {customerId && customerJobs.length > 0 && (
+        <Field label="Link to a job (optional)">
+          <Select value={jobId} onChange={(e) => setJobId(e.target.value)}>
+            <option value="">Not linked to a job</option>
+            {customerJobs.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}
           </Select>
         </Field>
-        <div className={`grid gap-2 items-end ${vatEnabled ? "grid-cols-[1fr_80px_120px_90px]" : "grid-cols-[1fr_80px_120px]"}`}>
-          <Field label="Description">
-            <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Concert tuning" />
-          </Field>
-          <Field label="Qty">
-            <TextInput type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-          </Field>
-          <Field label="Price">
-            <TextInput type="number" step="50" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="2500" />
-          </Field>
-          {vatEnabled ? (
-            <Field label="VAT">
-              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-                <option value="yes">Taxable</option>
-                <option value="no">Exempt</option>
-              </Select>
-            </Field>
-          ) : null}
+      )}
+
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>Lines</p>
+          {catalog.length > 0 && (
+            <Select
+              aria-label="Add a line from the price book" value="" className="!w-auto !min-h-10"
+              onChange={(e) => {
+                const item = catalog.find((c) => c.id === e.target.value);
+                if (!item) return;
+                const blank = lines.length === 1 && !lines[0]!.description.trim() && !lines[0]!.price.trim();
+                const init = { description: item.name, price: String(item.unitPriceCents / 100), taxable: item.taxable };
+                if (blank) patch(lines[0]!.key, init); else addLine(init);
+              }}
+            >
+              <option value="" disabled>＋ From price book…</option>
+              {catalog.map((c) => <option key={c.id} value={c.id}>{c.name} — {peso(c.unitPriceCents)}</option>)}
+            </Select>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Due date">
-            <TextInput type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </Field>
-          <Field label="Notes">
-            <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </Field>
+        <div className="space-y-2">
+          {lines.map((l, i) => (
+            <div key={l.key} className={`grid gap-2 items-start ${vatEnabled ? "grid-cols-[1fr_64px_120px_96px_40px]" : "grid-cols-[1fr_64px_120px_40px]"}`}>
+              <TextInput aria-label={`Line ${i + 1} description`} value={l.description} onChange={(e) => patch(l.key, { description: e.target.value })} placeholder="e.g. Concert tuning" />
+              <TextInput aria-label={`Line ${i + 1} quantity`} type="number" min={1} inputMode="numeric" value={l.qty} onChange={(e) => patch(l.key, { qty: e.target.value })} />
+              <PesoInput aria-label={`Line ${i + 1} unit price`} value={l.price} onChange={(v) => patch(l.key, { price: v })} />
+              {vatEnabled && (
+                <Select aria-label={`Line ${i + 1} VAT`} value={l.taxable ? "yes" : "no"} onChange={(e) => patch(l.key, { taxable: e.target.value === "yes" })}>
+                  <option value="yes">Taxable</option><option value="no">Exempt</option>
+                </Select>
+              )}
+              <button
+                type="button" disabled={lines.length === 1} onClick={() => setLines((cur) => cur.filter((x) => x.key !== l.key))}
+                aria-label={`Remove line ${i + 1}`} className="grid place-items-center h-10 w-10 rounded-lg hover:bg-white/[0.06] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
+                style={{ color: TONE_TEXT.danger }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
         </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
+        <GhostButton onClick={() => addLine()} className="mt-2 inline-flex items-center gap-1.5 !min-h-10"><Plus size={13} /> Add line</GhostButton>
+        {priceBad && <p role="alert" className="text-[12px] mt-2" style={{ color: TONE_TEXT.danger }}>Check the prices — use numbers like 2,500.</p>}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Due date" hint={`Defaults to today + ${termsDays} day${termsDays === 1 ? "" : "s"} (your payment terms)`}>
+          <DateField kind="date" value={dueDate} onChange={setDueDate} />
+        </Field>
+        <Field label="Notes"><TextInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Thank you! GCash accepted" /></Field>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <p className="text-[13px] svc-num" style={{ color: "var(--color-svc-text-dim)" }}>Subtotal <b className="font-medium" style={{ color: "var(--color-svc-text)" }}>{peso(totalCents)}</b>{vatEnabled ? " + VAT" : ""}</p>
+        <div className="flex gap-2">
+          <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
           <PrimaryButton
-            pending={pending}
-            disabled={!customerId || !description.trim()}
+            pending={pending} disabled={!customerId || usable.length === 0 || priceBad} className="!min-h-11"
             onClick={() => {
               onCreate({
-                customerId,
-                items: [{ description: description.trim(), qty: Number(qty) || 1, unitPrice: Number(price) || 0, taxable }],
-                dueDate: dueDate || null,
-                notes,
+                customerId, jobId: jobId || null,
+                items: usable.map((l) => ({ description: l.description.trim(), qty: Math.max(1, Math.round(Number(l.qty)) || 1), unitPrice: parsePesoInput(l.price) ?? 0, taxable: l.taxable })),
+                dueDate: dueDate || null, notes,
               });
               onClose();
-              setDescription(""); setPrice(""); setQty("1");
             }}
           >
             Create invoice
           </PrimaryButton>
         </div>
       </div>
-    </SvcModal>
+    </div>
   );
 }
 
@@ -410,7 +463,7 @@ function PaymentModal({
   invoice: InvoiceRow | null;
   onClose: () => void;
   pending: boolean;
-  onRecord: (input: { invoiceId: string; amount: number; method: string; reference: string; receivedAt: string | null }) => void;
+  onRecord: (input: { invoiceId: string; amount: number; method: string; reference: string; receivedAt: string | null; markSent: boolean }) => void;
 }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
@@ -427,15 +480,13 @@ function PaymentModal({
       subtitle={`Balance ${peso(invoice.balanceCents)} · ${invoice.customerName}`}
     >
       <div className="space-y-3.5">
-        <Field label="Amount" hint="Pesos">
-          <TextInput
-            type="number"
-            step="50"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={String(invoice.balanceCents / 100)}
-            autoFocus
-          />
+        {invoice.status === "draft" && (
+          <p className="text-[12.5px] rounded-lg px-3 py-2" style={{ background: "var(--color-svc-warn-soft)", color: "var(--color-svc-warn)" }}>
+            This invoice is still a draft. Recording a payment will <b className="font-medium">mark it as sent</b> first.
+          </p>
+        )}
+        <Field label="Amount">
+          <PesoInput value={amount} onChange={setAmount} placeholder={`e.g. ${(invoice.balanceCents / 100).toLocaleString("en-PH")}`} autoFocus />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Method">
@@ -453,29 +504,30 @@ function PaymentModal({
             <TextInput value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Ref / OR number" />
           </Field>
         </div>
-        <Field label="Received on" hint="Defaults to now">
-          <TextInput type="date" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
+        <Field label="Received on" hint="Defaults to today">
+          <DateField kind="date" value={receivedAt} onChange={setReceivedAt} />
         </Field>
         <div className="flex flex-wrap gap-2 pt-2">
-          <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))}>Full balance</GhostButton>
+          <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-10">Full balance</GhostButton>
           <div className="flex-1" />
           <GhostButton onClick={onClose}>Cancel</GhostButton>
           <PrimaryButton
             pending={pending}
-            disabled={!Number(amount)}
+            disabled={!parsePesoInput(amount)}
             onClick={() => {
               onRecord({
                 invoiceId: invoice.id,
-                amount: Number(amount),
+                amount: parsePesoInput(amount) ?? 0,
                 method,
                 reference,
                 receivedAt: receivedAt ? `${receivedAt}T09:00` : null,
+                markSent: invoice.status === "draft",
               });
               onClose();
               setAmount("");
             }}
           >
-            Record payment
+            {invoice.status === "draft" ? "Mark as sent & record" : "Record payment"}
           </PrimaryButton>
         </div>
       </div>
