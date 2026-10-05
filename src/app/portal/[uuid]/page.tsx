@@ -4,6 +4,7 @@ import { getPortal } from "@/server/data";
 import { STAGE_LABEL } from "@/lib/config";
 import { fmtDate } from "@/lib/format";
 import { Reveal } from "@/components/reveal";
+import { PUB_ROOT } from "@/lib/pub-fonts";
 import { Music, ShieldCheck, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,9 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
   const { project, updates } = data;
 
   return (
-    <div className="pub-theme bg-paper text-ink min-h-screen">
+    <div className={`${PUB_ROOT} bg-paper text-ink min-h-screen`}>
       {/* header */}
-      <header className="bg-coal text-white relative overflow-hidden">
+      <header className="pub-dark bg-coal text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-25">
           {project.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -28,27 +29,27 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
         <div className="relative max-w-4xl mx-auto px-6 pt-10 pb-16">
           <div className="flex items-center justify-between">
             <Link href="/" className="leading-none">
-              <span className="font-serif text-base tracking-wide">HERRERO</span>
-              <span className="block text-[8px] uppercase tracking-[0.4em] text-white/50 mt-1">Pianos · Atelier</span>
+              <span className="font-serif text-xl font-medium tracking-[0.06em]">HERRERO</span>
+              <span className="block text-[12px] text-white/75 mt-0.5">Piano sales &amp; restoration</span>
             </Link>
-            <span className="text-[10px] uppercase tracking-[0.24em] text-white/50 flex items-center gap-1.5">
+            <span className="text-[13px] text-white/80 flex items-center gap-1.5">
               <ShieldCheck size={13} /> Private exhibit
             </span>
           </div>
           <div className="mt-16">
-            <p className="text-[10.5px] uppercase tracking-[0.34em] text-white/55">Prepared for</p>
-            <h1 className="font-serif text-4xl sm:text-5xl mt-3">{project.clientName}</h1>
-            <p className="text-white/70 mt-3 text-[15px]">
+            <p className="pub-kicker !text-white/90">Prepared for</p>
+            <h1 className="font-serif font-medium tracking-[-0.01em] text-4xl sm:text-5xl mt-3">{project.clientName}</h1>
+            <p className="text-white/85 mt-3 text-[16px]">
               {project.pianoBrand} {project.pianoModel}
               {project.pianoYear ? ` · ${project.pianoYear}` : ""} · {project.serviceType}
             </p>
             <div className="mt-8 max-w-sm">
-              <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-white/60 mb-2">
+              <div className="flex items-center justify-between text-[14px] font-medium text-white/85 mb-2">
                 <span>{STAGE_LABEL[project.status] ?? project.status}</span>
                 <span className="tnum">{project.progress}%</span>
               </div>
               <div className="h-[3px] bg-white/15 rounded-full overflow-hidden">
-                <div className="h-full bg-white/85 rounded-full transition-all" style={{ width: `${project.progress}%` }} />
+                <div className="h-full bg-sky rounded-full transition-all" style={{ width: `${project.progress}%` }} />
               </div>
             </div>
           </div>
@@ -61,7 +62,7 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
           {(() => {
             const latest = updates[updates.length - 1];
             return (
-              <div className="bg-parchment rounded-2xl shadow-xl shadow-black/30 border border-white/8 p-6 sm:p-7 flex flex-col sm:flex-row gap-5 items-start">
+              <div className="bg-card rounded-2xl shadow-xl shadow-black/15 border border-white/8 p-6 sm:p-7 flex flex-col sm:flex-row gap-5 items-start">
                 {latest.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={latest.imageUrl} alt={latest.title} className="w-full sm:w-32 h-32 rounded-xl object-cover shrink-0" />
@@ -71,11 +72,11 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
                   </div>
                 )}
                 <div>
-                  <p className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.22em] text-gold">
+                  <p className="flex items-center gap-1.5 text-[14px] font-semibold text-gold">
                     <Sparkles size={12} /> Latest update · {fmtDate(new Date(latest.updateDate))}
                   </p>
-                  <h3 className="font-serif text-xl sm:text-[1.4rem] mt-1.5 leading-tight text-ink">{latest.title}</h3>
-                  {latest.body && <p className="text-mist text-[13.5px] leading-relaxed mt-2">{latest.body}</p>}
+                  <h3 className="font-serif font-medium text-[1.6rem] mt-1.5 leading-tight text-ink">{latest.title}</h3>
+                  {latest.body && <p className="text-subtle text-[15.5px] leading-relaxed mt-2">{latest.body}</p>}
                 </div>
               </div>
             );
@@ -85,11 +86,11 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
 
       {/* timeline */}
       <main className="max-w-4xl mx-auto px-6 py-20">
-        <p className="text-center text-[10.5px] uppercase tracking-[0.34em] text-mist">The journey of your instrument</p>
-        <h2 className="text-center font-serif text-3xl sm:text-4xl mt-3 text-ink">Restoration journal</h2>
+        <p className="text-center text-[15px] font-semibold text-gold">The journey of your instrument</p>
+        <h2 className="text-center font-serif font-medium text-[2.4rem] sm:text-5xl mt-3 text-ink">Restoration journal</h2>
 
         {updates.length === 0 ? (
-          <p className="text-center text-mist text-sm mt-16 max-w-md mx-auto leading-relaxed">
+          <p className="text-center text-subtle text-[16px] mt-16 max-w-md mx-auto leading-relaxed">
             The atelier is preparing the first entries of your piano&apos;s journal. Please check back soon.
           </p>
         ) : (
@@ -98,7 +99,7 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
               <Reveal key={u.id}>
                 <article className={`grid md:grid-cols-2 gap-8 md:gap-12 items-center ${i % 2 ? "md:[&>*:first-child]:order-2" : ""}`}>
                   {u.imageUrl ? (
-                    <figure className="rounded-2xl overflow-hidden shadow-xl shadow-black/30">
+                    <figure className="rounded-2xl overflow-hidden shadow-xl shadow-black/15">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u.imageUrl} alt={u.title} loading="lazy" className="w-full aspect-[4/3] object-cover" />
                     </figure>
@@ -108,10 +109,10 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
                     </div>
                   )}
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-mist tnum">{fmtDate(new Date(u.updateDate))}</p>
-                    <h3 className="font-serif text-[1.7rem] mt-2.5 leading-tight text-ink">{u.title}</h3>
-                    {u.body && <p className="text-mist text-[14px] leading-relaxed mt-4">{u.body}</p>}
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-white/20 mt-6">Entry {String(i + 1).padStart(2, "0")}</p>
+                    <p className="text-[14.5px] font-medium text-gold tnum">{fmtDate(new Date(u.updateDate))}</p>
+                    <h3 className="font-serif font-medium text-[2rem] mt-2 leading-tight text-ink">{u.title}</h3>
+                    {u.body && <p className="text-subtle text-[16px] leading-relaxed mt-4">{u.body}</p>}
+                    <p className="text-[13.5px] text-subtle mt-6 tnum">Entry {i + 1}</p>
                   </div>
                 </article>
               </Reveal>
@@ -121,8 +122,8 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
       </main>
 
       <footer className="border-t border-white/8 py-10 text-center">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-mist">Herrero Pianos · Davao</p>
-        <p className="text-[11px] text-mist/70 mt-2 max-w-sm mx-auto">
+        <p className="text-[14px] font-semibold text-ink">Herrero Pianos · Davao</p>
+        <p className="text-[13.5px] text-subtle mt-2 max-w-sm mx-auto">
           This page is a private exhibit prepared for {project.clientName}. Please do not share this link.
         </p>
       </footer>

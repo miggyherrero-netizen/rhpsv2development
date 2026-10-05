@@ -29,10 +29,21 @@ function PianoPhoto({ piano, className = "" }: { piano: PublicPiano; className?:
 
 /** Availability pills in the public palette (sky = available, terracotta tint = reserved, warm grey = sold). Text on a dark scrim stays readable over any photo. */
 const STATUS_PILL: Record<string, string> = {
-  available: "bg-coal/75 text-sky border-sky/40",
-  reserved: "bg-coal/75 text-gold border-gold/45",
-  sold: "bg-coal/75 text-mist border-white/20",
+  available: "bg-paper/95 text-ink border-line",
+  reserved: "bg-paper/95 text-ink border-line",
+  sold: "bg-paper/95 text-subtle border-line",
 };
+/** The small dot in front of the availability text. */
+const STATUS_DOT: Record<string, string> = { available: "bg-sky", reserved: "bg-terracotta", sold: "bg-olive" };
+
+function StatusPill({ status, children, className = "" }: { status: string; children: React.ReactNode; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-2 text-[13px] font-semibold px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-md ${STATUS_PILL[status] ?? STATUS_PILL.available} ${className}`}>
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${STATUS_DOT[status] ?? STATUS_DOT.available}`} />
+      {children}
+    </span>
+  );
+}
 
 /** The whole card is one control: it opens the instrument dialog. */
 export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g: ShowroomGroup) => void }) {
@@ -48,24 +59,22 @@ export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g:
       type="button"
       onClick={() => onOpen(group)}
       aria-label={`View ${p.brand} ${p.model}${many ? `, ${group.availableCount} available` : ""}`}
-      className={`group block w-full text-left rounded-2xl border border-white/8 bg-parchment/40 p-3 transition duration-300 hover:border-gold/50 hover:bg-parchment hover:-translate-y-0.5 hover:shadow-[0_14px_40px_-18px_rgba(0,0,0,0.9)] ${FOCUS_RING}`}
+      className={`group block w-full text-left rounded-2xl border border-white/8 bg-card p-3 shadow-[0_14px_30px_-22px_rgba(46,47,56,0.35)] transition duration-300 hover:border-gold/60 hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-22px_rgba(46,47,56,0.45)] ${FOCUS_RING}`}
     >
       <div className="relative overflow-hidden rounded-xl bg-parchment aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto piano={p} className="transition-transform duration-700 ease-out group-hover:scale-[1.045]" />
-        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border backdrop-blur-md ${STATUS_PILL[p.status] ?? STATUS_PILL.available}`}>
-          {badge}
-        </span>
+        <StatusPill status={p.status} className="absolute top-3 left-3">{badge}</StatusPill>
       </div>
       <div className="flex items-start justify-between mt-4 gap-3 px-1">
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">{p.brand}{group.year ? ` · ${group.year}` : ""}</p>
-          <p className="font-serif text-[1.55rem] leading-none mt-1.5 text-ink group-hover:text-gold transition-colors">{p.model}</p>
-          <p className="text-[12px] text-subtle mt-1.5">{details}</p>
+          <p className="text-[14px] text-subtle">{p.brand}{group.year ? ` · ${group.year}` : ""}</p>
+          <p className="font-serif font-medium text-[2rem] leading-none mt-1.5 text-ink group-hover:text-gold transition-colors">{p.model}</p>
+          <p className="text-[14px] text-subtle mt-2">{details}</p>
         </div>
-        <p className="shrink-0 pt-5 text-[13.5px] font-medium tnum text-gold">{p.priceCents ? peso(p.priceCents) : "On request"}</p>
+        <p className="shrink-0 pt-5 text-[16.5px] font-semibold tnum text-gold">{p.priceCents ? peso(p.priceCents) : "On request"}</p>
       </div>
-      <p className="mt-4 px-1 pb-1 flex items-center gap-1.5 text-[12px] text-ink/80 group-hover:text-gold transition-colors">
-        View instrument <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
+      <p className="mt-4 px-1 pb-1 flex items-center gap-1.5 text-[15px] font-semibold text-gold">
+        <span className="border-b-[1.5px] border-olive pb-px">View instrument</span> <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
       </p>
     </button>
   );
@@ -108,18 +117,16 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
     <div>
       <div className="relative rounded-xl overflow-hidden bg-paper aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto piano={selected} />
-        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border ${STATUS_PILL[selected.status] ?? STATUS_PILL.available}`}>
-          {PIANO_STATUS[selected.status]?.label}
-        </span>
+        <StatusPill status={selected.status} className="absolute top-3 left-3">{PIANO_STATUS[selected.status]?.label}</StatusPill>
       </div>
       {group.units.length > 1 && (
         <div className="mt-4">
-          <p className="text-[10.5px] uppercase tracking-[0.18em] text-subtle mb-2">{group.availableCount} available — pick a unit</p>
+          <p className="text-[14px] font-medium text-subtle mb-2">{group.availableCount} available — pick a unit</p>
           <div className="flex flex-wrap gap-2">
             {group.units.map((u, i) => (
               <button
                 key={u.id} type="button" onClick={() => setUnitIdx(i)} aria-pressed={i === unitIdx}
-                className={`text-[12px] rounded-full border px-3.5 py-1.5 transition-colors ${FOCUS_RING} ${i === unitIdx ? "border-gold bg-gold/15 text-gold" : "border-white/15 text-chrome hover:border-white/40"}`}
+                className={`text-[14px] font-medium rounded-full border px-4 min-h-10 transition-colors ${FOCUS_RING} ${i === unitIdx ? "border-gold bg-gold text-onbrass" : "border-white/15 bg-card text-ink hover:border-gold"}`}
               >
                 Unit {i + 1}{u.year ? ` · ${u.year}` : ""}{u.status === "reserved" ? " · reserved" : ""}
               </button>
@@ -128,28 +135,28 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
         </div>
       )}
       <div className="flex items-center justify-between mt-5 gap-3">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">{selected.type}{selected.year ? ` · ${selected.year}` : ""} · {selected.condition}</p>
-        <p className="font-serif text-2xl tnum text-gold shrink-0">{selected.priceCents ? peso(selected.priceCents) : "Price on request"}</p>
+        <p className="text-[14px] text-subtle">{selected.type}{selected.year ? ` · ${selected.year}` : ""} · {selected.condition}</p>
+        <p className="font-serif font-medium text-[1.75rem] tnum text-gold shrink-0">{selected.priceCents ? peso(selected.priceCents) : "Price on request"}</p>
       </div>
-      {selected.description && <p className="text-[14px] text-chrome leading-relaxed mt-4">{selected.description}</p>}
-      <div className="grid grid-cols-2 gap-3 mt-5 text-[12.5px]">
+      {selected.description && <p className="text-[16px] text-chrome leading-relaxed mt-4">{selected.description}</p>}
+      <div className="grid grid-cols-2 gap-3 mt-5 text-[14.5px]">
         {selected.dimensions && (
-          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><Ruler size={15} className="text-subtle mt-0.5" /><span><span className="text-subtle block text-[10.5px] uppercase tracking-wide">Dimensions</span>{selected.dimensions}</span></div>
+          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><Ruler size={16} className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Dimensions</span>{selected.dimensions}</span></div>
         )}
         {selected.recommendedUse && (
-          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><BadgeCheck size={15} className="text-subtle mt-0.5" /><span><span className="text-subtle block text-[10.5px] uppercase tracking-wide">Recommended for</span>{selected.recommendedUse}</span></div>
+          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><BadgeCheck size={16} className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Recommended for</span>{selected.recommendedUse}</span></div>
         )}
       </div>
       {selected.technicianNotes && (
         <div className="mt-4 border border-white/10 rounded-xl p-4">
-          <p className="text-[10.5px] uppercase tracking-[0.18em] text-subtle mb-1.5">Technician&apos;s notes</p>
-          <p className="text-[13px] text-chrome leading-relaxed italic">{selected.technicianNotes}</p>
+          <p className="text-[14px] font-semibold text-ink mb-1.5">Technician&apos;s notes</p>
+          <p className="text-[15px] text-chrome leading-relaxed font-serif">{selected.technicianNotes}</p>
         </div>
       )}
       {sent ? (
         <div className="mt-6 bg-white/5 rounded-xl p-5 text-center">
-          <BadgeCheck size={26} className="mx-auto text-emerald-400" strokeWidth={1.5} />
-          <p className="text-[14px] text-ink mt-2.5">Sent — a technician will get back to you within one working day.</p>
+          <BadgeCheck size={28} className="mx-auto text-emerald-700" strokeWidth={1.5} />
+          <p className="text-[15.5px] text-ink mt-2.5">Sent — a technician will get back to you within one working day.</p>
         </div>
       ) : open ? (
         <form onSubmit={send} className="mt-6 space-y-2.5">
@@ -162,13 +169,13 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
             onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
           />
           <textarea className="input-dark min-h-[80px] resize-y" aria-label="Message" placeholder="Anything else? (optional)" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-          {err && <p className="text-rose-400 text-xs">{err}</p>}
-          <button type="submit" disabled={busy} className={`w-full btn-brass text-sm font-medium rounded-xl py-3.5 transition flex items-center justify-center gap-2 ${FOCUS_RING}`}>
+          {err && <p role="alert" className="text-red-700 text-[14px]">{err}</p>}
+          <button type="submit" disabled={busy} className={`w-full btn-brass text-[15.5px] rounded-full min-h-12 transition flex items-center justify-center gap-2 ${FOCUS_RING}`}>
             {busy && <Spinner className="text-onbrass" />} Send inquiry
           </button>
         </form>
       ) : (
-        <button onClick={() => setOpen(true)} disabled={selected.status === "sold"} className={`mt-6 w-full btn-brass text-sm font-medium rounded-xl py-3.5 transition ${FOCUS_RING}`}>
+        <button onClick={() => setOpen(true)} disabled={selected.status === "sold"} className={`mt-6 w-full btn-brass text-[15.5px] rounded-full min-h-12 transition ${FOCUS_RING}`}>
           {selected.status === "sold" ? "This instrument has found a home" : "Inquire about this piano"}
         </button>
       )}

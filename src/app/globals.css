@@ -20,6 +20,12 @@
   --color-subtle: #aab2bf; /* public-site small labels: 8.5:1 on paper, 7.9:1 on parchment (WCAG AA needs 4.5:1) */
   --color-gold: #caa257;
   --color-sky: #86b3d1; /* public site: dusty sky blue (focus ring, small highlights) */
+  /* Public-site extras (their real values are set per scope in `.pub-theme` / `.pub-dark` below) */
+  --color-line: #cfc5ba;
+  --color-card: #fbf8f4;
+  --color-dusk: #474853;
+  --color-olive: #8e8268;
+  --color-terracotta: #844d36;
   --color-ember: #c2410c;
 
   /* ---- Personal Workspace (premium dark) ---- */
@@ -146,30 +152,77 @@ body {
 }
 
 .text-onbrass { color: var(--color-onbrass); }
-/* ---- Public site palette: terracotta · slate · sky ----
-   Scoped to `.pub-theme` (the public pages and the client portal) on purpose: admin, owner and service share the base
-   tokens above and must not change. The same variables are also set on <html> so the page edge/overscroll matches.
-   Reference swatches: terracotta #844D36 · slate #474853 · sky #86B3D1 · warm grey #AAA0A0 · olive-taupe #8E8268.
-   Contrast notes (WCAG AA 4.5:1 for small text): terracotta #844D36 is only ever a FILL with light text (6.8:1) — never text on
-   slate (2:1), so text/outline accents use the lighter terracotta --color-gold (5.9:1 on paper). Olive-taupe is 3.7:1,
-   so it is decoration only. */
+/* ---- Public site: ivory & slate (terracotta · sky · olive) ----
+   Scoped to `.pub-theme` (home, showroom, client portal) on purpose: admin, owner and service share the base tokens above
+   and must not change. `.pub-dark` flips the same token names for dark bands (hero, voices, footer, portal header), so
+   components just say text-ink / text-subtle / text-gold and get the right colour in either context.
+   Swatches: terracotta #844D36 · slate #474853 · sky #86B3D1 · warm grey #AAA0A0 · olive-taupe #8E8268.
+   Contrast (WCAG AA 4.5:1 small text): ink #2E2F38 on ivory 11.9:1 · subtle #5A5B66 on ivory 6.3:1 / linen 5.5:1 ·
+   terracotta #844D36 on ivory 6.4:1 / linen 5.5:1, and as a button fill with white text 6.8:1 · on dark slate #474853:
+   ivory 7.9:1, subtle #D4CDC8 5.8:1, light terracotta #EAB597 5.2:1. Olive and warm grey are decoration only (< 4.5:1). */
 .pub-theme, html:has(.pub-theme) {
-  --color-paper: #2b2c35;      /* page: deep slate, a step darker than the #474853 swatch so the photo and the accents glow */
-  --color-parchment: #363742;  /* alternating bands, dialogs */
-  --color-coal: #23242b;       /* footer, darkest scrim */
-  --color-panel: #2b2c35;
-  --color-edge: #474853;       /* the slate swatch itself: hairlines and raised surfaces */
-  --color-ink: #f4efe9;        /* warm off-white text */
-  --color-chrome: #dcd5d2;
-  --color-subtle: #c2b9b8;     /* small labels: 7.2:1 on paper, 6.1:1 on parchment */
-  --color-mist: #aaa0a0;       /* the warm-grey swatch: 5.4:1 on paper, 4.6:1 on parchment */
-  --color-gold: #d99a7a;       /* light terracotta: text, outlines, icons (5.9:1 on paper) */
-  --color-onbrass: #23242b;    /* dark text on the light-terracotta fill (bg-gold): 6.5:1 */
-  --color-terracotta: #844d36; /* the terracotta swatch: button / badge fill */
-  --color-olive: #8e8268;      /* decoration only */
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --color-paper: #f4efe8;      /* page: warm ivory */
+  --color-parchment: #e9e1d8;  /* alternating bands, dialogs */
+  --color-card: #fbf8f4;       /* cards and the enquiry form */
+  --color-line: #cfc5ba;       /* hairlines and card borders */
+  --color-coal: #2e2f38;       /* footer, darkest scrim */
+  --color-dusk: #474853;       /* the slate swatch: dark bands */
+  --color-panel: #fbf8f4;
+  --color-edge: #cfc5ba;
+  --color-ink: #2e2f38;        /* text */
+  --color-chrome: #3d3e48;
+  --color-subtle: #5a5b66;     /* secondary text */
+  --color-mist: #666772;
+  --color-gold: #844d36;       /* accent text, outlines, icons (the terracotta swatch itself) */
+  --color-onbrass: #ffffff;    /* text on a terracotta fill */
+  --color-terracotta: #844d36;
+  --color-olive: #8e8268;
 }
-.pub-theme .glass-light { background: rgba(35, 36, 43, 0.88); } /* the solid header, in coal instead of the old brown-black */
-.pub-theme .btn-brass { background: var(--color-terracotta); color: #fff7f0; } /* the swatch fill takes light text: 6.4:1 */
+.pub-theme { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); }
+.pub-dark {
+  --color-ink: #f4efe8;
+  --color-chrome: #e6dfd8;
+  --color-subtle: #d4cdc8;
+  --color-mist: #c4bbb8;
+  --color-gold: #eab597;       /* light terracotta for text on dark */
+  --color-line: rgba(255, 255, 255, 0.16);
+  --color-card: rgba(255, 255, 255, 0.07);
+  --color-paper: #474853;
+  --color-parchment: #3d3e48;
+  color: var(--color-ink);
+}
+
+/* Shared helpers written with white-alpha utilities (also used by the dark admin): in the light public context they
+   become warm slate hairlines; inside `.pub-dark` they go back to translucent white. */
+.pub-theme .border-white\/5, .pub-theme .border-white\/8, .pub-theme .border-white\/10, .pub-theme .border-white\/12, .pub-theme .border-white\/15 { border-color: var(--color-line); }
+.pub-theme .border-white\/20 { border-color: var(--color-olive); }
+.pub-theme .bg-white\/5, .pub-theme .bg-white\/\[0\.06\] { background-color: rgba(46, 47, 56, 0.05); }
+.pub-theme .hover\:bg-white\/10:hover { background-color: rgba(46, 47, 56, 0.07); }
+.pub-theme .ring-white\/10, .pub-theme .ring-white\/15 { --tw-ring-color: rgba(46, 47, 56, 0.14); }
+.pub-dark .border-white\/5, .pub-dark .border-white\/8, .pub-dark .border-white\/10, .pub-dark .border-white\/12, .pub-dark .border-white\/15 { border-color: rgba(255, 255, 255, 0.14); }
+.pub-dark .border-white\/20 { border-color: rgba(255, 255, 255, 0.3); }
+.pub-dark .bg-white\/5, .pub-dark .bg-white\/\[0\.06\] { background-color: rgba(255, 255, 255, 0.07); }
+.pub-dark .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1); }
+.pub-dark .ring-white\/10, .pub-dark .ring-white\/15 { --tw-ring-color: rgba(255, 255, 255, 0.18); }
+
+/* Surfaces, fields and buttons in the public palette */
+.pub-theme .glass-light { background: rgba(244, 239, 232, 0.94); border-bottom: 1px solid var(--color-line); backdrop-filter: blur(14px); }
+.pub-theme .glass-dark { background: var(--color-card); border: 1px solid var(--color-line); box-shadow: 0 22px 44px -30px rgba(46, 47, 56, 0.4); backdrop-filter: none; }
+.pub-theme .input-dark { background: #fff; border: 1px solid var(--color-line); color: var(--color-ink); font-size: 15px; padding: 12px 14px; border-radius: 12px; }
+.pub-theme .input-dark::placeholder { color: #707180; }
+.pub-theme .input-dark:focus { border-color: var(--color-terracotta); background: #fff; box-shadow: 0 0 0 3px rgba(134, 179, 209, 0.45); }
+.pub-theme .input-dark option, .pub-theme .input-dark optgroup { background: #fff; color: var(--color-ink); }
+.pub-theme .btn-brass { background: var(--color-terracotta); color: #fff; font-weight: 600; box-shadow: 0 10px 22px -14px rgba(132, 77, 54, 0.9); }
+.pub-theme .btn-brass:hover { filter: brightness(0.92); }
+
+/* Small section label: a short olive rule + sentence case, instead of tracked all-caps */
+.pub-kicker { display: flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 600; color: var(--color-gold); }
+.pub-kicker::before { content: ""; width: 24px; height: 2px; background: var(--color-olive); flex: none; }
+.pub-dark .pub-kicker::before { background: var(--color-sky); }
+
+.btn-brass { background: var(--color-terracotta); color: #fff7f0; } /* the swatch fill takes light text: 6.4:1 */
 
 .btn-brass {
   background: var(--color-gold);
