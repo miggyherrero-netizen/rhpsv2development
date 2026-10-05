@@ -7,6 +7,7 @@ Run them **in order**. Each one is additive (`ADD COLUMN IF NOT EXISTS`, default
 
 | # | File | Needed by |
 |---|------|-----------|
+| all | `00_ALL_IN_ONE.sql` | The four files below combined — easiest: paste this one |
 | 1 | `01_phase1_inline_lines.sql` | Inline quote/invoice lines: quick-add chips, packages, per-line cost |
 | 2 | `02_phase3_expense_kind.sql` | Expense kind (job / stock / overhead), piano link, review screen, Finance split |
 | 3 | `03_phase4_status_time.sql` | Status = time (status events derive travel / on-site entries) |
