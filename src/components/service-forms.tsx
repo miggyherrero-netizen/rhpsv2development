@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
+import { EXPENSE_KINDS, defaultKindForCategory } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
 import { parsePesoInput } from "@/lib/service-flow";
 import { createCustomer, createLocation, createPiano, loadCustomerPlaces } from "@/server/service";
@@ -282,6 +283,7 @@ function InlineBox({
 export type ExpenseFormValues = {
   category: string; description: string; amount: number; spentAt: string | null; vendor: string;
   method: string; reimbursable: boolean; jobId: string | null; receiptUrl: string | null;
+  kind: string; pianoId: string | null;
 };
 
 export function ExpenseFormModal(props: {
@@ -289,6 +291,8 @@ export function ExpenseFormModal(props: {
   /** Set when opened from a job page: the link is fixed and the picker is hidden. */
   fixedJobId?: string;
   jobOptions?: { id: string; label: string }[];
+  /** Showroom pianos for "Piano stock" expenses. Without it the stock kind isn't offered. */
+  pianoOptions?: { id: string; label: string; status: string }[];
   onSubmit: (values: ExpenseFormValues) => void;
 }) {
   return (
@@ -298,8 +302,11 @@ export function ExpenseFormModal(props: {
   );
 }
 
-function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], onSubmit }: Parameters<typeof ExpenseFormModal>[0]) {
+function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoOptions, onSubmit }: Parameters<typeof ExpenseFormModal>[0]) {
   const [category, setCategory] = useState("fuel");
+  // The kind follows the category (Fuel → Job cost, Rent → Overhead) until the owner picks one themselves.
+  const [kindPicked, setKindPicked] = useState<string | null>(null);
+  const [pianoId, setPianoId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [spentAt, setSpentAt] = useState(() => manilaDateTimeLocal(new Date()));
@@ -307,6 +314,7 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], onSubm
   const [method, setMethod] = useState("cash");
   const [reimbursable, setReimbursable] = useState(false);
   const [jobId, setJobId] = useState(fixedJobId ?? "");
+  const effectiveKind = kindPicked ?? (fixedJobId || jobId ? "job" : defaultKindForCategory(category));
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptErr, setReceiptErr] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -335,6 +343,21 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], onSubm
         <Field label="Amount"><PesoInput value={amount} onChange={setAmount} autoFocus /></Field>
       </div>
       {amountBad && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>Use a number like 1,250.</p>}
+      {!fixedJobId && (
+        <Field label="What is this for?" hint={EXPENSE_KINDS.find((k) => k.key === effectiveKind)?.hint}>
+          <Select value={effectiveKind} onChange={(e) => setKindPicked(e.target.value)}>
+            {EXPENSE_KINDS.filter((k) => k.key !== "stock" || pianoOptions).map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+          </Select>
+        </Field>
+      )}
+      {effectiveKind === "stock" && !fixedJobId && pianoOptions && (
+        <Field label="Which piano?" hint="Counts as a cost only once this piano is sold">
+          <Select value={pianoId} onChange={(e) => setPianoId(e.target.value)}>
+            <option value="">Choose a piano…</option>
+            {pianoOptions.map((p) => <option key={p.id} value={p.id}>{p.label}{p.status === "sold" ? " · sold" : ""}</option>)}
+          </Select>
+        </Field>
+      )}
       <Field label="Description"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Diesel — Buhangin run" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Vendor"><TextInput value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Shell Matina" /></Field>
@@ -382,11 +405,12 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], onSubm
       <div className="flex justify-end gap-2 pt-2">
         <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
         <PrimaryButton
-          pending={pending} disabled={!description.trim() || amountBad || reading} className="!min-h-11"
+          pending={pending} disabled={!description.trim() || amountBad || reading || (effectiveKind === "stock" && !pianoId)} className="!min-h-11"
           onClick={() => {
             onSubmit({
               category, description: description.trim(), amount: parsePesoInput(amount) ?? 0, spentAt: spentAt || null,
               vendor, method, reimbursable, jobId: fixedJobId ?? (jobId || null), receiptUrl: receipt,
+              kind: effectiveKind, pianoId: effectiveKind === "stock" ? pianoId || null : null,
             });
             onClose();
           }}

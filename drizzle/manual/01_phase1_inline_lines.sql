@@ -9,9 +9,9 @@ BEGIN;
 ALTER TABLE service_catalog ADD COLUMN IF NOT EXISTS is_quick_add boolean NOT NULL DEFAULT false;
 ALTER TABLE service_catalog ADD COLUMN IF NOT EXISTS package_id uuid;
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'service_catalog_package_id_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'service_catalog_package_id_service_catalog_id_fk') THEN
     ALTER TABLE service_catalog
-      ADD CONSTRAINT service_catalog_package_id_fkey
+      ADD CONSTRAINT service_catalog_package_id_service_catalog_id_fk
       FOREIGN KEY (package_id) REFERENCES service_catalog(id) ON DELETE SET NULL;
   END IF;
 END $$;

@@ -30,6 +30,7 @@ const testFiles = [
   { name: "service-flow", file: "tests/service-flow.ts" },
   { name: "service-lines", file: "tests/service-lines.ts" },
   { name: "service-today", file: "tests/service-today.ts" },
+  { name: "service-finance-split", file: "tests/service-finance-split.ts" },
 ];
 
 function runTest(name, file) {

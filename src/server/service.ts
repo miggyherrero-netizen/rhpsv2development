@@ -7,12 +7,12 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
   serviceJobs, serviceJobItems, serviceJobEvents, serviceTimeLogs, serviceInvoices,
-  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings,
+  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, pianos,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { addDays } from "@/lib/dates";
@@ -27,6 +27,7 @@ import {
   canViewFinance, confirmMatches, nextJobStep, stepEffect, type StepKey,
 } from "@/lib/service-flow";
 import { partsCostFromLines } from "@/lib/service-lines";
+import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -1262,7 +1263,24 @@ export type ExpenseInput = {
   reimbursable?: boolean; note?: string | null;
   /** Optional receipt photo (image data URL, downsized in the browser). */
   receiptUrl?: string | null;
+  /** job | stock | overhead. Omitted -> a job-linked expense is "job", otherwise the category's default. */
+  kind?: string | null;
+  /** Showroom piano a "stock" expense belongs to. */
+  pianoId?: string | null;
 };
+
+/** Resolves kind + piano together so the two can never disagree (only stock carries a piano). */
+async function resolveKind(input: { kind?: string | null; pianoId?: string | null; category: string; jobId: string | null }): Promise<
+  { ok: true; kind: ExpenseKind; pianoId: string | null } | { ok: false; error: string }
+> {
+  const kind: ExpenseKind = isExpenseKind(input.kind) ? input.kind : input.jobId ? "job" : defaultKindForCategory(input.category);
+  if (kind !== "stock") return { ok: true, kind, pianoId: null };
+  const pianoId = str(input.pianoId) || null;
+  if (pianoId && !(await db.select({ id: pianos.id }).from(pianos).where(eq(pianos.id, pianoId)).limit(1)).length) {
+    return { ok: false, error: "That piano is no longer in the showroom list." };
+  }
+  return { ok: true, kind, pianoId };
+}
 
 function validReceipt(value: unknown): { ok: true; url: string | null } | { ok: false } {
   if (value === undefined || value === null || value === "") return { ok: true, url: null };
@@ -1280,10 +1298,15 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
   if (linkedJob && !(await db.select({ id: serviceJobs.id }).from(serviceJobs).where(eq(serviceJobs.id, linkedJob)).limit(1)).length) {
     return fail("That job no longer exists.");
   }
+  const category = oneOf(input.category, EXPENSE_CATEGORIES.map((c) => c.key), "other");
+  const kind = await resolveKind({ kind: input.kind, pianoId: input.pianoId, category, jobId: linkedJob || null });
+  if (!kind.ok) return fail(kind.error);
   const [row] = await db
     .insert(serviceExpenses)
     .values({
-      category: oneOf(input.category, EXPENSE_CATEGORIES.map((c) => c.key), "other"),
+      category,
+      kind: kind.kind,
+      pianoId: kind.pianoId,
       description,
       amountCents: Math.max(0, moneyToCents(input.amount)),
       spentAt: optionalDate(input.spentAt) ?? new Date(),
@@ -1311,9 +1334,21 @@ export async function getExpenseReceipt(id: string): Promise<Result<{ url: strin
 export async function updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Result> {
   if (!(await requireFinance())) return FINANCE_DENIED;
   if (!id) return fail("Missing expense.");
+  let kindPatch: { kind: ExpenseKind; pianoId: string | null } | null = null;
+  if (patch.kind !== undefined || patch.pianoId !== undefined) {
+    const [cur] = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1);
+    if (!cur) return fail("Expense not found.");
+    const resolved = await resolveKind({
+      kind: patch.kind ?? cur.kind, pianoId: patch.pianoId !== undefined ? patch.pianoId : cur.pianoId,
+      category: patch.category ?? cur.category, jobId: patch.jobId !== undefined ? str(patch.jobId) || null : cur.jobId,
+    });
+    if (!resolved.ok) return fail(resolved.error);
+    kindPatch = resolved;
+  }
   await db
     .update(serviceExpenses)
     .set({
+      ...(kindPatch ?? {}),
       category: patch.category ? oneOf(patch.category, EXPENSE_CATEGORIES.map((c) => c.key), "other") : undefined,
       description: patch.description !== undefined ? str(patch.description, 300) || undefined : undefined,
       amountCents: patch.amount !== undefined ? Math.max(0, moneyToCents(patch.amount)) : undefined,
@@ -1328,6 +1363,28 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
     .where(eq(serviceExpenses.id, id));
   touch();
   return ok();
+}
+
+/** The one-time review: sets the kind (and piano for stock) on many expenses at once. */
+export async function setExpenseKinds(items: { id: string; kind: string; pianoId?: string | null }[]): Promise<Result<{ updated: number }>> {
+  if (!(await requireFinance())) return FINANCE_DENIED;
+  if (!Array.isArray(items) || items.length === 0) return fail("Nothing to save.");
+  if (items.length > 500) return fail("Too many at once — save in smaller batches.");
+  if (items.some((i) => !i.id || !isExpenseKind(i.kind))) return fail("Pick a kind for every expense you're saving.");
+  const wanted = [...new Set(items.filter((i) => i.kind === "stock" && i.pianoId).map((i) => i.pianoId!))];
+  if (wanted.length) {
+    const found = await db.select({ id: pianos.id }).from(pianos).where(inArray(pianos.id, wanted));
+    if (found.length !== wanted.length) return fail("One of the pianos is no longer in the showroom list.");
+  }
+  await db.transaction(async (tx) => {
+    for (const i of items) {
+      await tx.update(serviceExpenses)
+        .set({ kind: i.kind as ExpenseKind, pianoId: i.kind === "stock" ? str(i.pianoId) || null : null, updatedAt: new Date() })
+        .where(eq(serviceExpenses.id, i.id));
+    }
+  });
+  touch();
+  return ok({ updated: items.length });
 }
 
 export async function deleteExpense(id: string): Promise<Result> {

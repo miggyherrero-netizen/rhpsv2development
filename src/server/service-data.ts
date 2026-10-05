@@ -8,7 +8,7 @@ import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
   serviceJobs, serviceJobItems, serviceJobEvents, serviceTimeLogs, serviceInvoices,
-  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings,
+  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, pianos,
   type ServiceTechnician, type ServiceCustomer, type ServiceLocation, type ServicePiano,
   type ServiceCatalogItem, type ServiceJob, type ServiceJobItem, type ServiceJobEvent,
   type ServiceTimeLog, type ServiceInvoice, type ServiceInvoiceItem, type ServicePayment,
@@ -18,6 +18,7 @@ import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, t
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
+import { financeSplit, type FinanceSplit } from "@/lib/service-finance-split";
 import {
   avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
   jobMargin, DEFAULT_WORKING_HOURS, COMPLETED_JOB_STATUSES,
@@ -733,16 +734,28 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
  * ============================================================ */
 
 /** Receipt images are data URLs (~MBs): lists carry only `hasReceipt`; the viewer fetches one on demand. */
-export type ExpenseRow = Omit<ServiceExpense, "receiptUrl"> & { hasReceipt: boolean; jobCode: string | null; jobTitle: string | null };
+export type ExpenseRow = Omit<ServiceExpense, "receiptUrl"> & { hasReceipt: boolean; jobCode: string | null; jobTitle: string | null; pianoLabel: string | null };
+
+/** Showroom pianos a "stock" expense can be tied to. Read-only use of the Piano Management inventory. */
+export async function getPianoOptions(): Promise<{ id: string; label: string; status: string }[]> {
+  const rows = await db.select({ id: pianos.id, brand: pianos.brand, model: pianos.model, year: pianos.year, status: pianos.status })
+    .from(pianos).orderBy(desc(pianos.createdAt));
+  return rows.map((r) => ({ id: r.id, label: `${r.brand} ${r.model}${r.year ? ` (${r.year})` : ""}`, status: r.status }));
+}
 
 export async function getExpenses(from?: Date, to?: Date, limit = 300): Promise<ExpenseRow[]> {
   const clauses: (SQL | undefined)[] = [];
   if (from) clauses.push(gte(serviceExpenses.spentAt, from));
   if (to) clauses.push(lt(serviceExpenses.spentAt, to));
   const rows = await db
-    .select({ expense: serviceExpenses, hasReceipt: sql<boolean>`${serviceExpenses.receiptUrl} is not null`, jobNumber: serviceJobs.jobNumber, jobTitle: serviceJobs.title, jobCreatedAt: serviceJobs.createdAt })
+    .select({
+      expense: serviceExpenses, hasReceipt: sql<boolean>`${serviceExpenses.receiptUrl} is not null`,
+      jobNumber: serviceJobs.jobNumber, jobTitle: serviceJobs.title, jobCreatedAt: serviceJobs.createdAt,
+      pianoBrand: pianos.brand, pianoModel: pianos.model,
+    })
     .from(serviceExpenses)
     .leftJoin(serviceJobs, eq(serviceJobs.id, serviceExpenses.jobId))
+    .leftJoin(pianos, eq(pianos.id, serviceExpenses.pianoId))
     .where(clauses.length ? and(...clauses) : undefined)
     .orderBy(desc(serviceExpenses.spentAt))
     .limit(limit);
@@ -751,6 +764,27 @@ export async function getExpenses(from?: Date, to?: Date, limit = 300): Promise<
     hasReceipt: !!r.hasReceipt,
     jobCode: r.jobNumber ? jobCode("WO", r.jobNumber, r.jobCreatedAt) : null,
     jobTitle: r.jobTitle,
+    pianoLabel: r.pianoBrand ? `${r.pianoBrand} ${r.pianoModel ?? ""}`.trim() : null,
+  }));
+}
+
+/** Expenses (any date) with no kind saved yet. */
+export async function countUnreviewedExpenses(): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(serviceExpenses).where(isNull(serviceExpenses.kind));
+  return row?.n ?? 0;
+}
+
+export async function getUnreviewedExpenses(limit = 500): Promise<ExpenseRow[]> {
+  const rows = await db
+    .select({ expense: serviceExpenses, jobNumber: serviceJobs.jobNumber, jobTitle: serviceJobs.title, jobCreatedAt: serviceJobs.createdAt })
+    .from(serviceExpenses)
+    .leftJoin(serviceJobs, eq(serviceJobs.id, serviceExpenses.jobId))
+    .where(isNull(serviceExpenses.kind))
+    .orderBy(desc(serviceExpenses.spentAt))
+    .limit(limit);
+  return rows.map(({ expense: { receiptUrl: _r, ...expense }, ...r }) => ({
+    ...expense, hasReceipt: false,
+    jobCode: r.jobNumber ? jobCode("WO", r.jobNumber, r.jobCreatedAt) : null, jobTitle: r.jobTitle, pianoLabel: null,
   }));
 }
 
@@ -830,6 +864,8 @@ export type FinanceReport = {
   /** Created but never sent: reported apart from invoiced / outstanding. */
   drafts: { count: number; totalCents: number };
   expenseByCategory: { category: string; amountCents: number; count: number }[];
+  /** Profit split into Service / Piano sales / Overhead (stock only counts once its piano is sold). */
+  split: FinanceSplit & { unreviewedCount: number };
   topCustomers: { customerId: string; name: string; billedCents: number; paidCents: number }[];
   /** Empty when the owner has hidden job margins (`options.showJobMargins` false). */
   jobMargins: {
@@ -874,7 +910,7 @@ export async function getFinanceReport(
       .from(servicePayments)
       .where(and(range.from ? gte(servicePayments.receivedAt, range.from) : undefined, lt(servicePayments.receivedAt, range.to))),
     db
-      .select({ spentAt: serviceExpenses.spentAt, amountCents: serviceExpenses.amountCents, category: serviceExpenses.category })
+      .select({ spentAt: serviceExpenses.spentAt, amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind, pianoId: serviceExpenses.pianoId })
       .from(serviceExpenses)
       .where(and(range.from ? gte(serviceExpenses.spentAt, range.from) : undefined, lt(serviceExpenses.spentAt, range.to))),
     // Margins hidden in settings → skip the per-job queries entirely.
@@ -912,6 +948,22 @@ export async function getFinanceReport(
   ]);
 
   const rollup = financeRollup({ invoices: allInvoices, payments: paymentRows, expenses: expenseRows }, rangeKey, now);
+
+  // Stock is judged over all time (a piano bought last year and sold this month still carries its cost).
+  const [allStock, unreviewedCount] = await Promise.all([
+    db.select({ pianoId: serviceExpenses.pianoId, amountCents: serviceExpenses.amountCents }).from(serviceExpenses).where(eq(serviceExpenses.kind, "stock")),
+    countUnreviewedExpenses(),
+  ]);
+  const split = {
+    ...financeSplit({
+      serviceCollectedCents: rollup.collectedCents,
+      periodExpenses: expenseRows,
+      sales: [],
+      allStockExpenses: allStock,
+      pianosWithSale: new Set<string>(),
+    }),
+    unreviewedCount,
+  };
 
   // Top customers: billed on invoices issued in the range (countable only).
   const inRangeInvoices = countable(allInvoices, now).filter((i) => inRange(i.issueDate, range));
@@ -985,6 +1037,7 @@ export async function getFinanceReport(
     range,
     granularity: rollup.granularity,
     months: rollup.series,
+    split,
     kpis: {
       invoicedCents: rollup.invoicedCents,
       invoiceCount: rollup.invoiceCount,

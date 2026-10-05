@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
   type AnyPgColumn,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Recurrence } from "@/lib/dates";
@@ -576,6 +577,9 @@ export const serviceDocumentShares = pgTable("service_document_shares", {
   ownerIdx: index("service_document_shares_owner_idx").on(t.ownerId),
 }));
 
+/** What an expense is for: a cost of home-service work, stock for a piano to sell, or overhead. NULL = not reviewed yet. */
+export const serviceExpenseKind = pgEnum("service_expense_kind", ["job", "stock", "overhead"]);
+
 export const serviceExpenses = pgTable("service_expenses", {
   id: uuid("id").defaultRandom().primaryKey(),
   category: text("category").notNull().default("other"),
@@ -587,12 +591,17 @@ export const serviceExpenses = pgTable("service_expenses", {
   method: text("method").notNull().default("cash"),
   reimbursable: boolean("reimbursable").notNull().default(false),
   receiptUrl: text("receipt_url"),
+  /** NULL until the owner (or the form) picks one; finance falls back to the category default meanwhile. */
+  kind: serviceExpenseKind("kind"),
+  /** Showroom piano this stock expense belongs to (kind = stock). */
+  pianoId: uuid("piano_id").references(() => pianos.id, { onDelete: "set null" }),
   note: text("note"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 }, (t) => ({
   spentIdx: index("service_expenses_spent_idx").on(t.spentAt),
   jobIdx: index("service_expenses_job_idx").on(t.jobId),
+  pianoIdx: index("service_expenses_piano_idx").on(t.pianoId),
 }));
 
 /** One row per owner — invoice numbering, tax, terms, travel defaults, dispatch hours. */

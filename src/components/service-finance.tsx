@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORY_LABEL } from "@/lib/service";
 import { RANGES, chartScale, compactPeso } from "@/lib/service-reports";
 import type { FinanceReport } from "@/server/service-data";
 import {
-  Bar, Chip, Money, RangePicker, SectionCard, StatCard, TONE_BAR,
+  Bar, Chip, Money, RangePicker, SectionCard, StatCard, TONE_BAR, TONE_TEXT,
 } from "@/components/service-ui";
 
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
@@ -18,7 +18,7 @@ const SERIES = [
 ] as const;
 
 export default function FinanceClient({ report }: { report: FinanceReport }) {
-  const { kpis, months, aging, expenseByCategory, topCustomers, jobMargins, options, range, drafts, granularity } = report;
+  const { kpis, split, months, aging, expenseByCategory, topCustomers, jobMargins, options, range, drafts, granularity } = report;
   const avgSub = options.avgInvoiceBasis === "job" ? "invoiced ÷ jobs completed" : "invoiced ÷ invoices issued";
   const revenueHeading = options.marginExcludesVat ? "Revenue excl. VAT" : "Invoiced";
   const scale = chartScale(Math.max(0, ...months.map((m) => Math.max(m.invoicedCents, m.collectedCents, m.expenseCents))));
@@ -67,6 +67,37 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
             icon={<TrendingUp size={15} />}
           />
         </div>
+      </section>
+
+      <section aria-labelledby="fin-split" className="space-y-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="fin-split" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
+            Profit by business line · {range.label.toLowerCase()}
+          </h2>
+          {split.unreviewedCount > 0 && (
+            <Link href="/service/expenses/review" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.warn }}>
+              {split.unreviewedCount} expense{split.unreviewedCount === 1 ? "" : "s"} not reviewed yet — sorted by category for now
+            </Link>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <StatCard
+            label="Home service" value={<Money cents={split.service.profitCents} />} tone={split.service.profitCents >= 0 ? "success" : "danger"}
+            sub={`${peso(split.service.collectedCents)} collected − ${peso(split.service.jobCostCents)} job costs`}
+          />
+          <StatCard
+            label="Piano sales" value={<Money cents={split.sales.profitCents} />} tone={split.sales.profitCents >= 0 ? "azure" : "danger"}
+            sub={split.sales.count === 0 ? "no pianos sold in this period" : `${split.sales.count} sold · ${peso(split.sales.revenueCents)} − ${peso(split.sales.costOfGoodsCents)} cost`}
+          />
+          <StatCard
+            label="Overhead" value={<Money cents={-split.overhead.cents} />} tone="violet"
+            sub="rent, marketing, running the business"
+          />
+        </div>
+        <p className="text-[12.5px] svc-num" style={FAINT}>
+          After overhead: <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.netCents)}</b>
+          {split.stockOnHandCents > 0 ? <> · <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.stockOnHandCents)}</b> tied up in unsold piano stock (not counted until sold)</> : null}
+        </p>
       </section>
 
       <section aria-labelledby="fin-now" className="space-y-2.5">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Wallet, Search, Trash2, Paperclip } from "lucide-react";
 import { RANGES, type RangeKey } from "@/lib/service-reports";
 import { ExpenseFormModal } from "@/components/service-forms";
+import { EXPENSE_KIND_LABEL } from "@/lib/service-finance-split";
 import { fmtDate, peso } from "@/lib/format";
 import {
   EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, PAYMENT_METHODS, PAYMENT_METHOD_LABEL,
@@ -22,8 +23,13 @@ export default function ExpensesClient({
   rangeLabel,
   showFinance,
   jobOptions,
+  pianoOptions,
+  unreviewed,
 }: {
   jobOptions: { id: string; label: string }[];
+  pianoOptions: { id: string; label: string; status: string }[];
+  /** Expenses (any date) that still have no kind saved — drives the one-time review banner. */
+  unreviewed: number;
   /** Already limited to the selected range by the server. */
   expenses: ExpenseRow[];
   rangeKey: RangeKey;
@@ -95,6 +101,15 @@ export default function ExpensesClient({
 
       <ErrorLine>{error}</ErrorLine>
 
+      {unreviewed > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: "var(--color-svc-warn-soft)", border: "1px solid var(--color-svc-border)" }}>
+          <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+            <b className="font-medium">{unreviewed} expense{unreviewed === 1 ? "" : "s"}</b> {unreviewed === 1 ? "has" : "have"} no kind yet. Until you review them, Finance sorts them by category.
+          </p>
+          <Link href="/service/expenses/review" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Review expenses</Link>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RangePicker options={RANGES} value={rangeKey} />
         <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
@@ -155,7 +170,7 @@ export default function ExpensesClient({
               <table className="w-full text-left">
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                    {["Date", "Category", "Description", "Job", "Method", "Amount", ""].map((h) => (
+                    {["Date", "Category", "Kind", "Description", "Job", "Method", "Amount", ""].map((h) => (
                       <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                     ))}
                   </tr>
@@ -168,6 +183,14 @@ export default function ExpensesClient({
                       </td>
                       <td className="px-5 py-2.5">
                         <Chip tone="slate">{EXPENSE_CATEGORY_LABEL[e.category] ?? e.category}</Chip>
+                      </td>
+                      <td className="px-5 py-2.5">
+                        {e.kind ? (
+                          <Chip tone={e.kind === "stock" ? "violet" : e.kind === "overhead" ? "slate" : "azure"}>{EXPENSE_KIND_LABEL[e.kind] ?? e.kind}</Chip>
+                        ) : (
+                          <Chip tone="warn">Not reviewed</Chip>
+                        )}
+                        {e.pianoLabel ? <p className="text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{e.pianoLabel}</p> : null}
                       </td>
                       <td className="px-5 py-2.5 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                         {e.description}
@@ -262,6 +285,7 @@ export default function ExpensesClient({
         onClose={() => setOpen(false)}
         pending={pending}
         jobOptions={jobOptions}
+        pianoOptions={pianoOptions}
         onSubmit={(values) => run(() => createExpense(values))}
       />
     </div>
