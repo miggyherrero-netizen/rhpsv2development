@@ -10,6 +10,7 @@ import {
   CUSTOMER_SOURCES, CUSTOMER_SOURCE_LABEL, PIANO_TYPES, EXPENSE_CATEGORIES,
 } from "@/lib/service";
 import { isBatchCustomer, withCustomerType } from "@/lib/service-reports";
+import { customerRowSummary, dueLabel, dueSortKey, telHref, type CustomerRowSummary } from "@/lib/service-customer-list";
 import { parsePesoInput } from "@/lib/service-flow";
 import type { CustomerCard, RecallRow } from "@/server/service-data";
 import {
@@ -32,7 +33,9 @@ export default function CustomersClient({
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("active");
-  const [sort, setSort] = useState<"name" | "billed" | "recent">("name");
+  const [sort, setSort] = useState<"name" | "due" | "owes" | "billed" | "recent">("name");
+  // One "now" for the whole list so every row measures overdue against the same moment.
+  const [now] = useState(() => new Date());
   const [newOpen, setNewOpen] = useState(false);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
@@ -46,7 +49,7 @@ export default function CustomersClient({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const when = (c: CustomerCard) => (c.lastServiceAt ? new Date(c.lastServiceAt).getTime() : -Infinity);
-    return customers
+    const rows = customers
       .filter((c) => {
         if (filter === "archived") return !!c.archivedAt;
         if (c.archivedAt) return false;
@@ -54,11 +57,15 @@ export default function CustomersClient({
         return filter === "batch" ? isBatchCustomer(c.tags, c.name) : !isBatchCustomer(c.tags, c.name);
       })
       .filter((c) => !q || [c.name, c.company ?? "", c.phone ?? "", c.email ?? ""].join(" ").toLowerCase().includes(q))
-      .sort((a, b) =>
-        sort === "billed" ? b.billedCents - a.billedCents || a.name.localeCompare(b.name)
-        : sort === "recent" ? when(b) - when(a) || a.name.localeCompare(b.name)
-        : a.name.localeCompare(b.name));
-  }, [customers, query, filter, sort]);
+      .map((c) => ({ c, sum: customerRowSummary(c, now) }));
+    const byName = (a: { c: CustomerCard }, b: { c: CustomerCard }) => a.c.name.localeCompare(b.c.name);
+    return rows.sort((a, b) =>
+      sort === "billed" ? b.c.billedCents - a.c.billedCents || byName(a, b)
+      : sort === "owes" ? b.c.outstandingCents - a.c.outstandingCents || byName(a, b)
+      : sort === "due" ? dueSortKey(a.sum) - dueSortKey(b.sum) || byName(a, b)
+      : sort === "recent" ? when(b.c) - when(a.c) || byName(a, b)
+      : byName(a, b));
+  }, [customers, query, filter, sort, now]);
 
   const totals = useMemo(
     () => ({
@@ -105,9 +112,9 @@ export default function CustomersClient({
 
       {recalls.length > 0 && (
         <SectionCard title="Due for service">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px" style={{ background: "var(--color-svc-border)" }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {recalls.map((r) => (
-              <div key={r.pianoId} className="px-5 py-3.5" style={{ background: "var(--color-svc-surface)" }}>
+              <div key={r.pianoId} className="px-5 py-3.5" style={{ background: "var(--color-svc-surface)", boxShadow: "0 0 0 0.5px var(--color-svc-border)" }}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[13.5px] truncate" style={{ color: "var(--color-svc-text)" }}>
@@ -162,8 +169,10 @@ export default function CustomersClient({
         </div>
         <Select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort customers" className="!w-auto">
           <option value="name">Sort: Name A–Z</option>
+          <option value="due">Sort: Due soonest</option>
+          <option value="owes">Sort: Owes most</option>
           <option value="billed">Sort: Most billed</option>
-          <option value="recent">Sort: Latest job</option>
+          <option value="recent">Sort: Latest service</option>
         </Select>
       </div>
 
@@ -181,58 +190,7 @@ export default function CustomersClient({
           />
         </SectionCard>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
-          {filtered.map((c) => (
-            <Link
-              key={c.id}
-              href={`/service/customers/${c.id}`}
-              className="card-svc card-svc-hover p-5 text-left h-full flex flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[14.5px] font-medium truncate" style={{ color: "var(--color-svc-text)" }}>
-                    {c.name}
-                  </p>
-                  {c.company ? (
-                    <p className="text-[11.5px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>
-                      {c.company}
-                    </p>
-                  ) : null}
-                </div>
-                <Chip tone={isBatchCustomer(c.tags, c.name) ? "violet" : "slate"}>
-                  {isBatchCustomer(c.tags, c.name) ? "Trip / batch" : CUSTOMER_SOURCE_LABEL[c.source] ?? c.source}
-                </Chip>
-              </div>
-
-              <div className="mt-3 space-y-1 text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>
-                {c.phone ? (
-                  <p className="flex items-center gap-1.5">
-                    <Phone size={11} /> {c.phone}
-                  </p>
-                ) : null}
-                {c.email ? (
-                  <p className="flex items-center gap-1.5 truncate">
-                    <Mail size={11} /> {c.email}
-                  </p>
-                ) : null}
-                {c.locations[0] ? (
-                  <p className="flex items-center gap-1.5 truncate">
-                    <MapPin size={11} /> {c.locations[0].area ?? c.locations[0].city} — {c.locations[0].addressLine}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mt-auto pt-3" style={{ borderTop: "1px solid var(--color-svc-border)", marginTop: "auto" }}>
-                <Metric label="Pianos" value={String(c.pianos.length)} />
-                <Metric label="Jobs" value={String(c.jobCount)} />
-                <Metric label="Billed" value={<Money cents={c.billedCents} className="!text-[12.5px]" />} />
-              </div>
-              <p className="text-[12px] mt-2 min-h-[18px]" style={{ color: c.openJobCount > 0 ? TONE_TEXT.azure : "var(--color-svc-text-faint)" }}>
-                {c.openJobCount > 0 ? `${c.openJobCount} open job${c.openJobCount === 1 ? "" : "s"}` : "No open jobs"}
-              </p>
-            </Link>
-          ))}
-        </div>
+        <CustomerList rows={filtered} />
       )}
 
       <NewCustomerModal open={newOpen} onClose={() => setNewOpen(false)} pending={pending} onCreate={(i) => run(() => createCustomer(i))} />
@@ -241,17 +199,133 @@ export default function CustomersClient({
   );
 }
 
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+/* ---- The list: one line per customer on wide screens, a compact card on narrow ones ---- */
+
+const ROW_COLS = "minmax(0,2.4fr) minmax(0,1.2fr) minmax(0,1.3fr) 7.5rem 9rem 6.5rem";
+const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-svc-accent)]";
+
+type ListRow = { c: CustomerCard; sum: CustomerRowSummary };
+
+function CustomerList({ rows }: { rows: ListRow[] }) {
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--color-svc-text-faint)" }}>
-        {label}
-      </p>
-      <p className="text-[13px] svc-num mt-0.5" style={{ color: "var(--color-svc-text)" }}>
-        {value}
-      </p>
+    <div className="@container">
+      <div className="card-svc overflow-hidden">
+        {/* Column headings — wide screens only; narrow rows label their own values */}
+        <div
+          className="hidden @min-[56rem]:grid items-center gap-4 px-5 py-2.5 text-[12px]"
+          style={{ gridTemplateColumns: ROW_COLS, color: "var(--color-svc-text-faint)", borderBottom: "1px solid var(--color-svc-border)" }}
+        >
+          <span>Customer</span><span>Area</span><span>Phone</span><span>Last service</span><span>Next due</span><span className="text-right">Owes</span>
+        </div>
+        <ul>
+          {rows.map(({ c, sum }, i) => (
+            <CustomerRow key={c.id} c={c} sum={sum} first={i === 0} />
+          ))}
+        </ul>
+      </div>
     </div>
   );
+}
+
+function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
+  const batch = isBatchCustomer(c.tags, c.name);
+  const tel = telHref(c.phone);
+  const sub = c.company || (batch ? "Trip / batch" : CUSTOMER_SOURCE_LABEL[c.source] ?? c.source);
+  const last = c.lastServiceAt ? fmtDate(new Date(c.lastServiceAt)) : null;
+  const dueText = dueLabel(sum);
+  const dueTone = sum.dueState === "overdue" ? "danger" : sum.dueState === "soon" ? "warn" : "slate";
+  const owes = c.outstandingCents > 0;
+
+  const nextDue = sum.nextDueAt ? (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="svc-num text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(sum.nextDueAt)}</span>
+      {dueText && sum.dueState !== "later" ? <Chip tone={dueTone}>{dueText}</Chip> : null}
+    </span>
+  ) : <Dash />;
+
+  return (
+    <li
+      className="relative hover:bg-white/[0.03] transition-colors"
+      style={first ? undefined : { borderTop: "1px solid var(--color-svc-border)" }}
+    >
+      {/* Wide: one aligned line */}
+      <div className="hidden @min-[56rem]:grid items-center gap-4 px-5 py-3 min-h-[60px]" style={{ gridTemplateColumns: ROW_COLS }}>
+        <div className="min-w-0">
+          <NameLink c={c} />
+          <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>
+            {sub}{c.openJobCount > 0 ? <span style={{ color: TONE_TEXT.azure }}> · {c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}</span> : null}
+          </p>
+        </div>
+        <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{sum.area ?? <Dash />}</p>
+        <div className="min-w-0">{tel ? <CallLink tel={tel} phone={c.phone!} name={c.name} /> : <Dash />}</div>
+        <p className="svc-num text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{last ?? <Dash />}</p>
+        <div className="text-[13px]">{nextDue}</div>
+        <p className="text-right svc-num text-[13px]">{owes ? <Money cents={c.outstandingCents} className="!text-[13px]" /> : <Dash />}</p>
+      </div>
+
+      {/* Narrow: name, then area · last service, then what needs attention */}
+      <div className="@min-[56rem]:hidden flex items-start gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <NameLink c={c} />
+          <p className="text-[12.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+            {[sum.area, last ? `Last service ${last}` : null].filter(Boolean).join(" · ") || sub}
+          </p>
+          {(sum.nextDueAt || owes || c.openJobCount > 0) ? (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[12.5px]">
+              {sum.nextDueAt ? (
+                <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
+                  Next due {fmtDate(sum.nextDueAt)}{dueText && sum.dueState !== "later" ? <Chip tone={dueTone}>{dueText}</Chip> : null}
+                </span>
+              ) : null}
+              {owes ? <span className="inline-flex items-center gap-1" style={{ color: TONE_TEXT.warn }}>Owes <Money cents={c.outstandingCents} className="!text-[12.5px]" /></span> : null}
+              {c.openJobCount > 0 ? <span style={{ color: TONE_TEXT.azure }}>{c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}</span> : null}
+            </p>
+          ) : null}
+        </div>
+        {tel ? (
+          <a
+            href={tel}
+            aria-label={`Call ${c.name}`}
+            className={`relative z-10 shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full ${FOCUS}`}
+            style={{ background: "var(--color-svc-surface-2, rgba(255,255,255,0.05))", color: TONE_TEXT.azure, border: "1px solid var(--color-svc-border)" }}
+          >
+            <Phone size={16} />
+          </a>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+/** The whole row is clickable through this one link (stretched), so the phone link can sit on top of it. */
+function NameLink({ c }: { c: CustomerCard }) {
+  return (
+    <Link
+      href={`/service/customers/${c.id}`}
+      className={`block text-[14.5px] font-medium truncate after:absolute after:inset-0 after:content-[''] ${FOCUS}`}
+      style={{ color: "var(--color-svc-text)" }}
+    >
+      {c.name}
+    </Link>
+  );
+}
+
+function CallLink({ tel, phone, name }: { tel: string; phone: string; name: string }) {
+  return (
+    <a
+      href={tel}
+      aria-label={`Call ${name} at ${phone}`}
+      className={`relative z-10 inline-flex items-center gap-1.5 min-h-9 text-[13px] hover:underline ${FOCUS}`}
+      style={{ color: TONE_TEXT.azure }}
+    >
+      <Phone size={12} /> <span className="svc-num truncate">{phone}</span>
+    </a>
+  );
+}
+
+/** Empty value: a real dash, hidden from screen readers (the column heading already says what is missing). */
+function Dash() {
+  return <span aria-hidden="true" style={{ color: "var(--color-svc-text-faint)" }}>—</span>;
 }
 
 function NewCustomerModal({

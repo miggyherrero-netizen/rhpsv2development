@@ -36,6 +36,7 @@ const testFiles = [
   { name: "service-waitlist", file: "tests/service-waitlist.ts" },
   { name: "service-geo", file: "tests/service-geo.ts" },
   { name: "service-last-service", file: "tests/service-last-service.ts" },
+  { name: "service-customer-list", file: "tests/service-customer-list.ts" },
 ];
 
 function runTest(name, file) {
