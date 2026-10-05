@@ -15,6 +15,7 @@ import type { CustomerDetail } from "@/server/service-data";
 import {
   archiveCustomer, createJob, updateCustomer, createLocation, deleteLocation, createPiano, updatePiano, deletePiano,
 } from "@/server/service";
+import { lastServiceDate } from "@/lib/service-last-service";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import { CustomerSheet } from "@/components/service-customers";
 import {
@@ -62,7 +63,7 @@ export default function CustomerDetailClient({
     ...customer, locations,
     pianos: pianos.map((p) => ({ ...p, locationLabel: locations.find((l) => l.id === p.locationId)?.label ?? null })),
     jobCount: jobs.length, openJobCount: jobs.filter((j) => !["completed", "invoiced", "paid", "cancelled"].includes(j.status)).length,
-    lastServiceAt: null, billedCents: detail.billedCents, paidCents: 0, outstandingCents: detail.outstandingCents,
+    lastServiceAt: lastServiceDate(jobs, pianos), billedCents: detail.billedCents, paidCents: 0, outstandingCents: detail.outstandingCents,
     draftCount: detail.drafts.count, draftCents: detail.drafts.totalCents,
   } as Parameters<typeof CustomerSheet>[0]["customer"];
 

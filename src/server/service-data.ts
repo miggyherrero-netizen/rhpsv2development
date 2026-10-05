@@ -15,6 +15,7 @@ import {
   type ServiceExpense, type ServiceSetting,
 } from "@/db/schema";
 import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, type SQL } from "drizzle-orm";
+import { SERVED_STATUSES, lastServiceDate } from "@/lib/service-last-service";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
@@ -101,10 +102,21 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
       customerId: serviceJobs.customerId,
       total: sql<number>`count(*)::int`,
       open: sql<number>`count(*) filter (where ${serviceJobs.status} in ('lead','quoted','scheduled','en_route','in_progress','on_hold'))::int`,
-      lastServiceAt: sql<Date | null>`max(${serviceJobs.completedAt})`,
     })
     .from(serviceJobs)
     .groupBy(serviceJobs.customerId);
+
+  // Finished visits only (any status that means the work happened) — dated per `lastServiceDate`.
+  const servedJobs = await db
+    .select({
+      customerId: serviceJobs.customerId, status: serviceJobs.status, jobType: serviceJobs.jobType,
+      completedAt: serviceJobs.completedAt, startedAt: serviceJobs.startedAt,
+      scheduledStart: serviceJobs.scheduledStart, invoicedAt: serviceJobs.invoicedAt,
+    })
+    .from(serviceJobs)
+    .where(inArray(serviceJobs.status, [...SERVED_STATUSES]));
+  const servedByCustomer = new Map<string, typeof servedJobs>();
+  for (const j of servedJobs) servedByCustomer.set(j.customerId, [...(servedByCustomer.get(j.customerId) ?? []), j]);
 
   // Drafts and voids are not receivables: only sent / part-paid / paid invoices count as billed.
   const invoiceRows = await db
@@ -144,7 +156,10 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
         .map((p) => ({ ...p, locationLabel: p.locationId ? locationMap.get(p.locationId)?.label ?? null : null })),
       jobCount: jobs?.total ?? 0,
       openJobCount: jobs?.open ?? 0,
-      lastServiceAt: jobs?.lastServiceAt ?? null,
+      lastServiceAt: lastServiceDate(
+        servedByCustomer.get(c.id) ?? [],
+        pianos.filter((p) => p.customerId === c.id),
+      ),
       billedCents: money?.billed ?? 0,
       paidCents: money?.paid ?? 0,
       outstandingCents: money?.outstanding ?? 0,
