@@ -18,14 +18,15 @@ import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, t
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
-import { financeSplit, type FinanceSplit } from "@/lib/service-finance-split";
+import { financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
+import { saleBalanceCents, salePianoProfit } from "@/lib/service-sale";
 import {
   avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
   jobMargin, DEFAULT_WORKING_HOURS, COMPLETED_JOB_STATUSES,
   type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
 import {
-  titleCaseName, billedCents, countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
+  titleCaseName, isBatchCustomer, billedCents, countable, draftSummary, financeRollup, inRange, isCountable, needsClosing, needsFollowUp, receivables,
   resolveRange, type RangeKey, type ResolvedRange, type SeriesPoint,
 } from "@/lib/service-reports";
 
@@ -314,11 +315,18 @@ export type JobDetail = {
   invoices: (ServiceInvoice & { amountPaidCents: number })[];
   expenses: ServiceExpense[];
   catalog: ServiceCatalogItem[];
-  customers: { id: string; name: string }[];
+  customers: { id: string; name: string; isBatch: boolean }[];
   /** The customer's instruments, so a job with no piano can offer "Link piano". */
   customerPianos: ServicePiano[];
   technicians: ServiceTechnician[];
   totals: { subtotalCents: number; taxCents: number; totalCents: number; quotedCents: number };
+  /** Set only for piano-sale jobs. */
+  sale: {
+    pianoLabel: string | null;
+    stockExpensesCents: number;
+    balanceCents: number;
+    profit: { revenueCents: number; costOfGoodsCents: number; profitCents: number; marginPct: number };
+  } | null;
 };
 
 /** The tax inputs a quote preview needs; comes from the owner's service settings. */
@@ -351,7 +359,7 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
       db.select().from(serviceInvoices).where(eq(serviceInvoices.jobId, id)).orderBy(desc(serviceInvoices.issueDate)),
       db.select().from(serviceExpenses).where(eq(serviceExpenses.jobId, id)).orderBy(desc(serviceExpenses.spentAt)),
       getCatalog(true),
-      db.select({ id: serviceCustomers.id, name: serviceCustomers.name }).from(serviceCustomers)
+      db.select({ id: serviceCustomers.id, name: serviceCustomers.name, tags: serviceCustomers.tags }).from(serviceCustomers)
         .where(isNull(serviceCustomers.archivedAt)).orderBy(asc(serviceCustomers.name)),
       getTechnicians(true),
       row.job.locationId
@@ -369,6 +377,24 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
   // Quote preview uses the owner's current effective VAT setting via the shared calculator.
   const quote = computeTotals(items, { taxRateBps: tax.taxRateBps, vatEnabled: tax.vatEnabled });
 
+  let sale: JobDetail["sale"] = null;
+  if (row.job.jobType === "sale") {
+    const [pianoRow, stock] = await Promise.all([
+      row.job.salePianoId ? db.select({ brand: pianos.brand, model: pianos.model }).from(pianos).where(eq(pianos.id, row.job.salePianoId)).limit(1).then((r) => r[0] ?? null) : Promise.resolve(null),
+      row.job.salePianoId
+        ? db.select({ cents: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` }).from(serviceExpenses)
+            .where(and(eq(serviceExpenses.kind, "stock"), eq(serviceExpenses.pianoId, row.job.salePianoId))).then((r) => r[0]?.cents ?? 0)
+        : Promise.resolve(0),
+    ]);
+    const done = ["completed", "invoiced", "paid"].includes(row.job.status);
+    sale = {
+      pianoLabel: pianoRow ? `${pianoRow.brand} ${pianoRow.model}` : null,
+      stockExpensesCents: stock,
+      balanceCents: saleBalanceCents(row.job, done),
+      profit: salePianoProfit({ salePriceCents: row.job.salePriceCents, depositCents: row.job.depositCents, buyCostCents: row.job.buyCostCents, prepCostCents: row.job.prepCostCents, stockExpensesCents: stock }),
+    };
+  }
+
   return {
     job: toJobRow(row, running),
     customer: { ...customer, name: titleCaseName(customer.name) },
@@ -381,10 +407,11 @@ export async function getJobDetail(id: string, tax: QuoteTaxSettings): Promise<J
     invoices,
     expenses,
     catalog,
-    customers: customers.map((c) => ({ ...c, name: titleCaseName(c.name) })),
+    customers: customers.map((c) => ({ id: c.id, name: titleCaseName(c.name), isBatch: isBatchCustomer(c.tags, c.name) })),
     customerPianos,
     technicians,
     totals: { subtotalCents: quote.subtotalCents, taxCents: quote.taxCents, totalCents: quote.totalCents, quotedCents: row.job.quotedCents },
+    sale,
   };
 }
 
@@ -440,7 +467,9 @@ export type TodayBoard = {
   staleQuotes: { id: string; title: string; customerName: string; customerPhone: string | null; quotedCents: number; days: number }[];
   /** Visits from tomorrow through the next 7 days. */
   next7: JobRow[];
-  week: { from: Date; to: Date; booked: Split; collected: Split; spent: Split; profit: Split };
+  /** Sale jobs with a delivery coming up (or overdue) and money still to collect on delivery. */
+  deliveryBalances: { jobId: string; title: string; customerName: string; customerPhone: string | null; deliveryAt: Date; balanceCents: number }[];
+  week: { from: Date; to: Date; booked: Split; collected: Split; spent: Split; profit: Split; overheadCents: number };
   jobs: JobRow[];
   running: (ServiceTimeLog & { jobTitle: string; customerName: string; technicianName: string | null })[];
   technicians: ServiceTechnician[];
@@ -505,7 +534,7 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
       })
     : [];
 
-  const [settings, next7, draftRows, quotedRows, jobInvoices, weekBooked, weekCollected, weekSpent] = await Promise.all([
+  const [settings, next7, draftRows, quotedRows, jobInvoices, weekBooked, weekCollected, weekExpenses, weekSold, deliveryRows, stockRows] = await Promise.all([
     getServiceSettings(ownerId),
     getJobs({ from: dayEnd, to: addManilaDays(dayStart, 8), statuses: ["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"], limit: 100 }),
     getInvoices({ statuses: ["draft"], limit: 20 }, now),
@@ -521,12 +550,33 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
       ? db.select({ jobId: serviceInvoices.jobId, id: serviceInvoices.id }).from(serviceInvoices)
           .where(and(inArray(serviceInvoices.jobId, jobs.map((j) => j.id)), isNull(serviceInvoices.voidedAt)))
       : Promise.resolve([] as { jobId: string | null; id: string }[]),
-    db.select({ cents: sql<number>`coalesce(sum(${serviceJobs.quotedCents}), 0)::int` }).from(serviceJobs)
-      .where(and(gte(serviceJobs.scheduledStart, week.from), lt(serviceJobs.scheduledStart, week.to), ne(serviceJobs.status, "cancelled"))),
+    db.select({
+      jobType: serviceJobs.jobType,
+      cents: sql<number>`coalesce(sum(case when ${serviceJobs.jobType} = 'sale' then ${serviceJobs.salePriceCents} else ${serviceJobs.quotedCents} end), 0)::int`,
+    }).from(serviceJobs)
+      .where(and(gte(serviceJobs.scheduledStart, week.from), lt(serviceJobs.scheduledStart, week.to), ne(serviceJobs.status, "cancelled")))
+      .groupBy(serviceJobs.jobType),
     db.select({ cents: sql<number>`coalesce(sum(${servicePayments.amountCents}), 0)::int` }).from(servicePayments)
       .where(and(gte(servicePayments.receivedAt, week.from), lt(servicePayments.receivedAt, week.to))),
-    db.select({ cents: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` }).from(serviceExpenses)
-      .where(and(gte(serviceExpenses.spentAt, week.from), lt(serviceExpenses.spentAt, week.to))),
+    db.select({ amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind })
+      .from(serviceExpenses).where(and(gte(serviceExpenses.spentAt, week.from), lt(serviceExpenses.spentAt, week.to))),
+    // Piano sales closed this week: price is recognised on completion (the balance is collected at delivery).
+    db.select({
+      pianoId: serviceJobs.salePianoId, salePriceCents: serviceJobs.salePriceCents, buyCostCents: serviceJobs.buyCostCents, prepCostCents: serviceJobs.prepCostCents,
+    }).from(serviceJobs).where(and(
+      eq(serviceJobs.jobType, "sale"), ne(serviceJobs.status, "cancelled"),
+      or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+      gte(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`, week.from), lt(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`, week.to),
+    )),
+    db.select({
+      id: serviceJobs.id, title: serviceJobs.title, scheduledStart: serviceJobs.scheduledStart, salePriceCents: serviceJobs.salePriceCents,
+      depositCents: serviceJobs.depositCents, customerName: serviceCustomers.name, customerPhone: serviceCustomers.phone,
+    }).from(serviceJobs).innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId)).where(and(
+      eq(serviceJobs.jobType, "sale"), inArray(serviceJobs.status, ["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"]),
+      isNotNull(serviceJobs.scheduledStart), lt(serviceJobs.scheduledStart, addManilaDays(dayStart, 8)),
+    )).orderBy(asc(serviceJobs.scheduledStart)),
+    db.select({ pianoId: serviceExpenses.pianoId, cents: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` })
+      .from(serviceExpenses).where(and(eq(serviceExpenses.kind, "stock"), isNotNull(serviceExpenses.pianoId))).groupBy(serviceExpenses.pianoId),
   ]);
 
   const invPrefix = settings.invoicePrefix;
@@ -558,8 +608,14 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
   const minutesWorked = timeToday.find((t) => t.kind === "work")?.minutes ?? 0;
   const minutesTravel = timeToday.find((t) => t.kind === "travel")?.minutes ?? 0;
 
-  const collectedWeek = weekCollected[0]?.cents ?? 0;
-  const spentWeek = weekSpent[0]?.cents ?? 0;
+  const stockBy = new Map(stockRows.map((r) => [r.pianoId!, r.cents]));
+  const weekSplit = financeSplit({
+    serviceCollectedCents: weekCollected[0]?.cents ?? 0,
+    periodExpenses: weekExpenses,
+    sales: weekSold.map((j) => ({ pianoId: j.pianoId, salePriceCents: j.salePriceCents, buyCostCents: j.buyCostCents, prepCostCents: j.prepCostCents, stockExpensesCents: j.pianoId ? stockBy.get(j.pianoId) ?? 0 : 0 })),
+    allStockExpenses: [], pianosWithSale: new Set<string>(),
+  });
+  const bookedBy = (t: string) => weekBooked.find((b) => b.jobType === t)?.cents ?? 0;
   return {
     date: dayStart,
     businessName: settings.businessName,
@@ -568,12 +624,16 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
     unpaid: followUps.map((f) => ({ ...withCode(f), messenger: handles.get(f.customerId) ?? null })),
     staleQuotes,
     next7,
+    deliveryBalances: deliveryRows
+      .map((r) => ({ jobId: r.id, title: r.title, customerName: titleCaseName(r.customerName), customerPhone: r.customerPhone, deliveryAt: r.scheduledStart!, balanceCents: saleBalanceCents(r, false) }))
+      .filter((r) => r.balanceCents > 0),
     week: {
       ...week,
-      booked: { service: weekBooked[0]?.cents ?? 0, sales: 0 },
-      collected: { service: collectedWeek, sales: 0 },
-      spent: { service: spentWeek, sales: 0 },
-      profit: { service: collectedWeek - spentWeek, sales: 0 },
+      booked: { service: bookedBy("service"), sales: bookedBy("sale") },
+      collected: { service: weekSplit.service.collectedCents, sales: weekSplit.sales.revenueCents },
+      spent: { service: weekSplit.service.jobCostCents, sales: weekSplit.sales.costOfGoodsCents },
+      profit: { service: weekSplit.service.profitCents, sales: weekSplit.sales.profitCents },
+      overheadCents: weekSplit.overhead.cents,
     },
     jobs,
     running: running.map((r) => ({ ...r.log, jobTitle: r.jobTitle, customerName: titleCaseName(r.customerName), technicianName: r.technicianName })),
@@ -736,11 +796,21 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
 /** Receipt images are data URLs (~MBs): lists carry only `hasReceipt`; the viewer fetches one on demand. */
 export type ExpenseRow = Omit<ServiceExpense, "receiptUrl"> & { hasReceipt: boolean; jobCode: string | null; jobTitle: string | null; pianoLabel: string | null };
 
-/** Showroom pianos a "stock" expense can be tied to. Read-only use of the Piano Management inventory. */
-export async function getPianoOptions(): Promise<{ id: string; label: string; status: string }[]> {
-  const rows = await db.select({ id: pianos.id, brand: pianos.brand, model: pianos.model, year: pianos.year, status: pianos.status })
-    .from(pianos).orderBy(desc(pianos.createdAt));
-  return rows.map((r) => ({ id: r.id, label: `${r.brand} ${r.model}${r.year ? ` (${r.year})` : ""}`, status: r.status }));
+/** Showroom pianos a "stock" expense or a sale job can point at. Read-only use of the Piano Management inventory. */
+export type PianoOption = { id: string; label: string; status: string; listPriceCents: number | null; stockCents: number };
+
+export async function getPianoOptions(): Promise<PianoOption[]> {
+  const [rows, stock] = await Promise.all([
+    db.select({ id: pianos.id, brand: pianos.brand, model: pianos.model, year: pianos.year, status: pianos.status, price: pianos.priceCents })
+      .from(pianos).orderBy(desc(pianos.createdAt)),
+    db.select({ pianoId: serviceExpenses.pianoId, cents: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` })
+      .from(serviceExpenses).where(and(eq(serviceExpenses.kind, "stock"), isNotNull(serviceExpenses.pianoId))).groupBy(serviceExpenses.pianoId),
+  ]);
+  const stockBy = new Map(stock.map((r) => [r.pianoId!, r.cents]));
+  return rows.map((r) => ({
+    id: r.id, label: `${r.brand} ${r.model}${r.year ? ` (${r.year})` : ""}`, status: r.status,
+    listPriceCents: r.price, stockCents: stockBy.get(r.id) ?? 0,
+  }));
 }
 
 export async function getExpenses(from?: Date, to?: Date, limit = 300): Promise<ExpenseRow[]> {
@@ -866,6 +936,11 @@ export type FinanceReport = {
   expenseByCategory: { category: string; amountCents: number; count: number }[];
   /** Profit split into Service / Piano sales / Overhead (stock only counts once its piano is sold). */
   split: FinanceSplit & { unreviewedCount: number };
+  /** Piano sale jobs completed in the range, one row per piano. */
+  pianoSales: {
+    jobId: string; title: string; pianoLabel: string | null; customerName: string; soldAt: Date;
+    priceCents: number; costCents: number; profitCents: number; marginPct: number;
+  }[];
   topCustomers: { customerId: string; name: string; billedCents: number; paidCents: number }[];
   /** Empty when the owner has hidden job margins (`options.showJobMargins` false). */
   jobMargins: {
@@ -925,6 +1000,7 @@ export async function getFinanceReport(
           .innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId))
           .where(
             and(
+              eq(serviceJobs.jobType, "service"),
               ne(serviceJobs.status, "cancelled"),
               or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
               completedIn(serviceJobs.completedAt),
@@ -940,6 +1016,7 @@ export async function getFinanceReport(
       .from(serviceJobs)
       .where(
         and(
+          eq(serviceJobs.jobType, "service"),
           ne(serviceJobs.status, "cancelled"),
           or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
           completedIn(serviceJobs.completedAt),
@@ -949,21 +1026,48 @@ export async function getFinanceReport(
 
   const rollup = financeRollup({ invoices: allInvoices, payments: paymentRows, expenses: expenseRows }, rangeKey, now);
 
-  // Stock is judged over all time (a piano bought last year and sold this month still carries its cost).
-  const [allStock, unreviewedCount] = await Promise.all([
+  // Piano sales: completed sale jobs. Stock is judged over all time (a piano bought last year and sold this month still carries its cost).
+  const soldWhere = and(
+    eq(serviceJobs.jobType, "sale"),
+    or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+    ne(serviceJobs.status, "cancelled"),
+  );
+  const [allStock, unreviewedCount, soldAll, soldNames] = await Promise.all([
     db.select({ pianoId: serviceExpenses.pianoId, amountCents: serviceExpenses.amountCents }).from(serviceExpenses).where(eq(serviceExpenses.kind, "stock")),
     countUnreviewedExpenses(),
+    db.select({
+      id: serviceJobs.id, title: serviceJobs.title, salePianoId: serviceJobs.salePianoId, salePriceCents: serviceJobs.salePriceCents,
+      buyCostCents: serviceJobs.buyCostCents, prepCostCents: serviceJobs.prepCostCents, customerName: serviceCustomers.name,
+      soldAt: sql<Date>`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`,
+    }).from(serviceJobs).innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId)).where(soldWhere),
+    db.select({ id: pianos.id, brand: pianos.brand, model: pianos.model }).from(pianos),
   ]);
+  const stockByPiano = new Map<string, number>();
+  for (const e of allStock) if (e.pianoId) stockByPiano.set(e.pianoId, (stockByPiano.get(e.pianoId) ?? 0) + e.amountCents);
+  const pianoName = new Map(soldNames.map((p) => [p.id, `${p.brand} ${p.model}`]));
+  const soldInRange = soldAll.filter((j) => inRange(new Date(j.soldAt), range));
+  const saleLines: SaleLine[] = soldInRange.map((j) => ({
+    pianoId: j.salePianoId, salePriceCents: j.salePriceCents, buyCostCents: j.buyCostCents, prepCostCents: j.prepCostCents,
+    stockExpensesCents: j.salePianoId ? stockByPiano.get(j.salePianoId) ?? 0 : 0,
+  }));
   const split = {
     ...financeSplit({
       serviceCollectedCents: rollup.collectedCents,
       periodExpenses: expenseRows,
-      sales: [],
+      sales: saleLines,
       allStockExpenses: allStock,
-      pianosWithSale: new Set<string>(),
+      pianosWithSale: new Set(soldAll.map((j) => j.salePianoId).filter((x): x is string => !!x)),
     }),
     unreviewedCount,
   };
+  const pianoSales = soldInRange.map((j, i) => {
+    const p = salePianoProfit({ ...saleLines[i]!, depositCents: 0 });
+    return {
+      jobId: j.id, title: j.title, pianoLabel: j.salePianoId ? pianoName.get(j.salePianoId) ?? null : null,
+      customerName: titleCaseName(j.customerName), soldAt: new Date(j.soldAt),
+      priceCents: p.revenueCents, costCents: p.costOfGoodsCents, profitCents: p.profitCents, marginPct: p.marginPct,
+    };
+  }).sort((a, b) => b.soldAt.getTime() - a.soldAt.getTime());
 
   // Top customers: billed on invoices issued in the range (countable only).
   const inRangeInvoices = countable(allInvoices, now).filter((i) => inRange(i.issueDate, range));
@@ -1038,6 +1142,7 @@ export async function getFinanceReport(
     granularity: rollup.granularity,
     months: rollup.series,
     split,
+    pianoSales,
     kpis: {
       invoicedCents: rollup.invoicedCents,
       invoiceCount: rollup.invoiceCount,
@@ -1099,11 +1204,12 @@ export async function getCustomerDetail(id: string, now: Date = new Date()) {
 
 export async function getCustomerOptions() {
   const rows = await db
-    .select({ id: serviceCustomers.id, name: serviceCustomers.name })
+    .select({ id: serviceCustomers.id, name: serviceCustomers.name, tags: serviceCustomers.tags })
     .from(serviceCustomers)
     .where(isNull(serviceCustomers.archivedAt))
     .orderBy(asc(serviceCustomers.name));
-  return rows.map((r) => ({ ...r, name: titleCaseName(r.name) }));
+  // `isBatch` = a trip / batch placeholder, which never needs a piano on its jobs.
+  return rows.map((r) => ({ id: r.id, name: titleCaseName(r.name), isBatch: isBatchCustomer(r.tags, r.name) }));
 }
 
 export async function getLocationsForCustomer(customerId: string): Promise<ServiceLocation[]> {

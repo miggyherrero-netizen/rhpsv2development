@@ -133,6 +133,8 @@ Unlike skills (passive reference docs I read myself), agents are subagent person
 4. **After any rebuild, use a fresh browser tab** when testing — a tab left open across a rebuild can hold stale Server Action references and cause confusing double-submits / phantom mutations. Always verify in a newly opened tab.
 5. **`/api/live`** requires a session (`getUser()` check) — don't remove it; it was a real unauthenticated data leak before the fix.
 
+6. **Schema changes need a manual migration on the live DB.** Vercel runs `next build` only; `drizzle-kit push` runs in Docker (`init-db.sh`), not on Vercel. Any new column in `src/db/schema.ts` must also get an additive, idempotent SQL file in `drizzle/manual/` (see its README) that the owner pastes into the live database *before* the deploy is used.
+
 ## Personal Workspace design system (`/owner/*` only)
 Dark, premium theme — deliberately different from the rest of the app. Tokens live in `src/app/globals.css` under `/* ---- Personal Workspace (premium dark) ---- */` (CSS vars prefixed `--color-ow-*`) plus reusable classes `.card-ow`, `.input-ow`, `.btn-ow-primary`, `.chip-ow`, `.ow-divide`, `.ow-shell`, `.ow-sidebar`.
 - Background: deep charcoal-navy (`--color-ow-bg` `#10141b`), surfaces one step lighter (`--color-ow-surface` `#171c25`).

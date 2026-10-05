@@ -16,6 +16,7 @@ import {
 import type { TodayBoard } from "@/server/service-data";
 import { stopTimer, createJob, setInvoiceStatus } from "@/server/service";
 import StepButton from "@/components/service-step-button";
+import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import {
   Chip, DateField, Dot, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard,
   Select, StatCard, SvcModal, TextInput, TONE_TEXT, useNow,
@@ -42,9 +43,11 @@ function Elapsed({ startedAt, now }: { startedAt: Date; now: Date | null }) {
 export default function TodayClient({
   board,
   customers,
+  showroomPianos,
 }: {
   board: TodayBoard;
-  customers: { id: string; name: string }[];
+  customers: { id: string; name: string; isBatch?: boolean }[];
+  showroomPianos: ShowroomPiano[];
 }) {
   // `clock` is null until mount — anything time-sensitive waits for it so the server and client markup agree.
   const clock = useNow(1_000);
@@ -70,10 +73,10 @@ export default function TodayClient({
   const next7Days = useMemo(() => groupByManilaDay(board.next7, (j) => new Date(j.scheduledStart ?? board.date), board.date), [board.next7, board.date]);
 
   const week = board.week;
-  const weekHasData = [week.booked, week.collected, week.spent, week.profit].some((s) => s.service !== 0 || s.sales !== 0);
+  const weekHasData = [week.booked, week.collected, week.spent, week.profit].some((s) => s.service !== 0 || s.sales !== 0) || week.overheadCents > 0;
   const counts = {
     now: visits.length + otherRunning.length,
-    money: board.draftInvoices.length + board.unpaid.length,
+    money: board.draftInvoices.length + board.unpaid.length + board.deliveryBalances.length,
     next7: board.next7.length,
     followUps: board.staleQuotes.length + board.recalls.length + board.unfinished.length,
     week: weekHasData ? 1 : 0,
@@ -220,9 +223,31 @@ export default function TodayClient({
               </ul>
             </div>
           )}
-          {board.unpaid.length > 0 && (
+          {board.deliveryBalances.length > 0 && (
             <div>
               <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length ? 8 : 0 }}>
+                Balance due on delivery · {board.deliveryBalances.length}
+              </p>
+              <ul className="svc-divide">
+                {board.deliveryBalances.map((d) => (
+                  <li key={d.jobId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <Link href={`/service/jobs/${d.jobId}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{d.title}</Link>
+                      <p className="text-[12px] mt-0.5" style={DIM}>{d.customerName} · delivery {fmtDate(new Date(d.deliveryAt))}, {fmtTime(new Date(d.deliveryAt))}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Money cents={d.balanceCents} className="text-[13px] mr-1" />
+                      {d.customerPhone && <a href={telHref(d.customerPhone) ?? undefined} className={ROW_BTN} aria-label={`Call ${d.customerName}`}><Phone size={13} aria-hidden="true" /> Call</a>}
+                      <Link href={`/service/jobs/${d.jobId}`} className={ROW_BTN}>Open sale</Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {board.unpaid.length > 0 && (
+            <div>
+              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length + board.deliveryBalances.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length + board.deliveryBalances.length ? 8 : 0 }}>
                 Unpaid · {board.unpaid.length}
               </p>
               <ul className="svc-divide">
@@ -349,20 +374,25 @@ export default function TodayClient({
           <div className="svc-tiles">
             <WeekTile label="Booked" split={week.booked} icon={<CalendarClock size={15} />} />
             <WeekTile label="Collected" split={week.collected} tone="success" icon={<Wallet size={15} />} />
-            <WeekTile label="Spent" split={week.spent} icon={<Sun size={15} />} />
+            <WeekTile label="Spent" split={week.spent} icon={<Wallet size={15} />} />
             <WeekTile label="Profit" split={week.profit} tone="azure" icon={<TrendingUp size={15} />} />
           </div>
+          <p className="text-[12px]" style={FAINT}>
+            Spent = job costs and the cost of pianos sold. {week.overheadCents > 0 ? <>Overhead this week ({peso(week.overheadCents)}) is kept separate. </> : null}
+            Piano sales count on the day they are completed.
+          </p>
         </section>
       )}
 
-      <QuickJobModal
+      <JobFormModal
         open={quickOpen}
+        mode="new"
         onClose={() => setQuickOpen(false)}
-        customers={customers}
-        technicians={board.technicians.map((t) => ({ id: t.id, name: t.name }))}
-        onCreate={(input) => run(() => createJob(input))}
-        onDone={() => setQuickOpen(false)}
         pending={pending}
+        customers={customers}
+        showroomPianos={showroomPianos}
+        technicians={board.technicians.filter((t) => t.active).map((t) => ({ id: t.id, name: t.name }))}
+        onSubmit={(values) => run(() => createJob(values))}
       />
     </div>
   );
@@ -377,111 +407,4 @@ function WeekTile({ label, split, tone, icon }: { label: string; split: { servic
       sub={split.sales !== 0 ? `Service ${peso(split.service)} · Piano sales ${peso(split.sales)}` : undefined}
     />
   );
-}
-
-function QuickJobModal({
-  open,
-  onClose,
-  customers,
-  technicians,
-  onCreate,
-  onDone,
-  pending,
-}: {
-  open: boolean;
-  onClose: () => void;
-  customers: { id: string; name: string }[];
-  technicians: { id: string; name: string }[];
-  onCreate: (input: {
-    customerId: string; title: string; serviceType: string; technicianId: string | null;
-    scheduledStart: string; priority: string;
-  }) => void;
-  onDone: () => void;
-  pending: boolean;
-}) {
-  const [customerId, setCustomerId] = useState("");
-  const [title, setTitle] = useState("");
-  const [serviceType, setServiceType] = useState("tuning");
-  const [technicianId, setTechnicianId] = useState("");
-  const [date, setDate] = useState(() => todayInputValue());
-  const [time, setTime] = useState("09:00");
-  const [priority, setPriority] = useState("normal");
-
-  const submit = () => {
-    if (!customerId) return;
-    onCreate({
-      customerId,
-      title: title.trim() || "Home service visit",
-      serviceType,
-      technicianId: technicianId || null,
-      scheduledStart: `${date}T${time}`,
-      priority,
-    });
-    onDone();
-  };
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="New job" subtitle="Create and place it on today's board">
-      <div className="space-y-3.5">
-        <Field label="Customer">
-          <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            <option value="">Select a customer…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Job title" hint="Leave blank to use a generic title">
-          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Standard tuning — Yamaha U1" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Service type">
-            <Select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-              {Object.entries(SERVICE_TYPE_LABEL).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Technician">
-            <Select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-              <option value="">Unassigned</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Date">
-            <DateField kind="date" value={date} onChange={setDate} />
-          </Field>
-          <Field label="Start">
-            <TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Priority">
-          <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </Select>
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton pending={pending} disabled={!customerId} onClick={submit}>
-            Create job
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
-  );
-}
-
-function todayInputValue(): string {
-  // Mirror the business timezone (UTC+8) so the date input opens on the Manila day.
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-  return parts;
 }

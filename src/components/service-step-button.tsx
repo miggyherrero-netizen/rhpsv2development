@@ -15,7 +15,7 @@ import { PrimaryButton } from "@/components/service-ui";
 export default function StepButton({
   job, invoiceId, onError, className = "",
 }: {
-  job: { id: string; status: string; itemCount: number; scheduledStart: Date | string | null };
+  job: { id: string; status: string; itemCount: number; scheduledStart: Date | string | null; jobType?: string };
   invoiceId: string | null;
   onError?: (message: string | null) => void;
   className?: string;
@@ -23,7 +23,7 @@ export default function StepButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [localError, setLocalError] = useState<string | null>(null);
-  const step = nextJobStep(job.status, { hasLineItems: job.itemCount > 0, hasInvoice: !!invoiceId, hasSchedule: !!job.scheduledStart });
+  const step = nextJobStep(job.status, { hasLineItems: job.itemCount > 0, hasInvoice: !!invoiceId, hasSchedule: !!job.scheduledStart, isSale: job.jobType === "sale" });
   if (!step) return null;
   const fail = (m: string) => { setLocalError(m); onError?.(m); };
   const cls = `!min-h-11 !px-3.5 text-[12.5px] ${className}`;

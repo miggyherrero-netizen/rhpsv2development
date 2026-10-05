@@ -11,7 +11,7 @@ import {
 import { hasQuote, jobHeading, needsClosing } from "@/lib/service-reports";
 import type { JobRow } from "@/server/service-data";
 import { createJob } from "@/server/service";
-import { JobFormModal } from "@/components/service-forms";
+import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import {
   Chip, Dot, EmptyState, ErrorLine, Field, FilterPills, GhostButton, Money,
   PrimaryButton, SectionCard, Select, SvcModal, TextInput, TONE_TEXT,
@@ -36,13 +36,15 @@ const OPEN_SET = new Set(["lead", "quoted", "scheduled", "en_route", "in_progres
 export default function JobsClient({
   jobs,
   customers,
+  showroomPianos,
   technicians,
   initialNew,
   initialFilter = "open",
 }: {
   initialFilter?: string;
   jobs: JobRow[];
-  customers: { id: string; name: string }[];
+  customers: { id: string; name: string; isBatch?: boolean }[];
+  showroomPianos: ShowroomPiano[];
   technicians: { id: string; name: string; color: string }[];
   initialNew: boolean;
 }) {
@@ -217,7 +219,7 @@ export default function JobsClient({
                       )}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>
-                      {SERVICE_TYPE_LABEL[job.serviceType] ?? job.serviceType}
+                      {job.jobType === "sale" ? "Piano sale" : SERVICE_TYPE_LABEL[job.serviceType] ?? job.serviceType}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
                       <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>
@@ -259,6 +261,7 @@ export default function JobsClient({
         mode="new"
         onClose={() => setNewOpen(false)}
         customers={customers}
+        showroomPianos={showroomPianos}
         technicians={technicians}
         pending={pending}
         onSubmit={(values) => run(() => createJob(values))}

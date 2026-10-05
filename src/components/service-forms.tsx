@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
+import { peso } from "@/lib/format";
 import { EXPENSE_KINDS, defaultKindForCategory } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
 import { parsePesoInput } from "@/lib/service-flow";
@@ -82,7 +83,11 @@ export type JobFormValues = {
   customerId: string; locationId: string | null; pianoId: string | null; technicianId: string | null;
   title: string; serviceType: string; priority: string; scheduledStart: string | null;
   estimatedMinutes: number; travelFee: number; notes: string; privateNotes: string;
+  /** "service" | "sale". Sale fields are in pesos. */
+  jobType: string; salePianoId: string | null; buyCost: number; prepCost: number; salePrice: number; deposit: number;
 };
+
+export type ShowroomPiano = { id: string; label: string; status: string; listPriceCents: number | null; stockCents: number };
 
 type Places = {
   locations: { id: string; label: string; addressLine: string; city: string | null; area: string | null; travelFeeCents: number }[];
@@ -92,20 +97,34 @@ const NO_PLACES: Places = { locations: [], pianos: [] };
 
 export function JobFormModal(props: {
   open: boolean; onClose: () => void; mode: "new" | "edit"; pending: boolean;
-  customers: { id: string; name: string }[];
+  /** `isBatch` = a trip / batch placeholder customer, which doesn't need a piano. */
+  customers: { id: string; name: string; isBatch?: boolean }[];
   technicians: { id: string; name: string }[];
+  /** Showroom pianos (from Piano Management). Without them the "Piano sale" type isn't offered. */
+  showroomPianos?: ShowroomPiano[];
   initial?: Partial<JobFormValues>;
   onSubmit: (values: JobFormValues) => void;
 }) {
   const { open, onClose, mode } = props;
+  const sale = props.initial?.jobType === "sale";
   return (
-    <SvcModal open={open} onClose={onClose} title={mode === "new" ? "New job" : "Edit visit"} subtitle={mode === "new" ? "Leave the time blank to park it in Unscheduled." : undefined} wide>
+    <SvcModal open={open} onClose={onClose} title={mode === "new" ? "New job" : sale ? "Edit piano sale" : "Edit visit"} subtitle={mode === "new" ? "Leave the time blank to park it in Unscheduled." : undefined} wide>
       {open && <JobFormBody {...props} />}
     </SvcModal>
   );
 }
 
-function JobFormBody({ onClose, mode, pending, customers, technicians, initial, onSubmit }: Parameters<typeof JobFormModal>[0]) {
+function JobFormBody({ onClose, mode, pending, customers, technicians, showroomPianos, initial, onSubmit }: Parameters<typeof JobFormModal>[0]) {
+  const [jobType, setJobType] = useState<string>(initial?.jobType ?? "service");
+  const isSale = jobType === "sale";
+  const [salePianoId, setSalePianoId] = useState(initial?.salePianoId ?? "");
+  const [buyCost, setBuyCost] = useState(initial?.buyCost ? String(initial.buyCost) : "");
+  const [buyCostTouched, setBuyCostTouched] = useState(!!initial?.buyCost);
+  const [prepCost, setPrepCost] = useState(initial?.prepCost ? String(initial.prepCost) : "");
+  const [salePrice, setSalePrice] = useState(initial?.salePrice ? String(initial.salePrice) : "");
+  const [priceTouched, setPriceTouched] = useState(!!initial?.salePrice);
+  const [deposit, setDeposit] = useState(initial?.deposit ? String(initial.deposit) : "");
+  const showroomPick = showroomPianos?.find((p) => p.id === salePianoId) ?? null;
   const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
   const [locationId, setLocationId] = useState(initial?.locationId ?? "");
   const [pianoId, setPianoId] = useState(initial?.pianoId ?? "");
@@ -135,7 +154,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
   const [addPlace, setAddPlace] = useState(false);
   const [place, setPlace] = useState({ label: "Home", addressLine: "", area: "" });
   const [addPiano, setAddPiano] = useState(false);
-  const [piano, setPiano] = useState({ brand: "", model: "", type: "Upright" });
+  const [piano, setPiano] = useState({ brand: "", model: "", type: "Upright", lastTuned: "" });
   const [inlineBusy, setInlineBusy] = useState(false);
   const [inlineErr, setInlineErr] = useState<string | null>(null);
 
@@ -152,31 +171,71 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
   };
   const savePiano = async () => {
     setInlineBusy(true); setInlineErr(null);
-    const res = await createPiano({ customerId, brand: piano.brand, model: piano.model, type: piano.type, locationId: locationId || null });
+    const res = await createPiano({ customerId, brand: piano.brand, model: piano.model, type: piano.type, locationId: locationId || null, lastServiceAt: piano.lastTuned || null });
     setInlineBusy(false);
     if (!res.ok || !res.data) return setInlineErr(res.ok ? "Couldn't save the piano." : res.error);
     const created = { id: res.data.id, label: [piano.brand, piano.model].filter(Boolean).join(" "), type: piano.type };
     setPlacesBy((cur) => ({ ...cur, [customerId]: { ...(cur[customerId] ?? NO_PLACES), pianos: [...(cur[customerId]?.pianos ?? []), created] } }));
-    setPianoId(res.data.id); setAddPiano(false); setPiano({ brand: "", model: "", type: "Upright" });
+    setPianoId(res.data.id); setAddPiano(false); setPiano({ brand: "", model: "", type: "Upright", lastTuned: "" });
+  };
+
+  const isBatch = !!customers.find((c) => c.id === customerId)?.isBatch;
+  // A home-service job must name the customer's piano (or add one on the spot) so history and recalls stay right.
+  const needsPiano = !isSale && !isBatch && !pianoId;
+  const needsSalePiano = isSale && !salePianoId;
+  const moneyBad = [buyCost, prepCost, salePrice, deposit].some((v) => v.trim() !== "" && parsePesoInput(v) === null);
+
+  const pickShowroomPiano = (id: string) => {
+    setSalePianoId(id);
+    const p = showroomPianos?.find((x) => x.id === id);
+    if (!p) return;
+    // Prefill, never overwrite what the owner already typed.
+    if (!buyCostTouched && p.stockCents > 0) setBuyCost(String(p.stockCents / 100));
+    if (!priceTouched && p.listPriceCents) setSalePrice(String(p.listPriceCents / 100));
   };
 
   const submit = () => {
-    if (!customerId) return;
+    if (!customerId || needsPiano || needsSalePiano || moneyBad) return;
     onSubmit({
-      customerId, locationId: locationId || null, pianoId: pianoId || null, technicianId: technicianId || null,
-      title: title.trim() || "Home service visit", serviceType, priority, scheduledStart: start || null,
-      estimatedMinutes: Math.max(15, Number(minutes) || serviceTypeMinutes(serviceType)),
-      travelFee: parsePesoInput(travelFee) ?? 0, notes, privateNotes,
+      customerId, locationId: locationId || null, pianoId: isSale ? null : pianoId || null, technicianId: technicianId || null,
+      title: title.trim() || (isSale ? "" : "Home service visit"), serviceType: isSale ? "delivery" : serviceType, priority, scheduledStart: start || null,
+      estimatedMinutes: Math.max(15, Number(minutes) || serviceTypeMinutes(isSale ? "delivery" : serviceType)),
+      travelFee: isSale ? 0 : parsePesoInput(travelFee) ?? 0, notes, privateNotes,
+      jobType, salePianoId: isSale ? salePianoId || null : null,
+      buyCost: parsePesoInput(buyCost) ?? 0, prepCost: parsePesoInput(prepCost) ?? 0,
+      salePrice: parsePesoInput(salePrice) ?? 0, deposit: parsePesoInput(deposit) ?? 0,
     });
     onClose();
   };
 
   return (
     <div className="space-y-3.5">
-      <Field label="Customer"><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+      {mode === "new" && showroomPianos && (
+        <div role="radiogroup" aria-label="Job type" className="inline-flex rounded-xl p-1" style={{ background: "var(--color-svc-surface-2)" }}>
+          {[{ key: "service", label: "Home service" }, { key: "sale", label: "Piano sale" }].map((o) => (
+            <button
+              key={o.key} type="button" role="radio" aria-checked={jobType === o.key} onClick={() => setJobType(o.key)}
+              className="px-4 min-h-10 rounded-lg text-[13px]"
+              style={jobType === o.key ? { background: "var(--color-svc-accent)", color: "#051021", fontWeight: 500 } : { color: "var(--color-svc-text-dim)" }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <Field label={isSale ? "Buyer" : "Customer"}><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+
+      {isSale && (
+        <Field label="Piano being sold" hint={showroomPick ? `${showroomPick.status === "sold" ? "Marked sold in the showroom · " : ""}${showroomPick.listPriceCents ? `Listed at ${peso(showroomPick.listPriceCents)}` : "No list price"}` : "From your showroom list (Piano Management)"}>
+          <Select aria-label="Piano being sold" value={salePianoId} onChange={(e) => pickShowroomPiano(e.target.value)}>
+            <option value="">Choose a showroom piano…</option>
+            {(showroomPianos ?? []).map((p) => <option key={p.id} value={p.id}>{p.label}{p.status === "sold" ? " · sold" : ""}</option>)}
+          </Select>
+        </Field>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Location" hint={loadingPlaces ? "Loading addresses…" : undefined}>
+        <Field label={isSale ? "Delivery address" : "Location"} hint={loadingPlaces ? "Loading addresses…" : undefined}>
           <Select
             aria-label="Location" disabled={!customerId} value={addPlace ? ADD_PLACE : locationId}
             onChange={(e) => (e.target.value === ADD_PLACE ? setAddPlace(true) : (setAddPlace(false), setLocationId(e.target.value)))}
@@ -186,16 +245,18 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
             {customerId && <option value={ADD_PLACE}>＋ Add an address…</option>}
           </Select>
         </Field>
-        <Field label="Piano">
-          <Select
-            aria-label="Piano" disabled={!customerId} value={addPiano ? ADD_PIANO : pianoId}
-            onChange={(e) => (e.target.value === ADD_PIANO ? setAddPiano(true) : (setAddPiano(false), setPianoId(e.target.value)))}
-          >
-            <option value="">{customerId ? "No piano linked" : "Pick a customer first"}</option>
-            {places.pianos.map((p) => <option key={p.id} value={p.id}>{p.label} ({p.type})</option>)}
-            {customerId && <option value={ADD_PIANO}>＋ Add a piano…</option>}
-          </Select>
-        </Field>
+        {!isSale && (
+          <Field label="Piano" hint={needsPiano && customerId ? "Required — pick one or add a new piano" : undefined}>
+            <Select
+              aria-label="Piano" aria-required={!isBatch} disabled={!customerId} value={addPiano ? ADD_PIANO : pianoId}
+              onChange={(e) => (e.target.value === ADD_PIANO ? setAddPiano(true) : (setAddPiano(false), setPianoId(e.target.value)))}
+            >
+              <option value="">{customerId ? (isBatch ? "No piano (trip / batch)" : "Choose a piano…") : "Pick a customer first"}</option>
+              {places.pianos.map((p) => <option key={p.id} value={p.id}>{p.label} ({p.type})</option>)}
+              {customerId && <option value={ADD_PIANO}>＋ Add a piano…</option>}
+            </Select>
+          </Field>
+        )}
       </div>
 
       {addPlace && (
@@ -214,18 +275,40 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
               {["Upright", "Grand", "Digital", "Organ"].map((t) => <option key={t}>{t}</option>)}
             </Select>
           </Field>
+          <Field label="Last tuned (optional)" hint="Starts the recall clock">
+            <DateField kind="date" value={piano.lastTuned} onChange={(v) => setPiano({ ...piano, lastTuned: v })} />
+          </Field>
         </InlineBox>
       )}
 
-      <Field label="Job title"><TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Standard tuning — Yamaha U1" /></Field>
+      <Field label="Job title" hint={isSale ? "Leave blank to use “Piano sale — brand model”" : undefined}>
+        <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isSale ? "e.g. Yamaha C3 — Santos family" : "e.g. Standard tuning — Yamaha U1"} />
+      </Field>
+
+      {isSale && (
+        <fieldset className="rounded-xl p-3.5 space-y-3" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
+          <legend className="px-1.5 text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>The sale</legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Sale price"><PesoInput value={salePrice} onChange={(v) => { setSalePrice(v); setPriceTouched(true); }} placeholder="e.g. 180,000" /></Field>
+            <Field label="Deposit received" hint="Balance = price − deposit, collected at delivery"><PesoInput value={deposit} onChange={setDeposit} placeholder="e.g. 20,000" /></Field>
+            <Field label="Buy cost" hint={showroomPick && showroomPick.stockCents > 0 ? `From stock expenses: ${peso(showroomPick.stockCents)}` : "What the piano cost you"}>
+              <PesoInput value={buyCost} onChange={(v) => { setBuyCost(v); setBuyCostTouched(true); }} placeholder="e.g. 70,000" />
+            </Field>
+            <Field label="Prep costs" hint="Restoration, tuning, delivery"><PesoInput value={prepCost} onChange={setPrepCost} placeholder="e.g. 8,000" /></Field>
+          </div>
+          {moneyBad && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>Use numbers like 12,500.</p>}
+        </fieldset>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="Service type">
-          <Select value={serviceType} onChange={(e) => { setServiceType(e.target.value); if (!minutesTouched) setMinutes(String(serviceTypeMinutes(e.target.value))); }}>
-            {SERVICE_TYPES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Technician">
+        {!isSale && (
+          <Field label="Service type">
+            <Select value={serviceType} onChange={(e) => { setServiceType(e.target.value); if (!minutesTouched) setMinutes(String(serviceTypeMinutes(e.target.value))); }}>
+              {SERVICE_TYPES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </Select>
+          </Field>
+        )}
+        <Field label={isSale ? "Delivery crew" : "Technician"}>
           <Select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
             <option value="">Unassigned</option>
             {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -239,15 +322,17 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="Scheduled start" hint="Manila time">
+        <Field label={isSale ? "Delivery date & time" : "Scheduled start"} hint="Manila time">
           <DateField kind="datetime-local" value={start} onChange={setStart} />
         </Field>
         <Field label="Duration">
           <UnitInput type="number" inputMode="numeric" min={15} step={15} suffix="min" value={minutes} onChange={(e) => { setMinutes(e.target.value); setMinutesTouched(true); }} />
         </Field>
-        <Field label="Travel fee">
-          <PesoInput value={travelFee} onChange={setTravelFee} placeholder="e.g. 300" />
-        </Field>
+        {!isSale && (
+          <Field label="Travel fee">
+            <PesoInput value={travelFee} onChange={setTravelFee} placeholder="e.g. 300" />
+          </Field>
+        )}
       </div>
 
       <Field label="Notes (visible to client)"><TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Please bring the stool; gate code 1234" /></Field>
@@ -255,8 +340,8 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, initial, 
 
       <div className="flex justify-end gap-2 pt-2">
         <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
-        <PrimaryButton pending={pending} disabled={!customerId} onClick={submit} className="!min-h-11">
-          {mode === "new" ? "Create job" : "Save changes"}
+        <PrimaryButton pending={pending} disabled={!customerId || needsPiano || needsSalePiano || moneyBad} onClick={submit} className="!min-h-11">
+          {mode === "new" ? (isSale ? "Create sale" : "Create job") : "Save changes"}
         </PrimaryButton>
       </div>
     </div>
@@ -268,7 +353,7 @@ function InlineBox({
 }: { children: React.ReactNode; onCancel: () => void; onSave: () => void; busy: boolean; err: string | null; saveLabel: string; canSave: boolean }) {
   return (
     <div className="rounded-xl p-3 space-y-2.5" style={{ background: "var(--color-svc-surface-2)" }}>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">{children}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">{children}</div>
       <ErrorLine>{err}</ErrorLine>
       <div className="flex gap-2">
         <GhostButton onClick={onCancel} className="inline-flex items-center gap-1 !min-h-10"><X size={13} /> Cancel</GhostButton>

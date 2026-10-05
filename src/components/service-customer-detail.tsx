@@ -15,7 +15,7 @@ import type { CustomerDetail } from "@/server/service-data";
 import {
   archiveCustomer, createJob, updateCustomer, createLocation, deleteLocation, createPiano, updatePiano, deletePiano,
 } from "@/server/service";
-import { JobFormModal } from "@/components/service-forms";
+import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import { CustomerSheet } from "@/components/service-customers";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard, StatCard, SvcModal, TextInput, TONE_TEXT,
@@ -25,12 +25,13 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 
 export default function CustomerDetailClient({
-  detail, invoicePrefix, jobPrefix, technicians, canSeeMoney,
+  detail, invoicePrefix, jobPrefix, technicians, showroomPianos, canSeeMoney,
 }: {
   detail: CustomerDetail;
   invoicePrefix: string;
   jobPrefix: string;
   technicians: { id: string; name: string }[];
+  showroomPianos: ShowroomPiano[];
   /** Billing figures are finance data — hidden from non-owner roles. */
   canSeeMoney: boolean;
 }) {
@@ -225,7 +226,8 @@ export default function CustomerDetailClient({
         mode="new"
         onClose={() => setNewJob(false)}
         pending={pending}
-        customers={[{ id: customer.id, name: customer.name }]}
+        customers={[{ id: customer.id, name: customer.name, isBatch: isBatchCustomer(customer.tags, customer.name) }]}
+        showroomPianos={showroomPianos}
         technicians={technicians}
         initial={{ customerId: customer.id }}
         onSubmit={(values) => run(() => createJob(values))}

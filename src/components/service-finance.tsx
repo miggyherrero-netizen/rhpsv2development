@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { LineChart, TrendingUp, Wallet2, Receipt, Gauge, FileClock } from "lucide-react";
-import { peso } from "@/lib/format";
+import { fmtDate, peso } from "@/lib/format";
 import { EXPENSE_CATEGORY_LABEL } from "@/lib/service";
 import { RANGES, chartScale, compactPeso } from "@/lib/service-reports";
 import type { FinanceReport } from "@/server/service-data";
@@ -99,6 +99,40 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
           {split.stockOnHandCents > 0 ? <> · <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.stockOnHandCents)}</b> tied up in unsold piano stock (not counted until sold)</> : null}
         </p>
       </section>
+
+      {report.pianoSales.length > 0 && (
+        <SectionCard title={`Piano sales · profit per piano · ${range.label.toLowerCase()}`}>
+          <div className="overflow-x-auto thin-scroll">
+            <table className="w-full text-left">
+              <thead>
+                <tr style={{ color: "var(--color-svc-text-faint)" }}>
+                  {["Piano", "Buyer", "Sold", "Price", "Cost", "Profit"].map((h) => (
+                    <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="svc-divide">
+                {report.pianoSales.map((r) => (
+                  <tr key={r.jobId}>
+                    <td className="px-5 py-2.5 text-[13px]">
+                      <Link href={`/service/jobs/${r.jobId}`} className="inline-flex items-center min-h-11 hover:underline" style={{ color: "var(--color-svc-text)" }}>{r.pianoLabel ?? r.title}</Link>
+                    </td>
+                    <td className="px-5 py-2.5 text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>{r.customerName}</td>
+                    <td className="px-5 py-2.5 text-[12.5px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(new Date(r.soldAt))}</td>
+                    <td className="px-5 py-2.5"><Money cents={r.priceCents} className="text-[13px]" /></td>
+                    <td className="px-5 py-2.5"><Money cents={r.costCents} className="text-[13px]" /></td>
+                    <td className="px-5 py-2.5 whitespace-nowrap">
+                      <span className="svc-num text-[13px]" style={{ color: r.profitCents >= 0 ? "var(--color-svc-success)" : "var(--color-svc-danger)" }}>
+                        {peso(r.profitCents)} · {r.marginPct}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
 
       <section aria-labelledby="fin-now" className="space-y-2.5">
         <h2 id="fin-now" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>

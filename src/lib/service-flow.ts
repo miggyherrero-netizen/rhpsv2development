@@ -15,10 +15,11 @@ export type StepKey =
 
 export type NextStep = { key: StepKey; label: string; hint: string };
 
-export type StepContext = { hasLineItems: boolean; hasInvoice: boolean; hasSchedule: boolean };
+export type StepContext = { hasLineItems: boolean; hasInvoice: boolean; hasSchedule: boolean; /** A piano sale: no quote or invoice step, and its own wording. */ isSale?: boolean };
 
 /** The single primary button in a job header. `null` = nothing left to do (paid). */
 export function nextJobStep(status: string, ctx: StepContext): NextStep | null {
+  if (ctx.isSale) return nextSaleStep(status, ctx);
   switch (status) {
     case "lead":
       if (ctx.hasLineItems) return { key: "send_quote", label: "Send quote", hint: "Marks the job as quoted and opens the quote to share" };
@@ -48,6 +49,26 @@ export function nextJobStep(status: string, ctx: StepContext): NextStep | null {
       return { key: "reopen", label: "Reopen job", hint: "Back to lead" };
     default:
       return null; // paid
+  }
+}
+
+/** A piano sale: schedule the delivery, go, deliver, complete (balance collected). Completed is the end. */
+function nextSaleStep(status: string, ctx: StepContext): NextStep | null {
+  switch (status) {
+    case "lead": case "quoted": case "scheduled":
+      return ctx.hasSchedule
+        ? { key: "start_travel", label: "Out for delivery", hint: "Starts the delivery clock" }
+        : { key: "schedule", label: "Schedule delivery", hint: "Pick the delivery date and crew" };
+    case "en_route":
+      return { key: "arrive", label: "Delivered", hint: "At the customer's place — stops travel, starts on-site time" };
+    case "in_progress":
+      return { key: "complete", label: "Complete sale", hint: "Balance collected — closes the sale and counts it in profit" };
+    case "on_hold":
+      return { key: "resume", label: "Resume", hint: "Back to scheduled" };
+    case "cancelled":
+      return { key: "reopen", label: "Reopen sale", hint: "Back to lead" };
+    default:
+      return null; // completed / invoiced / paid: sold
   }
 }
 

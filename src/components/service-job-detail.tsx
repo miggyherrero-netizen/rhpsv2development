@@ -15,7 +15,7 @@ import {
 } from "@/lib/service";
 import { countable } from "@/lib/service-reports";
 import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
-import { ExpenseFormModal, JobFormModal, TimeEditModal } from "@/components/service-forms";
+import { ExpenseFormModal, JobFormModal, TimeEditModal, type ShowroomPiano } from "@/components/service-forms";
 import { timeSourceLabel } from "@/lib/service-time-events";
 import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
 import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
@@ -32,6 +32,7 @@ import {
 
 export default function JobDetailClient({
   detail: initialDetail,
+  showroomPianos,
   jobPrefix,
   taxRateBps,
   taxLabel,
@@ -41,6 +42,7 @@ export default function JobDetailClient({
   showJobMargins,
 }: {
   detail: JobDetail;
+  showroomPianos: ShowroomPiano[];
   jobPrefix: string;
   taxRateBps: number;
   taxLabel: string;
@@ -128,7 +130,8 @@ export default function JobDetailClient({
 
   // One primary "next step" instead of a free status dropdown; every status stays reachable under More.
   const liveInvoice = detail.invoices.find((i) => !i.voidedAt) ?? null;
-  const step = nextJobStep(job.status, { hasLineItems: detail.items.length > 0, hasInvoice: !!liveInvoice, hasSchedule: !!job.scheduledStart });
+  const isSale = job.jobType === "sale";
+  const step = nextJobStep(job.status, { hasLineItems: detail.items.length > 0, hasInvoice: !!liveInvoice, hasSchedule: !!job.scheduledStart, isSale });
   const onStep = () => {
     if (!step) return;
     if (step.key === "schedule") return setEditOpen(true);
@@ -142,7 +145,7 @@ export default function JobDetailClient({
     });
   };
   const moreItems: MoreItem[] = [
-    ...(detail.items.length > 0 ? [{ label: "Open quote document", href: `/service/jobs/${job.id}/quote`, icon: <FileText size={14} /> }] : []),
+    ...(!isSale && detail.items.length > 0 ? [{ label: "Open quote document", href: `/service/jobs/${job.id}/quote`, icon: <FileText size={14} /> }] : []),
     ...(job.status === "scheduled" || job.status === "en_route" || job.status === "in_progress"
       ? [{ label: "Put on hold", onSelect: () => run(() => setJobStatus(job.id, "on_hold")), icon: <PauseCircle size={14} /> }] : []),
     ...JOB_STATUSES.filter((s) => s.key !== job.status && s.key !== "on_hold").map((s) => ({
@@ -186,7 +189,7 @@ export default function JobDetailClient({
                 {step.label} <ArrowRight size={15} />
               </PrimaryButton>
             ) : (
-              <Chip tone="success">Paid — nothing left to do</Chip>
+              <Chip tone="success">{isSale ? "Sold — nothing left to do" : "Paid — nothing left to do"}</Chip>
             )}
             <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10">
               <Pencil size={13} /> Edit
@@ -293,6 +296,43 @@ export default function JobDetailClient({
             </div>
           </SectionCard>
 
+          {isSale && detail.sale && (
+            <SectionCard
+              title="Piano sale"
+              action={<GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10"><Pencil size={13} /> Edit sale</GhostButton>}
+            >
+              <div className="px-5 py-4 space-y-2.5 text-[13px]">
+                <Row label="Piano"><span style={{ color: "var(--color-svc-text)" }}>{detail.sale.pianoLabel ?? "Not chosen yet"}</span></Row>
+                <Row label="Sale price"><Money cents={job.salePriceCents} /></Row>
+                <Row label="Deposit received"><Money cents={job.depositCents} /></Row>
+                <Row label={["completed", "invoiced", "paid"].includes(job.status) ? "Balance" : "Balance due on delivery"} strong>
+                  {detail.sale.balanceCents > 0 ? <Money cents={detail.sale.balanceCents} /> : <span style={{ color: "var(--color-svc-success)" }}>Settled</span>}
+                </Row>
+                {showJobMargins ? (
+                  <div className="pt-3 space-y-2.5" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+                    <Row label="Buy cost"><Money cents={job.buyCostCents} /></Row>
+                    <Row label="Prep costs"><Money cents={job.prepCostCents} /></Row>
+                    {detail.sale.stockExpensesCents > job.buyCostCents ? (
+                      <p className="text-[12px]" style={{ color: "var(--color-svc-warn)" }}>
+                        Stock expenses on this piano total {peso(detail.sale.stockExpensesCents)} — more than the buy cost above, so profit uses that figure.
+                      </p>
+                    ) : null}
+                    <Row label="Profit on this piano" strong>
+                      <span style={{ color: detail.sale.profit.profitCents >= 0 ? "var(--color-svc-success)" : "var(--color-svc-danger)" }}>
+                        <Money cents={detail.sale.profit.profitCents} /> · {detail.sale.profit.marginPct}%
+                      </span>
+                    </Row>
+                    <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                      Counted in Finance once the sale is completed.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </SectionCard>
+          )}
+
+          {!isSale && (
+            <>
           {/* Line items: always-editable rows + an empty row at the bottom; every edit autosaves. */}
           <SectionCard title="Quote lines">
             <div className="pt-3 pb-1">
@@ -317,6 +357,8 @@ export default function JobDetailClient({
               <Row label="Total" strong><Money cents={totals.totalCents} /></Row>
             </div>
           </SectionCard>
+            </>
+          )}
 
           {/* Time log */}
           <SectionCard
@@ -457,6 +499,8 @@ export default function JobDetailClient({
 
         {/* Side column */}
         <div className="space-y-5">
+          {!isSale && (
+            <>
           <SectionCard title="Invoicing">
             <div className="px-5 py-4 space-y-3">
               <Row label="Quoted (pre-VAT)"><Money cents={job.quotedCents} /></Row>
@@ -498,8 +542,10 @@ export default function JobDetailClient({
               )}
             </div>
           </SectionCard>
+            </>
+          )}
 
-          {showJobMargins ? (
+          {showJobMargins && !isSale ? (
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
               <StatCard
@@ -573,6 +619,7 @@ export default function JobDetailClient({
         onClose={() => setEditOpen(false)}
         pending={pending}
         customers={detail.customers}
+        showroomPianos={showroomPianos}
         technicians={detail.technicians.filter((t) => t.active || t.id === job.technicianId).map((t) => ({ id: t.id, name: t.name }))}
         initial={{
           customerId: job.customerId, locationId: job.locationId, pianoId: job.pianoId, technicianId: job.technicianId,
@@ -580,6 +627,8 @@ export default function JobDetailClient({
           scheduledStart: job.scheduledStart ? toLocalInput(new Date(job.scheduledStart)).slice(0, 16) : "",
           estimatedMinutes: job.estimatedMinutes, travelFee: job.travelFeeCents / 100,
           notes: job.notes ?? "", privateNotes: job.privateNotes ?? "",
+          jobType: job.jobType, salePianoId: job.salePianoId,
+          buyCost: job.buyCostCents / 100, prepCost: job.prepCostCents / 100, salePrice: job.salePriceCents / 100, deposit: job.depositCents / 100,
         }}
         onSubmit={(values) => run(() => updateJob(job.id, values))}
       />

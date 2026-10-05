@@ -29,6 +29,8 @@ import {
 import { partsCostFromLines } from "@/lib/service-lines";
 import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
+import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
+import { isBatchCustomer } from "@/lib/service-reports";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -220,7 +222,8 @@ export async function createPiano(input: PianoInput): Promise<Result<{ id: strin
       conditionNotes: str(input.conditionNotes, 2_000),
       lastServiceAt: optionalDate(input.lastServiceAt),
       tuningIntervalMonths: Math.max(1, intOr(input.tuningIntervalMonths, 6)),
-      nextServiceDueAt: optionalDate(input.nextServiceDueAt),
+      // Recalls run off last tuning + interval, so a piano with a known last tuning is due-dated straight away.
+      nextServiceDueAt: optionalDate(input.nextServiceDueAt) ?? recallDueDate(optionalDate(input.lastServiceAt), Math.max(1, intOr(input.tuningIntervalMonths, 6))),
       notes: str(input.notes, 2_000),
     })
     .returning({ id: servicePianos.id });
@@ -406,21 +409,66 @@ export type JobInput = {
   scheduledStart?: string | null; scheduledEnd?: string | null;
   estimatedMinutes?: number; travelMinutes?: number; travelFee?: number;
   notes?: string | null; privateNotes?: string | null;
+  /** "service" (default) or "sale" (a showroom piano being sold). */
+  jobType?: string | null;
+  /** Sale only. Pesos. */
+  salePianoId?: string | null; buyCost?: number; prepCost?: number; salePrice?: number; deposit?: number;
 };
+
+/** The sale fields from a form, validated: the piano must be one in the showroom list. */
+async function saleFields(input: JobInput): Promise<
+  { ok: true; salePianoId: string; buyCostCents: number; prepCostCents: number; salePriceCents: number; depositCents: number; pianoLabel: string }
+  | { ok: false; error: string }
+> {
+  const pianoId = str(input.salePianoId);
+  if (!pianoId) return { ok: false, error: "Choose the piano being sold." };
+  const [piano] = await db.select({ id: pianos.id, brand: pianos.brand, model: pianos.model }).from(pianos).where(eq(pianos.id, pianoId)).limit(1);
+  if (!piano) return { ok: false, error: "That piano is no longer in the showroom list." };
+  return {
+    ok: true, salePianoId: piano.id, pianoLabel: `${piano.brand} ${piano.model}`,
+    buyCostCents: Math.max(0, moneyToCents(input.buyCost)), prepCostCents: Math.max(0, moneyToCents(input.prepCost)),
+    salePriceCents: Math.max(0, moneyToCents(input.salePrice)), depositCents: Math.max(0, moneyToCents(input.deposit)),
+  };
+}
 
 export async function createJob(input: JobInput): Promise<Result<{ id: string }>> {
   await requireUser();
-  const title = str(input.title, 200) || "Home service visit";
   if (!input.customerId) return fail("Pick a customer for this job.");
+  const [customer] = await db.select({ name: serviceCustomers.name, tags: serviceCustomers.tags }).from(serviceCustomers).where(eq(serviceCustomers.id, input.customerId)).limit(1);
+  if (!customer) return fail("That customer no longer exists.");
+  const jobType = input.jobType === "sale" ? "sale" : "service";
+  let title = str(input.title, 200) || (jobType === "sale" ? "Piano sale" : "Home service visit");
+
+  let sale: Awaited<ReturnType<typeof saleFields>> | null = null;
+  let pianoId = str(input.pianoId) || null;
+  if (jobType === "sale") {
+    sale = await saleFields(input);
+    if (!sale.ok) return fail(sale.error);
+    if (!str(input.title, 200)) title = `Piano sale — ${sale.pianoLabel}`;
+    pianoId = null;
+  } else {
+    if (!pianoId && pianoRequired({ jobType, customerIsBatch: isBatchCustomer(customer.tags, customer.name) })) {
+      return fail("Choose the customer's piano — or add a new one — so tuning history and recalls stay accurate.");
+    }
+    if (pianoId) {
+      const [owned] = await db.select({ id: servicePianos.id }).from(servicePianos).where(and(eq(servicePianos.id, pianoId), eq(servicePianos.customerId, input.customerId))).limit(1);
+      if (!owned) return fail("That piano belongs to a different customer.");
+    }
+  }
   const [row] = await db
     .insert(serviceJobs)
     .values({
+      jobType,
+      ...(sale && sale.ok ? {
+        salePianoId: sale.salePianoId, buyCostCents: sale.buyCostCents, prepCostCents: sale.prepCostCents,
+        salePriceCents: sale.salePriceCents, depositCents: sale.depositCents,
+      } : {}),
       customerId: input.customerId,
       locationId: str(input.locationId) || null,
-      pianoId: str(input.pianoId) || null,
+      pianoId,
       technicianId: str(input.technicianId) || null,
       title,
-      serviceType: oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
+      serviceType: jobType === "sale" ? "delivery" : oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
       status: oneOf(input.status, JOB_STATUSES.map((s) => s.key), "lead"),
       priority: oneOf(input.priority, ["low", "normal", "high", "urgent"], "normal"),
       scheduledStart: optionalDate(input.scheduledStart),
@@ -436,7 +484,7 @@ export async function createJob(input: JobInput): Promise<Result<{ id: string }>
   await db.insert(serviceJobEvents).values({
     jobId: row!.id,
     type: "created",
-    message: "Job created",
+    message: jobType === "sale" ? "Piano sale created" : "Job created",
     actorName: "Owner",
   });
   touch();
@@ -459,6 +507,19 @@ export async function updateJob(id: string, patch: Partial<JobInput>): Promise<R
   if (patch.travelFee !== undefined) next.travelFeeCents = Math.max(0, moneyToCents(patch.travelFee));
   if (patch.notes !== undefined) next.notes = str(patch.notes, 4_000);
   if (patch.privateNotes !== undefined) next.privateNotes = str(patch.privateNotes, 4_000);
+  const [current] = await db.select({ jobType: serviceJobs.jobType }).from(serviceJobs).where(eq(serviceJobs.id, id)).limit(1);
+  if (!current) return fail("Job not found.");
+  if (current.jobType === "sale") {
+    if (patch.salePianoId !== undefined) {
+      const sale = await saleFields({ ...patch, customerId: "", title: "" } as JobInput);
+      if (!sale.ok) return fail(sale.error);
+      next.salePianoId = sale.salePianoId;
+    }
+    if (patch.buyCost !== undefined) next.buyCostCents = Math.max(0, moneyToCents(patch.buyCost));
+    if (patch.prepCost !== undefined) next.prepCostCents = Math.max(0, moneyToCents(patch.prepCost));
+    if (patch.salePrice !== undefined) next.salePriceCents = Math.max(0, moneyToCents(patch.salePrice));
+    if (patch.deposit !== undefined) next.depositCents = Math.max(0, moneyToCents(patch.deposit));
+  }
   if (patch.scheduledStart !== undefined) {
     const start = optionalDate(patch.scheduledStart);
     next.scheduledStart = start;
@@ -632,8 +693,12 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
     const [invoice] = await tx.select({ id: serviceInvoices.id }).from(serviceInvoices)
       .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1);
     // Only the step the job is actually on may run.
-    const expected = nextJobStep(job.status, { hasLineItems: (items?.n ?? 0) > 0, hasInvoice: !!invoice, hasSchedule: !!job.scheduledStart });
+    const expected = nextJobStep(job.status, { hasLineItems: (items?.n ?? 0) > 0, hasInvoice: !!invoice, hasSchedule: !!job.scheduledStart, isSale: job.jobType === "sale" });
     if (expected?.key !== step) return fail("This job has moved on — refresh to see the next step.");
+    if (job.jobType === "sale" && step === "complete") {
+      const notReady = saleReadyToComplete({ salePianoId: job.salePianoId, salePriceCents: job.salePriceCents });
+      if (notReady) return fail(notReady);
+    }
 
     const now = new Date();
     if (effect.startTimer && (await technicianBusyElsewhere(tx, job.technicianId, jobId))) {
@@ -722,13 +787,13 @@ export async function recalcJobLabor(jobId: string): Promise<void> {
 /** After a tuning/maintenance visit, roll the piano's next-service date forward. */
 async function advanceRecall(jobId: string): Promise<void> {
   const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
-  if (!job?.pianoId) return;
+  if (!job?.pianoId || job.jobType !== "service") return;
+  // Only a tuning-type visit counts as "last tuned"; a repair or assessment leaves the recall date alone.
+  if (!countsAsTuning(job.serviceType)) return;
   const [piano] = await db.select().from(servicePianos).where(eq(servicePianos.id, job.pianoId)).limit(1);
   if (!piano) return;
   const servedAt = job.completedAt ?? new Date();
-  const months = Math.max(1, piano.tuningIntervalMonths || 6);
-  const next = new Date(servedAt);
-  next.setUTCMonth(next.getUTCMonth() + months);
+  const next = recallDueDate(servedAt, piano.tuningIntervalMonths || 6)!;
   await db
     .update(servicePianos)
     .set({ lastServiceAt: servedAt, nextServiceDueAt: next, updatedAt: new Date() })
@@ -1083,6 +1148,7 @@ export async function createInvoiceFromJob(jobId: string, opts: { discountCents?
   const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
   if (!job) return fail("Job not found.");
   if (job.status === "cancelled") return fail("This job is cancelled — reopen it before invoicing.");
+  if (job.jobType === "sale") return fail("A piano sale is closed on the sale itself (price, deposit, balance) — it doesn't use an invoice.");
   // Double-click / second tab: hand back the invoice that already exists instead of billing twice.
   const [existing] = await db.select({ id: serviceInvoices.id }).from(serviceInvoices)
     .where(and(eq(serviceInvoices.jobId, jobId), isNull(serviceInvoices.voidedAt))).limit(1);

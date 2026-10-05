@@ -75,6 +75,14 @@ check("no travel fee -> items untouched", quoteLines(li, 0).length, 1);
 console.log("finance access");
 check("owner only", [canViewFinance({ role: "owner" }), canViewFinance({ role: "technician" }), canViewFinance({ role: null }), canViewFinance(null)], [true, false, false, false]);
 
+console.log("\npiano sale steps");
+const sale = { hasLineItems: false, hasInvoice: false, hasSchedule: true, isSale: true };
+check("sale with a delivery date goes out for delivery", nextJobStep("lead", sale)?.label, "Out for delivery");
+check("sale without a date asks for one", nextJobStep("lead", { ...sale, hasSchedule: false })?.key, "schedule");
+check("sale flow: delivery → delivered → complete sale", ["scheduled", "en_route", "in_progress"].map((st) => nextJobStep(st, sale)?.label), ["Out for delivery", "Delivered", "Complete sale"]);
+check("a completed sale has no invoice step (it is sold)", nextJobStep("completed", sale), null);
+check("sales skip the quote step even with lines", nextJobStep("lead", { ...sale, hasLineItems: true })?.key, "start_travel");
+
 console.log("\nall service flow checks passed");
 
 check("quote re-sent after acceptance shows Sent", quoteStatus("quoted", [{ type: "quote_accepted" }]), "sent");

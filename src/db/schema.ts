@@ -400,6 +400,9 @@ export const serviceCatalog = pgTable("service_catalog", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/** A home-service visit, or the sale of a showroom piano. */
+export const serviceJobType = pgEnum("service_job_type", ["service", "sale"]);
+
 export const serviceJobs = pgTable("service_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   /** Monotonic human-facing number; the displayed code is `${jobPrefix}-${year}-${padded}`. */
@@ -430,9 +433,20 @@ export const serviceJobs = pgTable("service_jobs", {
   invoicedAt: timestamp("invoiced_at", { mode: "date" }),
   cancelledAt: timestamp("cancelled_at", { mode: "date" }),
   cancelReason: text("cancel_reason"),
+  /** service (default) or sale. A sale's delivery date is `scheduledStart` and its delivery crew is `technicianId`. */
+  jobType: serviceJobType("job_type").notNull().default("service"),
+  /** Sale only: the showroom piano being sold (read from Piano Management; never changed from here). */
+  salePianoId: uuid("sale_piano_id").references(() => pianos.id, { onDelete: "set null" }),
+  buyCostCents: integer("buy_cost_cents").notNull().default(0),
+  prepCostCents: integer("prep_cost_cents").notNull().default(0),
+  salePriceCents: integer("sale_price_cents").notNull().default(0),
+  /** Deposit already received; balance = price − deposit until the sale is completed (collected at delivery). */
+  depositCents: integer("deposit_cents").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 }, (t) => ({
+  jobTypeIdx: index("service_jobs_job_type_idx").on(t.jobType),
+  salePianoIdx: index("service_jobs_sale_piano_idx").on(t.salePianoId),
   scheduledIdx: index("service_jobs_scheduled_idx").on(t.scheduledStart),
   statusIdx: index("service_jobs_status_idx").on(t.status),
   customerIdx: index("service_jobs_customer_idx").on(t.customerId),
