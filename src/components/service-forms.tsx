@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
-import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, serviceTypeMinutes } from "@/lib/service";
+import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
 import { EXPENSE_KINDS, defaultKindForCategory } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
@@ -416,6 +416,60 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
           }}
         >
           Add expense
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ time entry edit */
+
+export type TimeEditValues = { kind: string; startedAt: string; endedAt: string | null; note: string };
+
+/** Fix a time entry by hand (forgot to tap Arrived, left a timer running). An edited status-derived entry stops following the status events. */
+export function TimeEditModal(props: {
+  open: boolean; onClose: () => void; pending: boolean;
+  log: { id: string; kind: string; startedAt: Date | string; endedAt: Date | string | null; note: string | null; fromStatus: boolean } | null;
+  onSubmit: (id: string, values: TimeEditValues) => void;
+}) {
+  return (
+    <SvcModal open={props.open} onClose={props.onClose} title="Edit time entry">
+      {props.open && props.log && <TimeEditBody {...props} log={props.log} />}
+    </SvcModal>
+  );
+}
+
+function TimeEditBody({ onClose, pending, log, onSubmit }: { onClose: () => void; pending: boolean; log: NonNullable<Parameters<typeof TimeEditModal>[0]["log"]>; onSubmit: (id: string, v: TimeEditValues) => void }) {
+  const [kind, setKind] = useState(log.kind);
+  const [start, setStart] = useState(() => manilaDateTimeLocal(new Date(log.startedAt)));
+  const [end, setEnd] = useState(() => (log.endedAt ? manilaDateTimeLocal(new Date(log.endedAt)) : ""));
+  const [note, setNote] = useState(log.note ?? "");
+  const bad = !!start && !!end && new Date(`${end}:00+08:00`) <= new Date(`${start}:00+08:00`);
+  return (
+    <div className="space-y-3.5">
+      {log.fromStatus && (
+        <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+          This entry came from the status buttons. Once you change it, it is yours — later status taps won&apos;t move it.
+        </p>
+      )}
+      <Field label="Type">
+        <Select value={kind} onChange={(e) => setKind(e.target.value)}>
+          {TIME_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+        </Select>
+      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Start"><DateField kind="datetime-local" value={start} onChange={setStart} /></Field>
+        <Field label="End" hint={log.endedAt ? undefined : "Leave empty to keep it running"}><DateField kind="datetime-local" value={end} onChange={setEnd} /></Field>
+      </div>
+      {bad && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>End time must be after the start time.</p>}
+      <Field label="Note"><TextInput value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+      <div className="flex justify-end gap-2 pt-2">
+        <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
+        <PrimaryButton
+          pending={pending} disabled={!start || bad} className="!min-h-11"
+          onClick={() => { onSubmit(log.id, { kind, startedAt: start, endedAt: end || null, note }); onClose(); }}
+        >
+          Save changes
         </PrimaryButton>
       </div>
     </div>

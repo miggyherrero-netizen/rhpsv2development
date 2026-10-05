@@ -467,6 +467,8 @@ export const serviceJobEvents = pgTable("service_job_events", {
     .notNull()
     .references(() => serviceJobs.id, { onDelete: "cascade" }),
   type: text("type").notNull().default("note"),
+  /** The job status this event moved the job into (null for notes, payments, …). Time entries are derived from these. */
+  status: text("status"),
   message: text("message"),
   actorName: text("actor_name"),
   at: timestamp("at", { mode: "date" }).defaultNow().notNull(),
@@ -488,9 +490,14 @@ export const serviceTimeLogs = pgTable("service_time_logs", {
   billable: boolean("billable").notNull().default(true),
   hourlyRateCents: integer("hourly_rate_cents").notNull().default(0), // snapshot for labor costing
   note: text("note"),
+  /** event = derived from job status events · timer = started with a timer button · manual = typed in or edited by hand. */
+  source: text("source").notNull().default("timer"),
+  /** The status event that opened this entry (event-derived entries only). */
+  startEventId: uuid("start_event_id").references(() => serviceJobEvents.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 }, (t) => ({
   jobIdx: index("service_time_logs_job_idx").on(t.jobId),
+  startEventIdx: uniqueIndex("service_time_logs_start_event_idx").on(t.startEventId).where(sql`"start_event_id" IS NOT NULL`),
   techStartIdx: index("service_time_logs_tech_start_idx").on(t.technicianId, t.startedAt),
   /** At most one running timer per technician — enforced by the database, not just the UI. */
   oneRunningIdx: uniqueIndex("service_time_logs_one_running_idx")

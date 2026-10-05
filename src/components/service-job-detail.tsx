@@ -15,13 +15,14 @@ import {
 } from "@/lib/service";
 import { countable } from "@/lib/service-reports";
 import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
-import { ExpenseFormModal, JobFormModal } from "@/components/service-forms";
+import { ExpenseFormModal, JobFormModal, TimeEditModal } from "@/components/service-forms";
+import { timeSourceLabel } from "@/lib/service-time-events";
 import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
 import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
 import type { JobDetail } from "@/server/service-data";
 import {
   advanceJob, updateJob, setJobStatus, addJobItems, updateJobItem, deleteJobItem, addJobNote, createCatalogItem,
-  startTimer, stopTimer, addManualTime, deleteTimeLog, createInvoiceFromJob, createExpense,
+  startTimer, stopTimer, addManualTime, updateTimeLog, deleteTimeLog, createInvoiceFromJob, createExpense,
   deleteExpense, deleteJob,
 } from "@/server/service";
 import {
@@ -55,6 +56,7 @@ export default function JobDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
+  const [editLogId, setEditLogId] = useState<string | null>(null);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -369,10 +371,11 @@ export default function JobDetailClient({
             ) : (
               <div className="svc-divide">
                 {detail.timeLogs.map((log) => (
-                  <div key={log.id} className="flex items-center gap-3 px-5 py-2.5 group">
+                  <div key={log.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 group">
                     <Chip tone={log.kind === "work" ? "azure" : log.kind === "travel" ? "violet" : "slate"}>
                       {TIME_KIND_LABEL[log.kind] ?? log.kind}
                     </Chip>
+                    <span className="text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</span>
                     <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
                       {fmtDate(new Date(log.startedAt))} {fmtTime(new Date(log.startedAt))}
                       {log.endedAt ? ` – ${fmtTime(new Date(log.endedAt))}` : " · running"}
@@ -384,6 +387,14 @@ export default function JobDetailClient({
                     <span className="text-[13px] tnum" style={{ color: "var(--color-svc-text)" }}>
                       {log.endedAt ? fmtMinutes(log.minutes) : fmtMinutes(elapsedMinutes(log.startedAt))}
                     </span>
+                    <button
+                      onClick={() => setEditLogId(log.id)}
+                      className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
+                      style={{ color: "var(--color-svc-text-faint)" }}
+                      aria-label="Edit time entry"
+                    >
+                      <Pencil size={13} />
+                    </button>
                     <button
                       onClick={() => run(() => deleteTimeLog(log.id))}
                       className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
@@ -571,6 +582,13 @@ export default function JobDetailClient({
           notes: job.notes ?? "", privateNotes: job.privateNotes ?? "",
         }}
         onSubmit={(values) => run(() => updateJob(job.id, values))}
+      />
+      <TimeEditModal
+        open={!!editLogId}
+        onClose={() => setEditLogId(null)}
+        pending={pending}
+        log={(() => { const l = detail.timeLogs.find((x) => x.id === editLogId); return l ? { id: l.id, kind: l.kind, startedAt: l.startedAt, endedAt: l.endedAt, note: l.note, fromStatus: l.source === "event" } : null; })()}
+        onSubmit={(id, v) => run(() => updateTimeLog(id, v))}
       />
       <ManualTimeModal
         open={timeOpen}

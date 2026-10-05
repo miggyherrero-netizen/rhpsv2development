@@ -7,7 +7,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/service-flow";
 import { partsCostFromLines } from "@/lib/service-lines";
 import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
+import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -511,50 +512,99 @@ export async function assignJob(id: string, technicianId: string | null): Promis
   return ok();
 }
 
+/* ---- status = time ---- */
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Exec = typeof db | Tx;
+
+/**
+ * Makes the stored time entries match what the job's status events say (see `deriveSegments`):
+ * a new Start travel / Arrived opens an entry, the next status closes it. Entries edited by hand are never overwritten,
+ * and only the entries the new event touches are written.
+ */
+async function syncEventTimeLogs(x: Exec, jobId: string, newEventId: string): Promise<void> {
+  const [job] = await x.select({ technicianId: serviceJobs.technicianId }).from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
+  if (!job) return;
+  const [events, existing] = await Promise.all([
+    x.select({ id: serviceJobEvents.id, status: serviceJobEvents.status, at: serviceJobEvents.at }).from(serviceJobEvents)
+      .where(and(eq(serviceJobEvents.jobId, jobId), isNotNull(serviceJobEvents.status))).orderBy(serviceJobEvents.at),
+    x.select({
+      id: serviceTimeLogs.id, startEventId: serviceTimeLogs.startEventId, source: serviceTimeLogs.source,
+      startedAt: serviceTimeLogs.startedAt, endedAt: serviceTimeLogs.endedAt, kind: serviceTimeLogs.kind,
+    }).from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, jobId), isNotNull(serviceTimeLogs.startEventId))),
+  ]);
+  // Only the segments this event opens or closes are touched, so an entry the owner deleted never comes back.
+  const touched = deriveSegments(events).filter((seg) => seg.startEventId === newEventId || seg.endEventId === newEventId);
+  const plan = planTimeSync(touched, existing);
+  if (!plan.inserts.length && !plan.updates.length) return;
+  const rate = job.technicianId
+    ? (await x.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1))[0]?.r ?? 0
+    : 0;
+  // Close first, then open: a technician may only have one running entry at a time.
+  for (const u of plan.updates) {
+    await x.update(serviceTimeLogs).set({ kind: u.kind, startedAt: u.startedAt, endedAt: u.endedAt, minutes: u.minutes }).where(eq(serviceTimeLogs.id, u.id));
+  }
+  for (const seg of plan.inserts) {
+    await x.insert(serviceTimeLogs).values({
+      jobId, technicianId: job.technicianId, kind: seg.kind, startedAt: seg.startedAt, endedAt: seg.endedAt,
+      minutes: segmentMinutes(seg), hourlyRateCents: rate, source: "event", startEventId: seg.startEventId,
+    });
+  }
+}
+
+/** Stops timers started by hand on this job (event-derived entries close themselves when the next status lands). */
+async function stopHandTimers(x: Exec, jobId: string, now: Date): Promise<void> {
+  const running = await x.select().from(serviceTimeLogs)
+    .where(and(eq(serviceTimeLogs.jobId, jobId), isNull(serviceTimeLogs.endedAt), ne(serviceTimeLogs.source, "event")));
+  for (const log of running) {
+    await x.update(serviceTimeLogs).set({ endedAt: now, minutes: elapsedMinutes(log.startedAt, now) }).where(eq(serviceTimeLogs.id, log.id));
+  }
+}
+
+/** A technician can only be on the clock for one job at a time (the database enforces it too). */
+async function technicianBusyElsewhere(x: Exec, technicianId: string | null, jobId: string): Promise<boolean> {
+  if (!technicianId) return false;
+  const [busy] = await x.select({ jobId: serviceTimeLogs.jobId }).from(serviceTimeLogs)
+    .where(and(eq(serviceTimeLogs.technicianId, technicianId), isNull(serviceTimeLogs.endedAt))).limit(1);
+  return !!busy && busy.jobId !== jobId;
+}
+
 /** Status changes carry the side effects that keep time, cost, and recall data honest. */
 export async function setJobStatus(id: string, status: string, note?: string): Promise<Result> {
   await requireUser();
   const next = oneOf(status, JOB_STATUSES.map((s) => s.key), "scheduled");
-  const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, id)).limit(1);
-  if (!job) return fail("Job not found.");
-
-  const patch: Record<string, unknown> = { status: next, updatedAt: new Date() };
-  const now = new Date();
-
-  if (next === "in_progress") {
-    patch.startedAt = job.startedAt ?? now;
-  }
-  if (next === "completed") {
-    patch.completedAt = job.completedAt ?? now;
-  }
-  if (next === "cancelled") {
-    patch.cancelledAt = now;
-    patch.cancelReason = str(note, 500);
-  }
-
-  await db.update(serviceJobs).set(patch).where(eq(serviceJobs.id, id));
-
-  // Leaving the field (done, paused, cancelled, billed) can't leave a timer running and cost accruing.
-  if (["completed", "cancelled", "on_hold", "invoiced", "paid"].includes(next)) {
-    const running = await db.select().from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, id), isNull(serviceTimeLogs.endedAt)));
-    for (const log of running) {
-      await db.update(serviceTimeLogs).set({ endedAt: now, minutes: elapsedMinutes(log.startedAt, now) }).where(eq(serviceTimeLogs.id, log.id));
+  const failure = await db.transaction(async (tx): Promise<string | null> => {
+    const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, id)).for("update").limit(1);
+    if (!job) return "Job not found.";
+    if ((next === "en_route" || next === "in_progress") && (await technicianBusyElsewhere(tx, job.technicianId, id))) {
+      return "That technician already has a timer running on another job — stop it first.";
     }
-    if (running.length) await recalcJobLabor(id);
-  }
-
-  if (next === "completed") {
-    await recalcJobLabor(id);
-    await recalcJobMoney(id);
-    await advanceRecall(id);
-  }
-
-  await db.insert(serviceJobEvents).values({
-    jobId: id,
-    type: next,
-    message: note ? str(note, 500) : `Status set to ${next.replace(/_/g, " ")}`,
-    actorName: "Owner",
+    const patch: Record<string, unknown> = { status: next, updatedAt: new Date() };
+    const now = new Date();
+    if (next === "en_route" || next === "in_progress") patch.startedAt = job.startedAt ?? now;
+    if (next === "completed") patch.completedAt = job.completedAt ?? now;
+    if (next === "cancelled") { patch.cancelledAt = now; patch.cancelReason = str(note, 500); }
+    await tx.update(serviceJobs).set(patch).where(eq(serviceJobs.id, id));
+    await stopHandTimers(tx, id, now);
+    const [event] = await tx.insert(serviceJobEvents).values({
+      jobId: id, type: next, status: next, at: now,
+      message: note ? str(note, 500) : `Status set to ${next.replace(/_/g, " ")}`,
+      actorName: "Owner",
+    }).returning({ id: serviceJobEvents.id });
+    await syncEventTimeLogs(tx, id, event!.id);
+    return null;
   });
+  if (failure) return fail(failure);
+
+  try {
+    await recalcJobLabor(id);
+    if (next === "completed") {
+      await recalcJobMoney(id);
+      await advanceRecall(id);
+    }
+  } catch (err) {
+    console.error("setJobStatus recalculation failed", id, err);
+  }
   touch();
   return ok();
 }
@@ -586,42 +636,30 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
     if (expected?.key !== step) return fail("This job has moved on — refresh to see the next step.");
 
     const now = new Date();
-    let rate = 0;
-    if (effect.startTimer && job.technicianId) {
-      const [busy] = await tx.select({ jobId: serviceTimeLogs.jobId }).from(serviceTimeLogs)
-        .where(and(eq(serviceTimeLogs.technicianId, job.technicianId), isNull(serviceTimeLogs.endedAt))).limit(1);
-      if (busy && busy.jobId !== jobId) return fail("That technician already has a timer running on another job — stop it first.");
-      const [tech] = await tx.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1);
-      rate = tech?.r ?? 0;
+    if (effect.startTimer && (await technicianBusyElsewhere(tx, job.technicianId, jobId))) {
+      return fail("That technician already has a timer running on another job — stop it first.");
     }
-    if (effect.stopTimers) {
-      const running = await tx.select().from(serviceTimeLogs).where(and(eq(serviceTimeLogs.jobId, jobId), isNull(serviceTimeLogs.endedAt)));
-      for (const log of running) {
-        await tx.update(serviceTimeLogs).set({ endedAt: now, minutes: elapsedMinutes(log.startedAt, now) }).where(eq(serviceTimeLogs.id, log.id));
-      }
-    }
-    if (effect.startTimer) {
-      await tx.insert(serviceTimeLogs).values({ jobId, technicianId: job.technicianId, kind: effect.startTimer, startedAt: now, hourlyRateCents: rate });
-    }
+    await stopHandTimers(tx, jobId, now);
     await tx.update(serviceJobs).set({
       status: effect.status,
       startedAt: effect.status === "en_route" || effect.status === "in_progress" ? job.startedAt ?? now : undefined,
       completedAt: effect.status === "completed" ? job.completedAt ?? now : undefined,
       updatedAt: now,
     }).where(eq(serviceJobs.id, jobId));
-    await tx.insert(serviceJobEvents).values({ jobId, type: effect.event.type, message: effect.event.message, actorName: "Owner" });
+    // The status event is the record; travel and on-site time are derived from it.
+    const [event] = await tx.insert(serviceJobEvents).values({ jobId, type: effect.event.type, status: effect.status, message: effect.event.message, at: now, actorName: "Owner" })
+      .returning({ id: serviceJobEvents.id });
+    await syncEventTimeLogs(tx, jobId, event!.id);
     return ok();
   });
   if (!outcome.ok) return outcome;
 
   // Derived totals are recomputed from the saved logs; a failure here must not hide that the step itself succeeded.
   try {
+    await recalcJobLabor(jobId);
     if (effect.status === "completed") {
-      await recalcJobLabor(jobId);
       await recalcJobMoney(jobId);
       await advanceRecall(jobId);
-    } else if (effect.stopTimers) {
-      await recalcJobLabor(jobId);
     }
   } catch (err) {
     console.error("advanceJob recalculation failed", jobId, err);
@@ -802,6 +840,31 @@ export async function startTimer(
   const nextKind = oneOf(kind, TIME_KINDS.map((k) => k.key), "work");
   const techId = str(technicianId) || null;
 
+  // Travel / on-site timers ARE status changes: the status event is recorded and the time entry follows from it.
+  if (nextKind === "travel" || nextKind === "work") {
+    const status = nextKind === "travel" ? "en_route" : "in_progress";
+    const failure = await db.transaction(async (tx): Promise<string | null> => {
+      const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).for("update").limit(1);
+      if (!job) return "Job not found.";
+      const tech = job.technicianId ?? techId;
+      if (!job.technicianId && tech) await tx.update(serviceJobs).set({ technicianId: tech }).where(eq(serviceJobs.id, jobId));
+      if (await technicianBusyElsewhere(tx, tech, jobId)) return "That technician already has a timer running on another job — stop it first.";
+      const now = new Date();
+      await stopHandTimers(tx, jobId, now);
+      await tx.update(serviceJobs).set({ status, startedAt: job.startedAt ?? now, updatedAt: now }).where(eq(serviceJobs.id, jobId));
+      const [event] = await tx.insert(serviceJobEvents).values({
+        jobId, type: status, status, at: now, actorName: "Owner",
+        message: nextKind === "travel" ? "Travel started" : "Work started",
+      }).returning({ id: serviceJobEvents.id });
+      await syncEventTimeLogs(tx, jobId, event!.id);
+      return null;
+    });
+    if (failure) return fail(failure);
+    await recalcJobLabor(jobId);
+    touch();
+    return ok();
+  }
+
   if (techId) {
     const [running] = await db
       .select({ id: serviceTimeLogs.id })
@@ -810,30 +873,14 @@ export async function startTimer(
       .limit(1);
     if (running) return fail("That technician already has a timer running — stop it first.");
   }
-
   const rate = techId
     ? (await db.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians)
         .where(eq(serviceTechnicians.id, techId)).limit(1))[0]?.r ?? 0
     : 0;
-
   await db.insert(serviceTimeLogs).values({
-    jobId,
-    technicianId: techId,
-    kind: nextKind,
-    startedAt: new Date(),
-    hourlyRateCents: rate,
+    jobId, technicianId: techId, kind: nextKind, startedAt: new Date(), hourlyRateCents: rate, source: "timer",
   });
-  await db.insert(serviceJobEvents).values({
-    jobId, type: nextKind === "travel" ? "en_route" : "started",
-    message: nextKind === "travel" ? "Travel started" : nextKind === "break" ? "Break started" : "Work started",
-    actorName: "Owner",
-  });
-  if (nextKind === "travel" || nextKind === "work") {
-    await db
-      .update(serviceJobs)
-      .set({ status: nextKind === "travel" ? "en_route" : "in_progress", startedAt: new Date(), updatedAt: new Date() })
-      .where(eq(serviceJobs.id, jobId));
-  }
+  await db.insert(serviceJobEvents).values({ jobId, type: "started", message: "Break started", actorName: "Owner" });
   touch();
   return ok();
 }
@@ -846,7 +893,8 @@ export async function stopTimer(logId: string): Promise<Result> {
   const endedAt = new Date();
   await db
     .update(serviceTimeLogs)
-    .set({ endedAt, minutes: elapsedMinutes(log.startedAt, endedAt) })
+    // Stopping a status-derived entry by hand detaches it, so the next status sync can't reopen or move it.
+    .set({ endedAt, minutes: elapsedMinutes(log.startedAt, endedAt), source: log.source === "event" ? "manual" : log.source })
     .where(eq(serviceTimeLogs.id, logId));
   await recalcJobLabor(log.jobId);
   touch();
@@ -876,8 +924,34 @@ export async function addManualTime(input: {
     minutes: elapsedMinutes(start, end),
     hourlyRateCents: rate,
     note: str(input.note, 500),
+    source: "manual",
   });
   await recalcJobLabor(input.jobId);
+  touch();
+  return ok();
+}
+
+/** Fixes a time entry by hand (forgot to tap Arrived, left a timer running…). An edited status-derived entry is detached from the events. */
+export async function updateTimeLog(
+  id: string,
+  patch: { kind?: string; startedAt?: string; endedAt?: string | null; note?: string | null },
+): Promise<Result> {
+  await requireUser();
+  const [log] = await db.select().from(serviceTimeLogs).where(eq(serviceTimeLogs.id, id)).limit(1);
+  if (!log) return fail("Time entry not found.");
+  const start = patch.startedAt !== undefined ? optionalDate(patch.startedAt) : log.startedAt;
+  const end = patch.endedAt !== undefined ? (patch.endedAt ? optionalDate(patch.endedAt) : null) : log.endedAt;
+  if (!start) return fail("Pick a start time.");
+  if (end && end <= start) return fail("End time must be after the start time.");
+  await db.update(serviceTimeLogs).set({
+    kind: patch.kind ? oneOf(patch.kind, TIME_KINDS.map((k) => k.key), log.kind) : undefined,
+    startedAt: start,
+    endedAt: end,
+    minutes: end ? elapsedMinutes(start, end) : null,
+    note: patch.note !== undefined ? str(patch.note, 500) : undefined,
+    source: log.source === "event" ? "manual" : undefined,
+  }).where(eq(serviceTimeLogs.id, id));
+  await recalcJobLabor(log.jobId);
   touch();
   return ok();
 }

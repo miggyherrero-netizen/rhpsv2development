@@ -2,11 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Timer, Square, Navigation, Play, Trash2 } from "lucide-react";
+import { Timer, Square, Navigation, Play, Trash2, Pencil } from "lucide-react";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { TIME_KIND_LABEL, fmtMinutes, elapsedMinutes, utilizationPct } from "@/lib/service";
 import type { TimeLogRow } from "@/server/service-data";
-import { stopTimer, deleteTimeLog } from "@/server/service";
+import { stopTimer, deleteTimeLog, updateTimeLog } from "@/server/service";
+import { TimeEditModal } from "@/components/service-forms";
+import { timeSourceLabel } from "@/lib/service-time-events";
 import {
   Bar, Chip, Dot, EmptyState, ErrorLine, FilterPills, GhostButton, Money, SectionCard,
   StatCard, TONE_TEXT,
@@ -30,6 +32,7 @@ export default function TimeClient({
   range: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const [editLogId, setEditLogId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
@@ -167,6 +170,7 @@ export default function TimeClient({
                         <Chip tone={log.kind === "work" ? "azure" : log.kind === "travel" ? "violet" : "slate"}>
                           {TIME_KIND_LABEL[log.kind] ?? log.kind}
                         </Chip>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</p>
                       </td>
                       <td className="px-5 py-2.5 text-[12px] tnum whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {fmtTime(new Date(log.startedAt))}
@@ -175,7 +179,15 @@ export default function TimeClient({
                       <td className="px-5 py-2.5 text-[13px] tnum" style={{ color: "var(--color-svc-text)" }}>
                         {log.endedAt ? fmtMinutes(log.minutes) : fmtMinutes(elapsedMinutes(log.startedAt))}
                       </td>
-                      <td className="px-5 py-2.5 text-right">
+                      <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setEditLogId(log.id)}
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
+                          style={{ color: "var(--color-svc-text-faint)" }}
+                          aria-label="Edit entry"
+                        >
+                          <Pencil size={13} />
+                        </button>
                         <button
                           onClick={() => run(() => deleteTimeLog(log.id))}
                           className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
@@ -225,9 +237,17 @@ export default function TimeClient({
       </div>
 
       <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
-        Tip: start a timer from <Link href="/service/today" className="inline-flex items-center min-h-11 px-1 hover:underline" style={{ color: TONE_TEXT.azure }}>Today</Link> so
-        travel and on-site minutes land on the right job.
+        Tip: tap Start travel / Arrived on <Link href="/service/today" className="inline-flex items-center min-h-11 px-1 hover:underline" style={{ color: TONE_TEXT.azure }}>Today</Link> — the
+        travel and on-site minutes fill in by themselves.
       </p>
+
+      <TimeEditModal
+        open={!!editLogId}
+        onClose={() => setEditLogId(null)}
+        pending={pending}
+        log={(() => { const l = logs.find((x) => x.id === editLogId); return l ? { id: l.id, kind: l.kind, startedAt: l.startedAt, endedAt: l.endedAt, note: l.note, fromStatus: l.source === "event" } : null; })()}
+        onSubmit={(id, v) => run(() => updateTimeLog(id, v))}
+      />
     </div>
   );
 }
