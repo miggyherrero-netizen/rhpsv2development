@@ -8,7 +8,7 @@ import { FALLBACK_PHONES, MESSENGER_URL } from "@/lib/site-config";
 
 /** Visible keyboard focus for every interactive element on the public site. */
 export const FOCUS_RING =
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold";
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky";
 
 const PH_MOBILE = /0\d{3}[\s-]?\d{3}[\s-]?\d{4}/g;
 
@@ -94,7 +94,7 @@ export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boo
     ["Voices", `${base}#voices`],
   ];
   return (
-    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "bg-gradient-to-b from-black/60 to-transparent"}`}>
+    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "bg-gradient-to-b from-coal/85 via-coal/45 to-transparent"}`}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <a href={home ? "#top" : "/"} className={`leading-none rounded-sm ${FOCUS_RING}`}>
           <span className="font-serif text-lg tracking-wide text-ink">HERRERO</span>

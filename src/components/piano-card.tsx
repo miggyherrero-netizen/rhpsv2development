@@ -27,6 +27,13 @@ function PianoPhoto({ piano, className = "" }: { piano: PublicPiano; className?:
   );
 }
 
+/** Availability pills in the public palette (sky = available, terracotta tint = reserved, warm grey = sold). Text on a dark scrim stays readable over any photo. */
+const STATUS_PILL: Record<string, string> = {
+  available: "bg-coal/75 text-sky border-sky/40",
+  reserved: "bg-coal/75 text-gold border-gold/45",
+  sold: "bg-coal/75 text-mist border-white/20",
+};
+
 /** The whole card is one control: it opens the instrument dialog. */
 export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g: ShowroomGroup) => void }) {
   const p = group.lead;
@@ -45,7 +52,7 @@ export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g:
     >
       <div className="relative overflow-hidden rounded-xl bg-parchment aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto piano={p} className="transition-transform duration-700 ease-out group-hover:scale-[1.045]" />
-        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border backdrop-blur-md ${st.cls}`}>
+        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border backdrop-blur-md ${STATUS_PILL[p.status] ?? STATUS_PILL.available}`}>
           {badge}
         </span>
       </div>
@@ -101,7 +108,7 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
     <div>
       <div className="relative rounded-xl overflow-hidden bg-paper aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto piano={selected} />
-        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border ${PIANO_STATUS[selected.status]?.cls}`}>
+        <span className={`absolute top-3 left-3 text-[10.5px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border ${STATUS_PILL[selected.status] ?? STATUS_PILL.available}`}>
           {PIANO_STATUS[selected.status]?.label}
         </span>
       </div>

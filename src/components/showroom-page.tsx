@@ -21,7 +21,7 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
   const units = shown.reduce((n, g) => n + g.units.length, 0);
 
   return (
-    <div className="bg-paper text-ink min-h-screen">
+    <div className="pub-theme bg-paper text-ink min-h-screen">
       <SiteHeader home={false} solid />
       <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-28 pb-24">
         <Link href="/" className={`inline-flex items-center gap-1.5 text-[12.5px] text-subtle hover:text-ink transition-colors rounded-sm ${FOCUS_RING}`}>
@@ -41,7 +41,7 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
                 filter === f.id ? "border-gold bg-gold text-onbrass font-medium" : "border-white/20 text-chrome hover:border-gold/60 hover:text-ink"
               }`}
             >
-              {f.label} <span className={filter === f.id ? "opacity-80" : "text-subtle"}>({counts[f.id]})</span>
+              {f.label} <span className={filter === f.id ? "opacity-90" : "text-subtle"}>({counts[f.id]})</span>
             </button>
           ))}
         </div>

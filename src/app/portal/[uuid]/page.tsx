@@ -15,7 +15,7 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
   const { project, updates } = data;
 
   return (
-    <div className="bg-paper text-ink min-h-screen">
+    <div className="pub-theme bg-paper text-ink min-h-screen">
       {/* header */}
       <header className="bg-coal text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-25">

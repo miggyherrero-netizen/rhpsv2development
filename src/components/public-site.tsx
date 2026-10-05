@@ -87,16 +87,16 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
   const availableCount = pianos.filter((p) => p.status === "available").length;
 
   return (
-    <div className="bg-paper text-ink">
+    <div className="pub-theme bg-paper text-ink">
       <SiteHeader home />
 
       {/* ================= HERO ================= */}
       <section id="top" className="relative min-h-[100svh] flex items-end overflow-hidden bg-coal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={content.hero.imageVersion ? `/hero-image?v=${content.hero.imageVersion}` : HERO_IMAGE.src} alt={content.hero.imageAlt || HERO_IMAGE.alt} style={{ objectPosition: HERO_IMAGE.position }} className="absolute inset-0 h-full w-full object-cover" />
-        {/* Two layers: a bottom-up fade for the whole block, plus a left-side scrim directly behind the text. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+        {/* Slate-tinted scrims, strongest only behind the words so the room stays visible: a bottom-up fade, a left-side scrim, and a light top fade for the nav. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-coal/95 via-coal/75 via-50% to-transparent to-92%" />
+        <div className="absolute inset-0 bg-gradient-to-r from-coal/80 via-coal/35 via-55% to-transparent" />
         <div className="relative max-w-7xl mx-auto px-5 sm:px-8 pb-24 pt-40 w-full">
           <p className="text-[10.5px] uppercase tracking-[0.38em] text-white/90 mb-5 anim-fade-up">{content.hero.eyebrow}</p>
           <h1 className="font-serif text-white text-[2.6rem] leading-[1.04] sm:text-6xl lg:text-7xl max-w-3xl anim-fade-up" style={{ animationDelay: "90ms" }}>
@@ -114,10 +114,10 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
             <a href="#assessment" className={`btn-brass text-sm font-medium rounded-full px-6 py-3 transition-colors ${FOCUS_RING}`}>
               {content.hero.primaryCta}
             </a>
-            <a href="#showroom" className={`text-white text-sm border border-white/40 rounded-full px-6 py-3 hover:bg-white/10 transition-colors flex items-center gap-2 ${FOCUS_RING}`}>
+            <a href="#showroom" className={`text-white text-sm border border-white/40 bg-coal/40 backdrop-blur-sm rounded-full px-6 py-3 hover:bg-white/10 transition-colors flex items-center gap-2 ${FOCUS_RING}`}>
               {content.hero.secondaryCta} <ArrowUpRight size={15} />
             </a>
-            <MessengerButton label="Message us" className="!border-white/40 !text-white hover:!bg-white/10" />
+            <MessengerButton label="Message us" className="!border-white/40 !text-white !bg-coal/40 backdrop-blur-sm hover:!bg-white/10" />
           </div>
         </div>
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70" aria-hidden="true">
@@ -186,7 +186,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                     <figure className="relative">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={c.before} alt={`${c.piano} grand piano before restoration — ${c.place}`} loading="lazy" className="rounded-lg aspect-[9/7] object-cover w-full grayscale opacity-80" />
-                      <figcaption className="absolute bottom-2.5 left-2.5 text-[9.5px] uppercase tracking-[0.22em] bg-black/55 text-white px-2 py-1 rounded">Before</figcaption>
+                      <figcaption className="absolute bottom-2.5 left-2.5 text-[9.5px] uppercase tracking-[0.22em] bg-coal/70 text-white px-2 py-1 rounded">Before</figcaption>
                     </figure>
                     <figure className="relative">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -225,7 +225,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
               <figure className="group relative overflow-hidden rounded-xl aspect-[7/9] bg-parchment">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={c.img} alt={`${c.cap} — ${c.sub}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-coal/90 via-coal/20 to-transparent" />
                 <figcaption className="absolute bottom-4 left-4 right-4">
                   <p className="text-white font-serif text-lg leading-tight">{c.cap}</p>
                   <p className="text-white/90 text-[11.5px] mt-0.5">{c.sub}</p>
