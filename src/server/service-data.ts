@@ -16,8 +16,10 @@ import {
 } from "@/db/schema";
 import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, type SQL } from "drizzle-orm";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
+import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
+import { messengerHandle } from "@/lib/service-flow";
 import {
-  avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceStatus, jobCode,
+  avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
   jobMargin, DEFAULT_WORKING_HOURS, COMPLETED_JOB_STATUSES,
   type AgingSummary, type AvgInvoiceBasis, type WorkingHours,
 } from "@/lib/service";
@@ -421,8 +423,23 @@ export async function getScheduleBoard(from: Date, to: Date): Promise<ScheduleBo
   return { from, to, scheduled, unscheduled, technicians };
 }
 
+/** A money figure split between home service and piano sales (sales stay 0 until piano-sale jobs exist). */
+export type Split = { service: number; sales: number };
+
 export type TodayBoard = {
   date: Date;
+  businessName: string;
+  /** Per today's job: whether it already has a live (non-void) invoice — drives the next-step button. */
+  invoiceByJob: Record<string, string>;
+  /** Draft invoices waiting to be sent. */
+  draftInvoices: (InvoiceRow & { code: string })[];
+  /** Sent, unpaid invoices to chase, with the customer's Messenger handle when saved. */
+  unpaid: (InvoiceRow & { code: string; messenger: string | null })[];
+  /** Quotes sent more than 3 days ago with no answer. */
+  staleQuotes: { id: string; title: string; customerName: string; customerPhone: string | null; quotedCents: number; days: number }[];
+  /** Visits from tomorrow through the next 7 days. */
+  next7: JobRow[];
+  week: { from: Date; to: Date; booked: Split; collected: Split; spent: Split; profit: Split };
   jobs: JobRow[];
   running: (ServiceTimeLog & { jobTitle: string; customerName: string; technicianName: string | null })[];
   technicians: ServiceTechnician[];
@@ -447,9 +464,11 @@ export type TodayBoard = {
   };
 };
 
-export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard> {
+export async function getTodayBoard(ownerId: string, now: Date = new Date()): Promise<TodayBoard> {
   const dayStart = startOfManilaDayUTC(now);
-  const dayEnd = addDays(dayStart, 1);
+  // Manila has no DST: a day is exactly 24h (addDays would use the server's timezone and end the day at 8am Manila).
+  const dayEnd = addManilaDays(dayStart, 1);
+  const week = manilaWeekBounds(now);
 
   const [jobs, technicians, recalls, running, moneyToday, timeToday, pastDue, snapshot] = await Promise.all([
     getJobs({ from: dayStart, to: dayEnd, limit: 200 }),
@@ -485,6 +504,47 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
       })
     : [];
 
+  const [settings, next7, draftRows, quotedRows, jobInvoices, weekBooked, weekCollected, weekSpent] = await Promise.all([
+    getServiceSettings(ownerId),
+    getJobs({ from: dayEnd, to: addManilaDays(dayStart, 8), statuses: ["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"], limit: 100 }),
+    getInvoices({ statuses: ["draft"], limit: 20 }, now),
+    db
+      .select({
+        job: serviceJobs, customerName: serviceCustomers.name, customerPhone: serviceCustomers.phone,
+        lastQuoted: sql<Date | null>`(select max(${serviceJobEvents.at}) from ${serviceJobEvents} where ${serviceJobEvents.jobId} = ${serviceJobs.id} and ${serviceJobEvents.type} = 'quoted')`,
+      })
+      .from(serviceJobs)
+      .innerJoin(serviceCustomers, eq(serviceCustomers.id, serviceJobs.customerId))
+      .where(eq(serviceJobs.status, "quoted")),
+    jobs.length
+      ? db.select({ jobId: serviceInvoices.jobId, id: serviceInvoices.id }).from(serviceInvoices)
+          .where(and(inArray(serviceInvoices.jobId, jobs.map((j) => j.id)), isNull(serviceInvoices.voidedAt)))
+      : Promise.resolve([] as { jobId: string | null; id: string }[]),
+    db.select({ cents: sql<number>`coalesce(sum(${serviceJobs.quotedCents}), 0)::int` }).from(serviceJobs)
+      .where(and(gte(serviceJobs.scheduledStart, week.from), lt(serviceJobs.scheduledStart, week.to), ne(serviceJobs.status, "cancelled"))),
+    db.select({ cents: sql<number>`coalesce(sum(${servicePayments.amountCents}), 0)::int` }).from(servicePayments)
+      .where(and(gte(servicePayments.receivedAt, week.from), lt(servicePayments.receivedAt, week.to))),
+    db.select({ cents: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` }).from(serviceExpenses)
+      .where(and(gte(serviceExpenses.spentAt, week.from), lt(serviceExpenses.spentAt, week.to))),
+  ]);
+
+  const invPrefix = settings.invoicePrefix;
+  const withCode = <T extends InvoiceRow>(i: T) => ({ ...i, code: invoiceCode(invPrefix, i.invoiceNumber, i.issueDate) });
+  const chaseCustomerIds = [...new Set(followUps.map((f) => f.customerId))];
+  const tagRows = chaseCustomerIds.length
+    ? await db.select({ id: serviceCustomers.id, tags: serviceCustomers.tags }).from(serviceCustomers).where(inArray(serviceCustomers.id, chaseCustomerIds))
+    : [];
+  const handles = new Map(tagRows.map((r) => [r.id, messengerHandle(r.tags)]));
+
+  const staleQuotes = quotedRows
+    .map((r) => ({ r, sentAt: r.lastQuoted ? new Date(r.lastQuoted) : r.job.updatedAt }))
+    .filter(({ sentAt }) => isStaleQuote(sentAt, now))
+    .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+    .map(({ r, sentAt }) => ({
+      id: r.job.id, title: r.job.title, customerName: titleCaseName(r.customerName), customerPhone: r.customerPhone,
+      quotedCents: r.job.quotedCents, days: daysSince(sentAt, now),
+    }));
+
   const unfinished = pastDue.filter((j) => needsClosing(j, now));
   const rec = snapshot.aging;
   const drafts = snapshot.drafts;
@@ -497,8 +557,23 @@ export async function getTodayBoard(now: Date = new Date()): Promise<TodayBoard>
   const minutesWorked = timeToday.find((t) => t.kind === "work")?.minutes ?? 0;
   const minutesTravel = timeToday.find((t) => t.kind === "travel")?.minutes ?? 0;
 
+  const collectedWeek = weekCollected[0]?.cents ?? 0;
+  const spentWeek = weekSpent[0]?.cents ?? 0;
   return {
     date: dayStart,
+    businessName: settings.businessName,
+    invoiceByJob: Object.fromEntries(jobInvoices.filter((i) => i.jobId).map((i) => [i.jobId!, i.id])),
+    draftInvoices: draftRows.map(withCode),
+    unpaid: followUps.map((f) => ({ ...withCode(f), messenger: handles.get(f.customerId) ?? null })),
+    staleQuotes,
+    next7,
+    week: {
+      ...week,
+      booked: { service: weekBooked[0]?.cents ?? 0, sales: 0 },
+      collected: { service: collectedWeek, sales: 0 },
+      spent: { service: spentWeek, sales: 0 },
+      profit: { service: collectedWeek - spentWeek, sales: 0 },
+    },
     jobs,
     running: running.map((r) => ({ ...r.log, jobTitle: r.jobTitle, customerName: titleCaseName(r.customerName), technicianName: r.technicianName })),
     technicians,
