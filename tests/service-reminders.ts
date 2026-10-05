@@ -1,5 +1,5 @@
 /** Client follow-up reminders: dates, snooze, labels. No database. Run: npx tsx tests/service-reminders.ts */
-import { presetDate, parseDayInput, toDayInput, isTodayOrLater, daysUntil, reminderState, isDueNow, snoozedTo, reminderLabel, sortByDue, cleanNote, NOTE_MAX } from "../src/lib/service-reminders";
+import { presetDate, parseDayInput, toDayInput, isTodayOrLater, daysUntil, reminderState, isDueNow, snoozedTo, reminderLabel, sortByDue, cleanNote, NOTE_MAX, groupReminders } from "../src/lib/service-reminders";
 
 let failures = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -39,6 +39,11 @@ console.log("\nsorting + note");
 const a = { id: "a", dueAt: D("2026-10-09") }, b = { id: "b", dueAt: D("2026-10-01") }, c = { id: "c", dueAt: D("2026-10-05") };
 check("most overdue first", sortByDue([a, b, c]).map((x) => x.id), ["b", "c", "a"]);
 check("note is trimmed, blank -> null, capped", [cleanNote("  call  "), cleanNote("   "), cleanNote(undefined), cleanNote("x".repeat(500))?.length], ["call", null, null, NOTE_MAX]);
+
+console.log("\ngroups");
+const g = groupReminders([a, b, c, { id: "d", dueAt: D("2026-10-06") }], noon);
+check("overdue / today / upcoming, each in due order", [g.overdue.map((x) => x.id), g.today.map((x) => x.id), g.upcoming.map((x) => x.id)], [["b"], ["c"], ["d", "a"]]);
+check("nothing -> three empty groups", groupReminders([], noon), { overdue: [], today: [], upcoming: [] });
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log("\nall reminder checks passed");

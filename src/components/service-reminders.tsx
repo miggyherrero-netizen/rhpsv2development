@@ -21,29 +21,49 @@ const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 
 /** "Remind me" box. The client's name is in the title, so it is always clear who the reminder is for. */
 export function RemindMeModal({
-  open, onClose, customerId, customerName,
-}: { open: boolean; onClose: () => void; customerId: string; customerName: string }) {
+  open, onClose, customerId, customerName, customers,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Known client (customer page). Left out on the Reminders page, where `customers` is given to choose from. */
+  customerId?: string;
+  customerName?: string;
+  customers?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [now] = useState(() => new Date());
   const [day, setDay] = useState(() => toDayInput(presetDate("tomorrow", new Date())));
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState("");
+  const chosenId = customerId ?? picked;
+  const chosenName = customerName ?? customers?.find((c) => c.id === picked)?.name;
 
   const save = () => {
     setError(null);
+    if (!chosenId) { setError("Choose a client first."); return; }
     startTransition(async () => {
-      const res = await createReminder({ customerId, day, note });
+      const res = await createReminder({ customerId: chosenId, day, note });
       if (!res.ok) { setError(res.error); return; }
       setNote("");
+      setPicked("");
       onClose();
       router.refresh();
     });
   };
 
   return (
-    <SvcModal open={open} onClose={onClose} title={`Remind me about ${customerName}`} subtitle="It will show on Today when it's due.">
+    <SvcModal open={open} onClose={onClose} title={chosenName ? `Remind me about ${chosenName}` : "Add a reminder"} subtitle="It will show on Today when it's due.">
       <div className="space-y-4">
+        {!customerId ? (
+          <Field label="Client">
+            <Select value={picked} onChange={(e) => setPicked(e.target.value)} required>
+              <option value="">Choose a client…</option>
+              {(customers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+        ) : null}
         <div>
           <p className="text-[12px] mb-2" style={DIM}>When?</p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Quick dates">

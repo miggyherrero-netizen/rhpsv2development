@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -14,6 +14,7 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
     label: "Operations",
     items: [
       { href: "/service/today", label: "Today", icon: Sun },
+      { href: "/service/reminders", label: "Reminders", icon: Bell },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
       { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
@@ -53,11 +54,14 @@ export default function ServiceShell({
   businessName,
   showFinance = true,
   canFinance = true,
+  dueReminders = 0,
 }: {
   /** Role check (server-enforced separately): non-finance roles never see Finance or Expenses. */
   canFinance?: boolean;
   children: ReactNode;
   businessName: string;
+  /** Open reminders due today or earlier (badge on the Reminders link). */
+  dueReminders?: number;
   /** Owner setting: hides the Finance link only — the route itself is not blocked. */
   showFinance?: boolean;
 }) {
@@ -107,6 +111,14 @@ export default function ServiceShell({
               >
                 <item.icon size={16} strokeWidth={1.8} />
                 {item.label}
+                {item.href === "/service/reminders" && dueReminders > 0 ? (
+                  <span
+                    className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] leading-5 text-center svc-num"
+                    style={{ background: "var(--color-svc-accent)", color: "#06101f" }}
+                  >
+                    {dueReminders}<span className="sr-only"> due</span>
+                  </span>
+                ) : null}
               </Link>
             ))}
           </div>

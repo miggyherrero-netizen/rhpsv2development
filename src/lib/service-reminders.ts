@@ -85,3 +85,12 @@ export function cleanNote(v: unknown): string | null {
   const s = typeof v === "string" ? v.trim().slice(0, NOTE_MAX) : "";
   return s || null;
 }
+
+export type ReminderGroups<T> = { overdue: T[]; today: T[]; upcoming: T[] };
+
+/** Splits reminders into the three groups the Reminders page shows, each in due order. */
+export function groupReminders<T extends WithDue & { createdAt?: Date }>(list: T[], now: Date): ReminderGroups<T> {
+  const groups: ReminderGroups<T> = { overdue: [], today: [], upcoming: [] };
+  for (const r of sortByDue(list)) groups[reminderState(r.dueAt, now)].push(r);
+  return groups;
+}
