@@ -141,7 +141,7 @@ export default function ServiceShell({
 
   return (
     <div className="min-h-screen svc-shell">
-      <aside data-print-hide className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col svc-sidebar border-r z-40">
+      <aside data-print-hide className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col svc-sidebar border-r z-40">
         <div className="px-5 pt-6 pb-5">
           <p
             className="text-[11px] uppercase tracking-[0.2em]"
@@ -157,7 +157,7 @@ export default function ServiceShell({
         <div className="p-4 border-t" style={{ borderColor: "var(--color-svc-border)" }}>
           <button
             onClick={() => logout()}
-            className="flex items-center gap-2.5 px-1.5 text-[12px] transition-colors hover:opacity-80"
+            className={`flex items-center gap-2.5 px-3 min-h-11 w-full rounded-lg text-[12px] transition-colors hover:opacity-80 ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <LogOut size={14} /> Sign out
@@ -167,7 +167,7 @@ export default function ServiceShell({
 
       <div
         data-print-hide
-        className="lg:hidden sticky top-0 z-40 svc-sidebar border-b"
+        className="md:hidden sticky top-0 z-40 svc-sidebar border-b"
         style={{ borderColor: "var(--color-svc-border)" }}
       >
         <div className="flex items-center justify-between px-4 h-14">
@@ -179,6 +179,9 @@ export default function ServiceShell({
             className={`p-3 ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
             aria-label="Open menu"
+            aria-expanded={open}
+            aria-controls="svc-drawer"
+            aria-haspopup="dialog"
           >
             <Menu size={20} />
           </button>
@@ -186,9 +189,9 @@ export default function ServiceShell({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm anim-fade-in" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-modal="true" aria-label="Menu" className="absolute left-0 top-0 h-full w-72 svc-sidebar flex flex-col p-4 anim-drawer">
+          <div id="svc-drawer" role="dialog" aria-modal="true" aria-label="Menu" className="absolute left-0 top-0 h-full w-72 svc-sidebar flex flex-col p-4 anim-drawer">
             <div className="flex items-center justify-between px-2 pt-2 pb-4">
               <p className="font-serif text-lg" style={{ color: "var(--color-svc-text)" }}>
                 Home Service
@@ -201,7 +204,7 @@ export default function ServiceShell({
             <div className="p-3 border-t mt-2" style={{ borderColor: "var(--color-svc-border)" }}>
               <button
                 onClick={() => logout()}
-                className="flex items-center gap-2.5 text-[12px]"
+                className={`flex items-center gap-2.5 px-3 min-h-11 text-[12px] ${FOCUS}`}
                 style={{ color: "var(--color-svc-text-dim)" }}
               >
                 <LogOut size={14} /> Sign out
@@ -211,13 +214,13 @@ export default function ServiceShell({
         </div>
       )}
 
-      <main className="lg:pl-60 min-h-screen pb-20 lg:pb-0">{children}</main>
+      <main className="md:pl-60 min-h-screen pb-20 md:pb-0">{children}</main>
 
-      {/* Phone: persistent bottom tab bar (the sidebar takes over from 1024px) */}
+      {/* Phone: persistent bottom tab bar (the sidebar takes over from 768px) */}
       <nav
         data-print-hide
         aria-label="Main tabs"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 svc-sidebar border-t grid grid-cols-5"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 svc-sidebar border-t grid grid-cols-5"
         style={{ borderColor: "var(--color-svc-border)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {TABS.map((t) => {
@@ -241,6 +244,7 @@ export default function ServiceShell({
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={open}
+          aria-controls="svc-drawer"
           aria-current={!onTab ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[11px] ${FOCUS}`}
           style={{ color: !onTab ? "var(--color-svc-accent)" : "var(--color-svc-text-dim)" }}

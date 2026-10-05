@@ -480,7 +480,7 @@ export function CustomerSheet({
                   </div>
                   <button
                     onClick={() => onDeleteLocation(l.id)}
-                    className="p-1.5 rounded-lg hover:bg-white/[0.06]"
+                    className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]"
                     style={{ color: "var(--color-svc-text-faint)" }}
                     aria-label="Delete location"
                   >
@@ -540,7 +540,7 @@ export function CustomerSheet({
                       />
                       <button
                         onClick={() => onDeletePiano(p.id)}
-                        className="p-1.5 rounded-lg hover:bg-white/[0.06]"
+                        className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]"
                         style={{ color: "var(--color-svc-text-faint)" }}
                         aria-label="Delete instrument"
                       >

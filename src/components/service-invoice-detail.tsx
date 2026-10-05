@@ -364,7 +364,7 @@ export default function InvoiceDetailClient({
                   </Link>
                   <button
                     onClick={() => run(() => deletePayment(p.id))}
-                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                    className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                     style={{ color: "var(--color-svc-text-faint)" }}
                     aria-label="Delete payment"
                   >
@@ -377,7 +377,7 @@ export default function InvoiceDetailClient({
 
           {invoice.balanceCents > 0 && invoice.status !== "void" && (
             <div
-              className="grid grid-cols-1 sm:grid-cols-[1fr_130px_1fr_auto] gap-2 items-end pt-3"
+              className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_130px_1fr_auto] gap-2 items-end pt-3"
               style={{ borderTop: "1px solid var(--color-svc-border)" }}
             >
               {isDraft && (

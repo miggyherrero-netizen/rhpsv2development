@@ -139,7 +139,7 @@ export default function InvoicesClient({
             <div className="flex-1" />
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
-              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="!pl-9 w-56" />
+              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" aria-label="Search invoices" className="!pl-9 w-56" />
             </div>
           </div>
 

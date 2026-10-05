@@ -316,6 +316,12 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
   border-color: var(--color-svc-accent);
   box-shadow: 0 0 0 3px var(--color-svc-accent-soft);
 }
+/* Home Service focus ring: solid 2px outline with offset on every control (border/glow alone is too faint for WCAG 2.4.7/1.4.11). */
+.svc-shell :is(input, select, textarea, button, a, summary, [role="switch"], [tabindex]:not([tabindex="-1"])):focus-visible,
+.svc-shell :is(input[type="time"], input[type="date"], input[type="datetime-local"]):focus-within {
+  outline: 2px solid var(--color-svc-accent);
+  outline-offset: 2px;
+}
 .input-svc option, .input-svc optgroup { background: var(--color-svc-surface-2); color: var(--color-svc-text); }
 
 .btn-svc-primary {

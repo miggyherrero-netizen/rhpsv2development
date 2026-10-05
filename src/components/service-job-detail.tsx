@@ -340,7 +340,7 @@ export default function JobDetailClient({
                           <td className="px-5 py-2.5 text-right">
                             <button
                               onClick={() => run(() => deleteJobItem(item.id))}
-                              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                              className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                               style={{ color: "var(--color-svc-text-faint)" }}
                               aria-label="Remove line"
                             >
@@ -436,7 +436,7 @@ export default function JobDetailClient({
                     </span>
                     <button
                       onClick={() => run(() => deleteTimeLog(log.id))}
-                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                      className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                       style={{ color: "var(--color-svc-text-faint)" }}
                       aria-label="Delete time entry"
                     >
@@ -478,7 +478,7 @@ export default function JobDetailClient({
                     <Money cents={e.amountCents} className="text-[13px]" />
                     <button
                       onClick={() => run(() => deleteExpense(e.id))}
-                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                      className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                       style={{ color: "var(--color-svc-text-faint)" }}
                       aria-label="Delete expense"
                     >

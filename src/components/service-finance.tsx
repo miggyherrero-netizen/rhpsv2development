@@ -52,7 +52,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
       )}
 
       <section aria-labelledby="fin-range" className="space-y-2.5">
-        <h2 id="fin-range" className="text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <h2 id="fin-range" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
           {range.label}
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -70,7 +70,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
       </section>
 
       <section aria-labelledby="fin-now" className="space-y-2.5">
-        <h2 id="fin-now" className="text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <h2 id="fin-now" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
           Owed to you · as of today
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -218,7 +218,7 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
                     {jobMargins.map((j) => (
                       <tr key={j.jobId}>
                         <td className="px-5 py-2.5 max-w-[180px]">
-                          <Link href={`/service/jobs/${j.jobId}`} className="text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                          <Link href={`/service/jobs/${j.jobId}`} className="inline-flex items-center min-h-11 text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
                             {j.title}
                           </Link>
                           <p className="text-[11.5px] truncate" style={FAINT}>{j.customerName}</p>

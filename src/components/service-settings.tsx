@@ -264,10 +264,11 @@ export default function SettingsClient({
               const open = !!value;
               return (
                 <div key={day} className="flex items-center gap-3">
-                  <span className="w-10 text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>{day}</span>
-                  <label className="inline-flex items-center gap-2 text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>
+                  <label className="inline-flex items-center gap-3 min-h-11 pr-3 text-[12px] cursor-pointer" style={{ color: "var(--color-svc-text-dim)" }}>
+                    <span className="w-10" style={{ color: "var(--color-svc-text-dim)" }}>{day}</span>
                     <input
                       type="checkbox"
+                      className="w-5 h-5 shrink-0 cursor-pointer"
                       checked={open}
                       onChange={(e) =>
                         setHours((prev) => ({ ...prev, [index]: e.target.checked ? [480, 1080] : null }))
@@ -313,7 +314,7 @@ export default function SettingsClient({
         <div
           role="status"
           aria-label="Unsaved changes"
-          className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] lg:bottom-0 lg:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
+          className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
           style={{ background: "var(--color-svc-surface)", borderColor: "var(--color-svc-border-strong)", boxShadow: "0 -10px 30px rgba(0,0,0,0.35)" }}
         >
           <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
@@ -386,7 +387,7 @@ export default function SettingsClient({
                 </button>
                 <button
                   onClick={() => setDeleteId(t.id)}
-                  className="p-1.5 rounded-lg hover:bg-white/[0.06]"
+                  className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]"
                   style={{ color: "var(--color-svc-text-faint)" }}
                   aria-label="Delete technician"
                 >
@@ -401,7 +402,7 @@ export default function SettingsClient({
       {/* Price book */}
       <SectionCard title={<>Price book <span className="font-normal text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>· saves instantly</span></>}>
         <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_120px_90px_auto] gap-2 items-end">
+          <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_130px_120px_90px_auto] gap-2 items-end">
             <Field label="Item name">
               <TextInput
                 value={newItem.name}
@@ -467,6 +468,7 @@ export default function SettingsClient({
                     <tr key={item.id} className="group">
                       <td className="py-2 pr-4">
                         <input
+                          aria-label="Item name"
                           defaultValue={item.name}
                           onBlur={(e) => {
                             if (e.target.value !== item.name) run(() => updateCatalogItem(item.id, { name: e.target.value }));
@@ -476,6 +478,7 @@ export default function SettingsClient({
                       </td>
                       <td className="py-2 pr-4">
                         <Select
+                          aria-label="Type"
                           defaultValue={item.kind}
                           onChange={(e) => run(() => updateCatalogItem(item.id, { kind: e.target.value }))}
                           className="!py-1 !px-2 text-[12px] !w-auto"
@@ -490,6 +493,7 @@ export default function SettingsClient({
                           type="number"
                           prefix="₱"
                           step="50"
+                          aria-label="Price"
                           defaultValue={item.unitPriceCents / 100}
                           onBlur={(e) => run(() => updateCatalogItem(item.id, { unitPrice: Number(e.target.value) }))}
                           className="input-svc !w-28 !py-1 !px-2 text-[12px]"
@@ -499,6 +503,7 @@ export default function SettingsClient({
                         <input
                           type="number"
                           step="15"
+                          aria-label="Minutes"
                           defaultValue={item.estimatedMinutes}
                           onBlur={(e) => run(() => updateCatalogItem(item.id, { estimatedMinutes: Number(e.target.value) }))}
                           className="input-svc !w-20 !py-1 !px-2 text-[12px]"
@@ -507,7 +512,7 @@ export default function SettingsClient({
                       <td className="py-2 text-right">
                         <button
                           onClick={() => run(() => deleteCatalogItem(item.id))}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                           style={{ color: "var(--color-svc-text-faint)" }}
                           aria-label="Delete item"
                         >

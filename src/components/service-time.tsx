@@ -178,7 +178,7 @@ export default function TimeClient({
                       <td className="px-5 py-2.5 text-right">
                         <button
                           onClick={() => run(() => deleteTimeLog(log.id))}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                           style={{ color: "var(--color-svc-text-faint)" }}
                           aria-label="Delete entry"
                         >
@@ -225,7 +225,7 @@ export default function TimeClient({
       </div>
 
       <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
-        Tip: start a timer from <Link href="/service/today" className="hover:underline" style={{ color: TONE_TEXT.azure }}>Today</Link> so
+        Tip: start a timer from <Link href="/service/today" className="inline-flex items-center min-h-11 px-1 hover:underline" style={{ color: TONE_TEXT.azure }}>Today</Link> so
         travel and on-site minutes land on the right job.
       </p>
     </div>

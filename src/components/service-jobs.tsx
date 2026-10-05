@@ -126,6 +126,7 @@ export default function JobsClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search customer, address…"
+            aria-label="Search jobs"
             className="!pl-9 w-64"
           />
         </div>

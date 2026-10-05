@@ -134,7 +134,7 @@ export default function ExpensesClient({
             <div className="flex-1" />
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
-              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="!pl-9 w-52" />
+              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" aria-label="Search expenses" className="!pl-9 w-52" />
             </div>
             <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category" className="!w-auto">
               <option value="all">All categories</option>
@@ -203,7 +203,7 @@ export default function ExpensesClient({
                       <td className="px-5 py-2.5 text-right">
                         <button
                           onClick={() => run(() => deleteExpense(e.id))}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/[0.06]"
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                           style={{ color: "var(--color-svc-text-faint)" }}
                           aria-label="Delete expense"
                         >
@@ -239,7 +239,7 @@ export default function ExpensesClient({
               Category totals cover the last 90 days.
             </p>
             {showFinance ? (
-              <Link href="/service/finance" className="text-[11.5px] hover:underline" style={{ color: TONE_BAR.azure }}>
+              <Link href="/service/finance" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_BAR.azure }}>
                 See the full finance report →
               </Link>
             ) : null}
