@@ -27,11 +27,11 @@ export function defaultKindForCategory(category: string | null | undefined): Exp
   }
 }
 
-/** A saved kind wins; an expense nobody has reviewed yet falls back to its category's default. */
-export const effectiveKind = (e: { kind?: string | null; category: string }): ExpenseKind =>
-  isExpenseKind(e.kind) ? e.kind : defaultKindForCategory(e.category);
+/** A saved kind wins; an unreviewed expense linked to a job is a job cost; otherwise its category's default. */
+export const effectiveKind = (e: { kind?: string | null; category: string; jobId?: string | null }): ExpenseKind =>
+  isExpenseKind(e.kind) ? e.kind : e.jobId ? "job" : defaultKindForCategory(e.category);
 
-export type SplitExpense = { amountCents: number; category: string; kind?: string | null; pianoId?: string | null };
+export type SplitExpense = { amountCents: number; category: string; kind?: string | null; pianoId?: string | null; jobId?: string | null };
 
 /** One sold piano inside the period. `stockExpensesCents` = stock expenses recorded against that piano (any date). */
 export type SaleLine = {
@@ -43,10 +43,11 @@ export type SaleLine = {
 };
 
 /**
- * Cost of goods for one sold piano: the buy cost and prep costs, but never less than the stock expenses on record
- * (the buy cost is usually prefilled from them, so taking the larger avoids both double-counting and silent undercount).
+ * Cost of goods for one sold piano: buy cost + prep costs, but never less than the stock expenses on record.
+ * Stock expenses often already include the purchase AND its restoration, so the two are compared as a whole
+ * (adding prep on top of the stock total would count the restoration twice).
  */
-export const costOfGoodsCents = (s: SaleLine): number => Math.max(s.buyCostCents, s.stockExpensesCents) + s.prepCostCents;
+export const costOfGoodsCents = (s: SaleLine): number => Math.max(s.buyCostCents + s.prepCostCents, s.stockExpensesCents);
 
 export type FinanceSplit = {
   service: { collectedCents: number; jobCostCents: number; profitCents: number };

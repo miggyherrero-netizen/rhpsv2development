@@ -54,6 +54,8 @@ check("package expands to its members", expandCatalogEntry(catalog[3]!, catalog)
 check("package with no members adds itself as a service", expandCatalogEntry(entry({ id: "x", name: "Empty pkg", kind: "package", unitPriceCents: 1 }), []).map((l) => l.kind), ["service"]);
 check("quick-add chips: flagged, active, not package members", quickAddEntries(catalog).map((c) => c.id), ["t", "pk"]);
 
+check("a member whose package was removed is offered on its own again", filterCatalog(catalog.filter((c) => c.id !== "pk"), "action").map((c) => c.id), ["m2"]);
+
 console.log("\nsave to price book prompt");
 check("free text not in book -> offer", shouldOfferPriceBook({ description: "Pedal repair", catalogItemId: null }, catalog), true);
 check("picked from book -> no offer", shouldOfferPriceBook({ description: "Standard tuning", catalogItemId: "t" }, catalog), false);
@@ -136,6 +138,21 @@ async function main() {
   const second = h.saver.flush("a");
   await Promise.all([first, second]);
   check("saves for the same line never overlap or reorder (last edit wins)", [h.log[0], h.log[1], h.server.a], ['update a {"qty":2}', 'update a {"qty":3}', { qty: 3 }]);
+}
+
+{
+  const h = harness();
+  h.saver.queue("a", { qty: 2 });
+  const boom = new LineSaver<Record<string, unknown>>({
+    update: async () => { throw new Error("network"); }, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }),
+    onStatus: (s, e) => h.statuses.push(e ? `${s}:${e}` : s), schedule: (fn, ms) => setTimeout(fn, ms), cancel: (x) => clearTimeout(x as ReturnType<typeof setTimeout>),
+  });
+  boom.queue("z", { qty: 5 });
+  await boom.flush("z");
+  check("a Server Action that throws is a failed save, never a silent \"Saved\"", h.statuses.at(-1)?.startsWith("error:"), true);
+  check("…and the edit is kept for Retry", boom.hasPending(), true);
+  await boom.flush("z");
+  check("the line is not stuck: a later flush still sends", h.statuses.at(-1)?.startsWith("error:"), true);
 }
 
 console.log("\nremove + undo (5s window)");

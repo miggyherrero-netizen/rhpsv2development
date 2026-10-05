@@ -16,7 +16,7 @@ check("deposit above the price never gives a negative balance", saleBalanceCents
 console.log("\nprofit per piano");
 const f = { salePriceCents: 12_000_000, depositCents: 2_000_000, buyCostCents: 7_000_000, prepCostCents: 800_000, stockExpensesCents: 7_000_000 };
 check("price − (buy + prep)", salePianoProfit(f), { revenueCents: 12_000_000, costOfGoodsCents: 7_800_000, profitCents: 4_200_000, marginPct: 35 });
-check("stock expenses larger than the typed buy cost are never ignored", salePianoProfit({ ...f, buyCostCents: 0, stockExpensesCents: 7_500_000 }).costOfGoodsCents, 8_300_000);
+check("stock expenses larger than the typed buy cost are never ignored", salePianoProfit({ ...f, buyCostCents: 0, stockExpensesCents: 7_500_000 }).costOfGoodsCents, 7_500_000);
 check("selling at a loss shows a negative profit", salePianoProfit({ ...f, salePriceCents: 6_000_000 }).profitCents, -1_800_000);
 check("no price -> 0% margin, no divide by zero", salePianoProfit({ ...f, salePriceCents: 0 }).marginPct, 0);
 check("buy cost prefills from the stock expenses", suggestedBuyCostCents(7_000_000), 7_000_000);

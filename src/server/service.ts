@@ -340,7 +340,10 @@ async function validPackageId(value: string | null | undefined, selfId?: string)
   if (!id || id === selfId) return null;
   const [parent] = await db.select({ id: serviceCatalog.id, packageId: serviceCatalog.packageId, kind: serviceCatalog.kind })
     .from(serviceCatalog).where(eq(serviceCatalog.id, id)).limit(1);
-  return parent && parent.kind === "package" && !parent.packageId ? parent.id : null;
+  if (!parent || parent.kind !== "package" || parent.packageId) return null;
+  // A package that already has members can't itself become a member (no nesting).
+  if (selfId && (await db.select({ id: serviceCatalog.id }).from(serviceCatalog).where(eq(serviceCatalog.packageId, selfId)).limit(1)).length) return null;
+  return parent.id;
 }
 
 export async function createCatalogItem(input: CatalogInput): Promise<Result<{ id: string }>> {
@@ -372,6 +375,9 @@ export async function createCatalogItem(input: CatalogInput): Promise<Result<{ i
 export async function updateCatalogItem(id: string, patch: Partial<CatalogInput>): Promise<Result> {
   await requireUser();
   if (!id) return fail("Missing price-book item.");
+  // A package that stops being a package (or is switched off) releases its members so they never vanish from the picker.
+  const becomesNonPackage = (patch.kind !== undefined && oneOf(patch.kind, CATALOG_KINDS, "service") !== "package") || patch.active === false;
+  if (becomesNonPackage) await db.update(serviceCatalog).set({ packageId: null }).where(eq(serviceCatalog.packageId, id));
   await db
     .update(serviceCatalog)
     .set({
@@ -469,7 +475,7 @@ export async function createJob(input: JobInput): Promise<Result<{ id: string }>
       technicianId: str(input.technicianId) || null,
       title,
       serviceType: jobType === "sale" ? "delivery" : oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
-      status: oneOf(input.status, JOB_STATUSES.map((s) => s.key), "lead"),
+      status: jobType === "sale" ? "lead" : oneOf(input.status, JOB_STATUSES.map((s) => s.key), "lead"),
       priority: oneOf(input.priority, ["low", "normal", "high", "urgent"], "normal"),
       scheduledStart: optionalDate(input.scheduledStart),
       scheduledEnd: optionalDate(input.scheduledEnd),
@@ -575,6 +581,19 @@ export async function assignJob(id: string, technicianId: string | null): Promis
 
 /* ---- status = time ---- */
 
+const BUSY_MESSAGE = "That technician already has a timer running — stop it first.";
+
+/** Two taps at once can race past the "is the technician busy" read; the database's one-running-timer index then says no. */
+async function busyGuard<T>(run: () => Promise<T>, onBusy: T): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    const code = (err as { code?: string; cause?: { code?: string } } | null);
+    if (code?.code === "23505" || code?.cause?.code === "23505") return onBusy;
+    throw err;
+  }
+}
+
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Exec = typeof db | Tx;
 
@@ -597,6 +616,8 @@ async function syncEventTimeLogs(x: Exec, jobId: string, newEventId: string): Pr
   // Only the segments this event opens or closes are touched, so an entry the owner deleted never comes back.
   const touched = deriveSegments(events).filter((seg) => seg.startEventId === newEventId || seg.endEventId === newEventId);
   const plan = planTimeSync(touched, existing);
+  // Closing an entry only ever updates it; an entry the owner deleted is not re-created by the event that would have closed it.
+  plan.inserts = plan.inserts.filter((seg) => seg.startEventId === newEventId);
   if (!plan.inserts.length && !plan.updates.length) return;
   const rate = job.technicianId
     ? (await x.select({ r: serviceTechnicians.hourlyRateCents }).from(serviceTechnicians).where(eq(serviceTechnicians.id, job.technicianId)).limit(1))[0]?.r ?? 0
@@ -634,14 +655,20 @@ async function technicianBusyElsewhere(x: Exec, technicianId: string | null, job
 export async function setJobStatus(id: string, status: string, note?: string): Promise<Result> {
   await requireUser();
   const next = oneOf(status, JOB_STATUSES.map((s) => s.key), "scheduled");
-  const failure = await db.transaction(async (tx): Promise<string | null> => {
+  const failure = await busyGuard(() => db.transaction(async (tx): Promise<string | null> => {
     const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, id)).for("update").limit(1);
     if (!job) return "Job not found.";
     if ((next === "en_route" || next === "in_progress") && (await technicianBusyElsewhere(tx, job.technicianId, id))) {
       return "That technician already has a timer running on another job — stop it first.";
     }
+    if (job.jobType === "sale" && ["completed", "invoiced", "paid"].includes(next)) {
+      const notReady = saleReadyToComplete({ salePianoId: job.salePianoId, salePriceCents: job.salePriceCents });
+      if (notReady) return notReady;
+    }
     const patch: Record<string, unknown> = { status: next, updatedAt: new Date() };
     const now = new Date();
+    // Moving a finished job back into the field un-finishes it: it must stop counting as done / sold.
+    if (["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold", "cancelled"].includes(next)) patch.completedAt = null;
     if (next === "en_route" || next === "in_progress") patch.startedAt = job.startedAt ?? now;
     if (next === "completed") patch.completedAt = job.completedAt ?? now;
     if (next === "cancelled") { patch.cancelledAt = now; patch.cancelReason = str(note, 500); }
@@ -654,7 +681,7 @@ export async function setJobStatus(id: string, status: string, note?: string): P
     }).returning({ id: serviceJobEvents.id });
     await syncEventTimeLogs(tx, id, event!.id);
     return null;
-  });
+  }), BUSY_MESSAGE as string | null);
   if (failure) return fail(failure);
 
   try {
@@ -686,7 +713,7 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
   if (!effect) return fail("That step isn't an action.");
 
   // Guard + writes share one transaction with the job row locked, so a double-click or stale tab can't run a step twice.
-  const outcome = await db.transaction(async (tx): Promise<Result> => {
+  const outcome = await busyGuard(() => db.transaction(async (tx): Promise<Result> => {
     const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).for("update").limit(1);
     if (!job) return fail("Job not found.");
     const [items] = await tx.select({ n: sql<number>`count(*)::int` }).from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
@@ -716,7 +743,7 @@ export async function advanceJob(jobId: string, step: string): Promise<Result> {
       .returning({ id: serviceJobEvents.id });
     await syncEventTimeLogs(tx, jobId, event!.id);
     return ok();
-  });
+  }), fail(BUSY_MESSAGE) as Result);
   if (!outcome.ok) return outcome;
 
   // Derived totals are recomputed from the saved logs; a failure here must not hide that the step itself succeeded.
@@ -908,12 +935,12 @@ export async function startTimer(
   // Travel / on-site timers ARE status changes: the status event is recorded and the time entry follows from it.
   if (nextKind === "travel" || nextKind === "work") {
     const status = nextKind === "travel" ? "en_route" : "in_progress";
-    const failure = await db.transaction(async (tx): Promise<string | null> => {
+    const failure = await busyGuard(() => db.transaction(async (tx): Promise<string | null> => {
       const [job] = await tx.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).for("update").limit(1);
       if (!job) return "Job not found.";
       const tech = job.technicianId ?? techId;
-      if (!job.technicianId && tech) await tx.update(serviceJobs).set({ technicianId: tech }).where(eq(serviceJobs.id, jobId));
       if (await technicianBusyElsewhere(tx, tech, jobId)) return "That technician already has a timer running on another job — stop it first.";
+      if (!job.technicianId && tech) await tx.update(serviceJobs).set({ technicianId: tech }).where(eq(serviceJobs.id, jobId));
       const now = new Date();
       await stopHandTimers(tx, jobId, now);
       await tx.update(serviceJobs).set({ status, startedAt: job.startedAt ?? now, updatedAt: now }).where(eq(serviceJobs.id, jobId));
@@ -923,7 +950,7 @@ export async function startTimer(
       }).returning({ id: serviceJobEvents.id });
       await syncEventTimeLogs(tx, jobId, event!.id);
       return null;
-    });
+    }), BUSY_MESSAGE as string | null);
     if (failure) return fail(failure);
     await recalcJobLabor(jobId);
     touch();
@@ -1008,14 +1035,18 @@ export async function updateTimeLog(
   const end = patch.endedAt !== undefined ? (patch.endedAt ? optionalDate(patch.endedAt) : null) : log.endedAt;
   if (!start) return fail("Pick a start time.");
   if (end && end <= start) return fail("End time must be after the start time.");
-  await db.update(serviceTimeLogs).set({
+  const saved = await busyGuard(async () => {
+    await db.update(serviceTimeLogs).set({
     kind: patch.kind ? oneOf(patch.kind, TIME_KINDS.map((k) => k.key), log.kind) : undefined,
     startedAt: start,
     endedAt: end,
     minutes: end ? elapsedMinutes(start, end) : null,
     note: patch.note !== undefined ? str(patch.note, 500) : undefined,
     source: log.source === "event" ? "manual" : undefined,
-  }).where(eq(serviceTimeLogs.id, id));
+    }).where(eq(serviceTimeLogs.id, id));
+    return true;
+  }, false);
+  if (!saved) return fail(BUSY_MESSAGE);
   await recalcJobLabor(log.jobId);
   touch();
   return ok();
@@ -1088,8 +1119,9 @@ async function createInvoiceRows(input: {
 }): Promise<Result<{ id: string }>> {
   const user = await requireUser();
   if (input.jobId) {
-    const [linked] = await db.select({ customerId: serviceJobs.customerId }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
+    const [linked] = await db.select({ customerId: serviceJobs.customerId, jobType: serviceJobs.jobType }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
     if (!linked) return fail("That job no longer exists.");
+    if (linked.jobType === "sale") return fail("A piano sale is settled on the sale itself — it doesn't take an invoice.");
     if (linked.customerId !== input.customerId) return fail("That job belongs to a different customer.");
   }
   const [settings] = await db.select().from(serviceSettings).where(eq(serviceSettings.ownerId, user.id)).limit(1);

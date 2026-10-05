@@ -18,7 +18,7 @@ export default async function ServiceInvoicesPage({ searchParams }: { searchPara
       invoicePrefix={settings.invoicePrefix}
       vatEnabled={settings.vatEnabled}
       catalog={catalog.filter((c) => c.kind !== "package").map((c) => ({ id: c.id, name: c.name, unitPriceCents: c.unitPriceCents, taxable: c.taxable }))}
-      jobOptions={jobs.map((j) => ({ id: j.id, customerId: j.customerId, label: `${jobCode(settings.jobPrefix, j.jobNumber, j.createdAt)} · ${j.title}` }))}
+      jobOptions={jobs.filter((j) => j.jobType !== "sale").map((j) => ({ id: j.id, customerId: j.customerId, label: `${jobCode(settings.jobPrefix, j.jobNumber, j.createdAt)} · ${j.title}` }))}
       termsDays={settings.defaultTermsDays}
       aging={snapshot.aging}
       drafts={snapshot.drafts}

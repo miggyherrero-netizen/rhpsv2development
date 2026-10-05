@@ -22,9 +22,10 @@ check("kind validation", [isExpenseKind("stock"), isExpenseKind("pianos"), isExp
 
 console.log("\ncost of goods");
 const sale = (o: Partial<SaleLine> = {}): SaleLine => ({ pianoId: "p1", salePriceCents: 12_000_000, buyCostCents: 7_000_000, prepCostCents: 800_000, stockExpensesCents: 7_000_000, ...o });
-check("buy cost + prep, not double counted with the stock expense it was prefilled from", costOfGoodsCents(sale()), 7_800_000);
-check("never below the stock expenses on record", costOfGoodsCents(sale({ buyCostCents: 6_000_000, stockExpensesCents: 7_000_000 })), 7_800_000);
-check("stock expense can't have been recorded -> buy cost alone", costOfGoodsCents(sale({ stockExpensesCents: 0 })), 7_800_000);
+check("buy cost + prep when no stock expenses exceed them", costOfGoodsCents(sale({ stockExpensesCents: 0 })), 7_800_000);
+check("restoration recorded as stock is not counted twice (purchase 100k + restoration 20k as stock, same on the sale)", costOfGoodsCents(sale({ buyCostCents: 10_000_000, prepCostCents: 2_000_000, stockExpensesCents: 12_000_000 })), 12_000_000);
+check("never below the stock expenses on record", costOfGoodsCents(sale({ buyCostCents: 6_000_000, prepCostCents: 500_000, stockExpensesCents: 7_000_000 })), 7_000_000);
+check("unreviewed job-linked expense is a job cost whatever its category", effectiveKind({ category: "tools", kind: null, jobId: "j1" }), "job");
 
 console.log("\nfinance split");
 const none = { periodExpenses: [], sales: [], allStockExpenses: [], pianosWithSale: new Set<string>() };

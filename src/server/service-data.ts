@@ -18,7 +18,7 @@ import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, t
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
-import { financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
+import { effectiveKind, financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
 import { saleBalanceCents, salePianoProfit } from "@/lib/service-sale";
 import {
   avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
@@ -558,14 +558,13 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
       .groupBy(serviceJobs.jobType),
     db.select({ cents: sql<number>`coalesce(sum(${servicePayments.amountCents}), 0)::int` }).from(servicePayments)
       .where(and(gte(servicePayments.receivedAt, week.from), lt(servicePayments.receivedAt, week.to))),
-    db.select({ amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind })
+    db.select({ amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind, jobId: serviceExpenses.jobId })
       .from(serviceExpenses).where(and(gte(serviceExpenses.spentAt, week.from), lt(serviceExpenses.spentAt, week.to))),
     // Piano sales closed this week: price is recognised on completion (the balance is collected at delivery).
     db.select({
       pianoId: serviceJobs.salePianoId, salePriceCents: serviceJobs.salePriceCents, buyCostCents: serviceJobs.buyCostCents, prepCostCents: serviceJobs.prepCostCents,
     }).from(serviceJobs).where(and(
-      eq(serviceJobs.jobType, "sale"), ne(serviceJobs.status, "cancelled"),
-      or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
+      eq(serviceJobs.jobType, "sale"), inArray(serviceJobs.status, COMPLETED_JOB_STATUSES),
       gte(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`, week.from), lt(sql`coalesce(${serviceJobs.completedAt}, ${serviceJobs.updatedAt})`, week.to),
     )),
     db.select({
@@ -985,7 +984,7 @@ export async function getFinanceReport(
       .from(servicePayments)
       .where(and(range.from ? gte(servicePayments.receivedAt, range.from) : undefined, lt(servicePayments.receivedAt, range.to))),
     db
-      .select({ spentAt: serviceExpenses.spentAt, amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind, pianoId: serviceExpenses.pianoId })
+      .select({ spentAt: serviceExpenses.spentAt, amountCents: serviceExpenses.amountCents, category: serviceExpenses.category, kind: serviceExpenses.kind, pianoId: serviceExpenses.pianoId, jobId: serviceExpenses.jobId })
       .from(serviceExpenses)
       .where(and(range.from ? gte(serviceExpenses.spentAt, range.from) : undefined, lt(serviceExpenses.spentAt, range.to))),
     // Margins hidden in settings → skip the per-job queries entirely.
@@ -1024,13 +1023,13 @@ export async function getFinanceReport(
       ),
   ]);
 
-  const rollup = financeRollup({ invoices: allInvoices, payments: paymentRows, expenses: expenseRows }, rangeKey, now);
+  // Money tied up in unsold piano stock is not an expense yet, so it stays out of Spent / Net and the chart (it shows as "stock on hand").
+  const rollup = financeRollup({ invoices: allInvoices, payments: paymentRows, expenses: expenseRows.filter((e) => effectiveKind(e) !== "stock") }, rangeKey, now);
 
   // Piano sales: completed sale jobs. Stock is judged over all time (a piano bought last year and sold this month still carries its cost).
   const soldWhere = and(
     eq(serviceJobs.jobType, "sale"),
-    or(inArray(serviceJobs.status, COMPLETED_JOB_STATUSES), isNotNull(serviceJobs.completedAt)),
-    ne(serviceJobs.status, "cancelled"),
+    inArray(serviceJobs.status, COMPLETED_JOB_STATUSES),
   );
   const [allStock, unreviewedCount, soldAll, soldNames] = await Promise.all([
     db.select({ pianoId: serviceExpenses.pianoId, amountCents: serviceExpenses.amountCents }).from(serviceExpenses).where(eq(serviceExpenses.kind, "stock")),

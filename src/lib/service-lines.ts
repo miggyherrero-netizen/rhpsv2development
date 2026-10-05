@@ -68,8 +68,10 @@ export const partsCostFromLines = (lines: { kind: string; qty: number; unitPrice
 /** Type-ahead: active entries whose name contains every typed word, prefix matches first. */
 export function filterCatalog(catalog: CatalogEntry[], query: string, limit = 8): CatalogEntry[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  // Package members are only offered through their package, so a tuning "package" never lists its own parts twice.
-  const pool = catalog.filter((c) => c.active && !c.packageId);
+  // Package members are only offered through their package (so it never lists its own parts twice) —
+  // but a member whose package is gone, switched off or no longer a package is offered on its own again.
+  const liveParents = new Set(catalog.filter((c) => c.active && c.kind === "package").map((c) => c.id));
+  const pool = catalog.filter((c) => c.active && (!c.packageId || !liveParents.has(c.packageId)));
   if (!words.length) return pool.slice(0, limit);
   const scored: { c: CatalogEntry; score: number }[] = [];
   for (const c of pool) {
@@ -105,8 +107,10 @@ export function expandCatalogEntry(entry: CatalogEntry, catalog: CatalogEntry[])
 }
 
 /** The entries shown as quick-add chips. */
-export const quickAddEntries = (catalog: CatalogEntry[]): CatalogEntry[] =>
-  catalog.filter((c) => c.active && c.isQuickAdd && !c.packageId);
+export const quickAddEntries = (catalog: CatalogEntry[]): CatalogEntry[] => {
+  const liveParents = new Set(catalog.filter((c) => c.active && c.kind === "package").map((c) => c.id));
+  return catalog.filter((c) => c.active && c.isQuickAdd && (!c.packageId || !liveParents.has(c.packageId)));
+};
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -173,8 +177,8 @@ export class LineSaver<P extends Record<string, unknown>> {
     this.inFlight++;
     this.deps.onStatus("saving");
     const prev = this.chain.get(id) ?? Promise.resolve();
-    const next = prev.then(async () => {
-      const res = await this.deps.update(id, patch);
+    const next = prev.catch(() => undefined).then(async () => {
+      const res = await this.safely(() => this.deps.update(id, patch));
       if (!res.ok) {
         this.failed = res.error;
         // Keep the unsaved edit (without overriding anything newer) so "Retry" can send it again.
@@ -207,11 +211,11 @@ export class LineSaver<P extends Record<string, unknown>> {
     const t = this.timers.get(id);
     if (t !== undefined) { this.deps.cancel(t); this.timers.delete(id); }
     this.pending.delete(id);
-    await (this.chain.get(id) ?? Promise.resolve());
+    await (this.chain.get(id) ?? Promise.resolve()).catch(() => undefined);
     this.inFlight++;
     this.deps.onStatus("saving");
     let res: SaveOutcome;
-    try { res = await this.deps.remove(id); } finally { this.inFlight--; }
+    try { res = await this.safely(() => this.deps.remove(id)); } finally { this.inFlight--; }
     if (!res.ok) { this.failed = res.error; this.settle(); return res; }
     const timer = this.deps.schedule(() => { this.undoable.delete(id); }, this.undoMs);
     this.undoable.set(id, { snapshot, position, timer });
@@ -232,10 +236,15 @@ export class LineSaver<P extends Record<string, unknown>> {
     this.inFlight++;
     this.deps.onStatus("saving");
     let res: SaveOutcome;
-    try { res = await this.deps.restore(entry.snapshot, entry.position); } finally { this.inFlight--; }
+    try { res = await this.safely(() => this.deps.restore(entry.snapshot, entry.position)); } finally { this.inFlight--; }
     if (!res.ok) this.failed = res.error;
     this.settle();
     return res;
+  }
+
+  /** A Server Action that throws (network drop, stale deploy) counts as a failed save, never as a silent success. */
+  private async safely(fn: () => Promise<SaveOutcome>): Promise<SaveOutcome> {
+    try { return await fn(); } catch { return { ok: false, error: "Couldn't reach the server — check your connection." }; }
   }
 
   private settle(): void {

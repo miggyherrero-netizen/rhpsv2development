@@ -125,7 +125,7 @@ export default function LineEditor({
   const addLines = async (lines: NewLine[]): Promise<boolean> => {
     setAddError(null);
     setStatus({ s: "saving" });
-    const res = await adapter.addMany(lines);
+    const res = await adapter.addMany(lines).catch((): { ok: false; error: string } => ({ ok: false, error: "Couldn't reach the server — check your connection." }));
     if (!res.ok) { setStatus({ s: "error", error: res.error }); setAddError(res.error); return false; }
     setRows((prev) => [...prev, ...lines.map((l, i) => ({ ...l, id: res.ids[i]!, position: res.positions[i] }))]);
     setStatus({ s: "saved" });
@@ -291,7 +291,7 @@ function LineRow({
         <input
           aria-label={`Description for line ${n}`} value={desc} aria-invalid={desc.trim() === "" || undefined} className={FIELD} maxLength={300}
           onChange={(e) => { setDesc(e.target.value); if (e.target.value.trim()) onEdit({ description: e.target.value.trim() }, { description: e.target.value.trim() }); }}
-          onBlur={onBlur} onKeyDown={keys}
+          onBlur={() => { if (!desc.trim()) setDesc(row.description); onBlur(); }} onKeyDown={keys}
         />
       </Cell>
       <Cell show label="Qty">
