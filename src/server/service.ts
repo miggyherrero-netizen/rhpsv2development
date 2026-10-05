@@ -31,7 +31,7 @@ import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/s
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
 import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
 import { isBatchCustomer } from "@/lib/service-reports";
-import { completeEntriesForJob, ensureRecallEntry } from "@/server/service-waitlist-core";
+import { completeEntriesForJob, ensureRecallEntry, releaseEntriesForJob } from "@/server/service-waitlist-core";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -713,6 +713,9 @@ export async function setJobStatus(id: string, status: string, note?: string): P
   if (failure) return fail(failure);
 
   try {
+    // A booked waitlist client must never be stranded: cancelling frees them up, reopening a finished visit un-finishes them.
+    if (next === "cancelled") await releaseEntriesForJob(id, "cancelled");
+    else if (["lead", "quoted", "scheduled", "en_route", "in_progress", "on_hold"].includes(next)) await releaseEntriesForJob(id, "reopened");
     await recalcJobLabor(id);
     if (next === "completed") {
       await recalcJobMoney(id);

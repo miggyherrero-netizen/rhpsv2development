@@ -5,7 +5,7 @@
  * service-waitlist-core.ts. Every action starts with requireUser().
  */
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   phCities, serviceCustomers, serviceJobs, servicePianos, serviceLocations, serviceMessageTemplates, serviceRoutes, serviceSettings,
@@ -14,7 +14,7 @@ import {
 import { requireUser } from "@/lib/auth";
 import { SERVICE_TYPES, SERVICE_TYPE_LABEL, serviceTypeMinutes } from "@/lib/service";
 import { placeLabel } from "@/lib/service-geo";
-import { PLACEHOLDERS, WAIT_SOURCES, WAIT_STATUSES, afterMessaged, defaultNextFollowUp, type WaitSource, type WaitStatus } from "@/lib/service-waitlist";
+import { NOT_NOW_DAYS, PLACEHOLDERS, WAIT_SOURCES, WAIT_STATUSES, afterMessaged, defaultNextFollowUp, type WaitSource, type WaitStatus } from "@/lib/service-waitlist";
 import { createJob } from "@/server/service";
 import { insertEntry } from "@/server/service-waitlist-core";
 import { findCities, getBarangaysOf } from "@/server/service-waitlist-data";
@@ -23,6 +23,7 @@ type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string
 const ok = <T>(data?: T): Result<T> => ({ ok: true, data });
 const fail = (error: string): Result<never> => ({ ok: false, error });
 const touch = () => { revalidatePath("/service", "layout"); };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const text = (v: unknown, max: number): string | null => {
   const s = typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -38,7 +39,7 @@ const when = (v: unknown): Date | null => {
 };
 const pesoToCents = (v: unknown): number => {
   const n = typeof v === "number" ? v : Number(String(v ?? "").replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) ? Math.max(0, Math.min(99_999_999_00, Math.round(n * 100))) : 0;
+  return Number.isFinite(n) ? Math.max(0, Math.min(2_000_000_000, Math.round(n * 100))) : 0;
 };
 
 /* ------------------------------------------------------------------ places */
@@ -93,16 +94,39 @@ export async function addWaitlistEntry(input: EntryInput): Promise<Result<{ id: 
 
 export async function updateWaitlistEntry(id: string, patch: Partial<EntryInput> & { status?: string }): Promise<Result> {
   await requireUser();
+  if (!UUID_RE.test(String(id))) return fail("Entry not found.");
   const [cur] = await db.select().from(serviceWaitlistEntries).where(eq(serviceWaitlistEntries.id, id)).limit(1);
   if (!cur) return fail("Entry not found.");
   const set: Partial<typeof serviceWaitlistEntries.$inferInsert> = { updatedAt: new Date() };
-  if (patch.status !== undefined) set.status = oneOf(patch.status, WAIT_STATUSES.map((s) => s.key) as WaitStatus[], cur.status);
+  if (patch.status !== undefined) {
+    const next = oneOf(patch.status, WAIT_STATUSES.map((s) => s.key) as WaitStatus[], cur.status);
+    // "Scheduled" and "done" mean a visit exists: they come from booking / completing a job, not from the edit form.
+    if ((next === "scheduled" || next === "done") && next !== cur.status && !cur.jobId) return fail("Book the visit first — “Scheduled” and “Done” follow a real job.");
+    set.status = next;
+    if (next !== cur.status) {
+      // A manual status change restarts the follow-up cycle sensibly instead of keeping stale counters/dates.
+      if (next === "waiting") { set.followUpCount = 0; set.nextFollowUpAt = defaultNextFollowUp(set.updatedAt as Date); }
+      if (next === "not_now") set.nextFollowUpAt = new Date((set.updatedAt as Date).getTime() + NOT_NOW_DAYS * 86_400_000);
+    }
+  }
   if (patch.notes !== undefined) set.notes = text(patch.notes, 1_000);
   if (patch.estValue !== undefined) set.estValueCents = pesoToCents(patch.estValue);
   if (patch.serviceType) set.serviceType = oneOf(patch.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning");
-  if (patch.pianoId !== undefined) set.pianoId = text(patch.pianoId, 60);
-  if (patch.cityCode !== undefined) { set.cityCode = text(patch.cityCode, 20); set.barangayCode = text(patch.barangayCode, 20); }
-  if (patch.nextFollowUpAt !== undefined) {
+  if (patch.pianoId !== undefined) {
+    const pid = text(patch.pianoId, 60);
+    if (pid) {
+      if (!UUID_RE.test(pid)) return fail("That piano isn't valid.");
+      const [p] = await db.select({ id: servicePianos.id }).from(servicePianos).where(and(eq(servicePianos.id, pid), eq(servicePianos.customerId, cur.customerId))).limit(1);
+      if (!p) return fail("That piano belongs to a different customer.");
+    }
+    set.pianoId = pid;
+  }
+  if (patch.cityCode !== undefined) {
+    const code = text(patch.cityCode, 20);
+    if (code && !(await db.select({ c: phCities.code }).from(phCities).where(eq(phCities.code, code)).limit(1)).length) return fail("That city isn't in the list.");
+    set.cityCode = code; set.barangayCode = code ? text(patch.barangayCode, 20) : null;
+  }
+  if (patch.nextFollowUpAt !== undefined && !(set.nextFollowUpAt && patch.status !== undefined)) {
     const d = when(patch.nextFollowUpAt);
     if (!d) return fail("Every entry needs a next follow-up date.");
     set.nextFollowUpAt = d;
@@ -160,15 +184,38 @@ export async function createTrip(input: { name: string; cityCode: string | null;
  */
 export async function confirmEntryForTrip(input: { entryId: string; tripId: string; start: string; technicianId?: string | null }): Promise<Result<{ jobId: string }>> {
   await requireUser();
+  if (!UUID_RE.test(String(input.entryId)) || !UUID_RE.test(String(input.tripId))) return fail("Entry not found.");
   const [entry] = await db.select().from(serviceWaitlistEntries).where(eq(serviceWaitlistEntries.id, input.entryId)).limit(1);
   if (!entry) return fail("Entry not found.");
-  if (entry.jobId && entry.status === "scheduled") return ok({ jobId: entry.jobId });
+  // Already booked on a live visit: hand that back instead of making a second one.
+  if (entry.jobId) {
+    const [existing] = await db.select({ id: serviceJobs.id, status: serviceJobs.status }).from(serviceJobs).where(eq(serviceJobs.id, entry.jobId)).limit(1);
+    if (existing && existing.status !== "cancelled" && entry.status === "scheduled") return ok({ jobId: existing.id });
+  }
+  if (entry.status === "done") return fail("This one is already done.");
   const [trip] = await db.select().from(serviceTrips).where(eq(serviceTrips.id, input.tripId)).limit(1);
   if (!trip) return fail("Trip not found.");
   const start = when(input.start);
   if (!start) return fail("Pick the visit time first.");
-  if (!entry.pianoId) return fail("Choose this client's piano on their waitlist entry first — every visit is for a piano.");
-  const [piano] = await db.select().from(servicePianos).where(eq(servicePianos.id, entry.pianoId)).limit(1);
+
+  // A client's only piano is the obvious one; with several (or none) it has to be chosen first.
+  let pianoId = entry.pianoId;
+  if (!pianoId) {
+    const owned = await db.select({ id: servicePianos.id }).from(servicePianos).where(eq(servicePianos.customerId, entry.customerId)).limit(2);
+    if (owned.length === 1) pianoId = owned[0]!.id;
+  }
+  if (!pianoId) return fail("Choose this client's piano on their waitlist entry first (add it on the customer page if they have none) — every visit is for a piano.");
+
+  // Claim the entry before creating anything, so a double-click or a second tab can only ever book it once.
+  const prevStatus = entry.status;
+  const [claimed] = await db.update(serviceWaitlistEntries)
+    .set({ status: "scheduled", tripId: trip.id, pianoId, updatedAt: new Date() })
+    .where(and(eq(serviceWaitlistEntries.id, entry.id), inArray(serviceWaitlistEntries.status, ["waiting", "messaged", "confirmed", "not_now", "scheduled"] as WaitStatus[])))
+    .returning({ id: serviceWaitlistEntries.id, jobId: serviceWaitlistEntries.jobId });
+  if (!claimed) return fail("This client was just booked or finished — refresh the list.");
+  if (prevStatus === "scheduled" && !entry.jobId) { /* a stale "scheduled" with no visit: carry on and book it properly */ }
+
+  const [piano] = await db.select().from(servicePianos).where(eq(servicePianos.id, pianoId)).limit(1);
   const locations = await db.select().from(serviceLocations).where(eq(serviceLocations.customerId, entry.customerId));
   const loc = locations.find((l) => entry.cityCode && l.cityCode === entry.cityCode) ?? locations[0] ?? null;
   const techs = input.technicianId === undefined ? await db.select({ id: serviceTechnicians.id }).from(serviceTechnicians).where(eq(serviceTechnicians.active, true)) : [];
@@ -176,13 +223,17 @@ export async function confirmEntryForTrip(input: { entryId: string; tripId: stri
   const typeLabel = SERVICE_TYPE_LABEL[entry.serviceType] ?? "Visit";
   const pianoLabel = piano ? [piano.brand, piano.model].filter(Boolean).join(" ") : "";
   const created = await createJob({
-    customerId: entry.customerId, locationId: loc?.id ?? null, pianoId: entry.pianoId, technicianId,
+    customerId: entry.customerId, locationId: loc?.id ?? null, pianoId, technicianId,
     title: pianoLabel ? `${typeLabel} — ${pianoLabel}` : typeLabel, serviceType: entry.serviceType, status: "scheduled",
     scheduledStart: input.start, estimatedMinutes: serviceTypeMinutes(entry.serviceType), notes: entry.notes ?? null,
   });
-  if (!created.ok || !created.data) return fail(created.ok ? "Couldn't create the visit." : created.error);
+  if (!created.ok || !created.data) {
+    // Nothing was booked: put the entry back exactly as it was.
+    await db.update(serviceWaitlistEntries).set({ status: prevStatus, tripId: entry.tripId, pianoId: entry.pianoId, updatedAt: new Date() }).where(eq(serviceWaitlistEntries.id, entry.id));
+    return fail(created.ok ? "Couldn't create the visit." : created.error);
+  }
   await db.update(serviceJobs).set({ tripId: trip.id }).where(eq(serviceJobs.id, created.data.id));
-  await db.update(serviceWaitlistEntries).set({ status: "scheduled", jobId: created.data.id, tripId: trip.id, updatedAt: new Date() }).where(eq(serviceWaitlistEntries.id, entry.id));
+  await db.update(serviceWaitlistEntries).set({ jobId: created.data.id, updatedAt: new Date() }).where(eq(serviceWaitlistEntries.id, entry.id));
   touch();
   return ok({ jobId: created.data.id });
 }

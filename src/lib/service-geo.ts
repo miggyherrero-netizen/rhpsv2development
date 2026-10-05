@@ -50,11 +50,13 @@ export type TripCandidate<T> = {
  */
 export function suggestForTrip<T>(input: {
   home: LatLng; dest: LatLng; radiusKm: number;
-  candidates: { item: T; point: LatLng | null; sameCity?: boolean }[];
+  /** `atHome`: lives in the home-base city — only offered when the trip is to that same city (the route starts there, so they are always "on the way"). */
+  candidates: { item: T; point: LatLng | null; sameCity?: boolean; atHome?: boolean }[];
 }): TripCandidate<T>[] {
   const out: TripCandidate<T>[] = [];
   for (const c of input.candidates) {
     if (!c.point) { out.push({ item: c.item, point: null, routeKm: null, destKm: null, reason: "no_location" }); continue; }
+    if (c.atHome && !c.sameCity) continue;
     const routeKm = distanceToSegmentKm(c.point, input.home, input.dest);
     const destKm = haversineKm(c.point, input.dest);
     if (c.sameCity || destKm <= 1) out.push({ item: c.item, point: c.point, routeKm, destKm, reason: "at_destination" });
@@ -114,12 +116,17 @@ export function searchPlaces<T extends { name: string; fullName?: string }>(plac
  * wins over "Santos"; returns null when nothing is recognised (the entry then lands in "Unsorted").
  */
 export function findCityInText<T extends { name: string }>(text: string, cities: T[]): T | null {
+  const raw = text.toLowerCase();
   const hay = ` ${norm(text)} `;
   if (hay.trim() === "") return null;
   const sorted = [...cities].sort((a, b) => b.name.length - a.name.length);
   for (const c of sorted) {
     const n = norm(c.name);
-    if (n.length >= 4 && hay.includes(` ${n} `)) return c;
+    if (n.length < 4) continue;
+    // Short names (Mati, Tago, Lupon…) are also ordinary words: they only count after "taga / sa / in / from / city of",
+    // before "City", or as a comma-separated address part ("Matti, Digos").
+    const short = n.length < 6;
+    if (!short ? hay.includes(` ${n} `) : new RegExp(` (taga|sa|in|at|from|ng|city of) ${n} `).test(hay) || (raw.includes(`${n} city`)) || new RegExp(`[,;]\\s*${n}\\b`).test(raw)) return c;
   }
   return null;
 }

@@ -295,7 +295,7 @@ export default function TodayClient({
       {/* Waitlist follow-ups */}
       {counts.waitlist > 0 && (
         <SectionCard
-          title={<span className="inline-flex items-center gap-2"><ListChecks size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Follow up today ({waitlistFollowUps.length})</span>}
+          title={<span className="inline-flex items-center gap-2"><ListChecks size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> {waitlistFollowUps.length > 0 ? `Follow up today (${waitlistFollowUps.length})` : "Trips"}</span>}
           action={<Link href="/service/waitlist" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open waitlist</Link>}
         >
           {tripPrompts.length > 0 && (

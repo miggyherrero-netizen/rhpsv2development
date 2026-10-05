@@ -39,6 +39,13 @@ check("every offered client has its distances", s.filter((x) => x.point).every((
 check("a wider radius brings Tagum (about 45 km from the line) in", suggestForTrip({ home: davao, dest: gensan, radiusKm: 60, candidates: [cand("tagum", tagum)] }).length, 1);
 check("a tiny radius leaves only the destination city", suggestForTrip({ home: davao, dest: gensan, radiusKm: 2, candidates: [cand("a", { lat: 6.12, lng: 125.18 }, true), cand("digos", digos)] }).map((x) => x.item), ["a"]);
 
+console.log("\nhome-city clients");
+const homeTrip = suggestForTrip({
+  home: davao, dest: digos, radiusKm: 20,
+  candidates: [{ item: "davao-client", point: { lat: 7.07, lng: 125.61 }, atHome: true }, { item: "digos-client", point: digos, sameCity: true }, { item: "home-to-home", point: { lat: 7.07, lng: 125.61 }, atHome: true, sameCity: true }],
+});
+check("clients in the home city aren't offered for a trip elsewhere", homeTrip.map((x) => x.item), ["digos-client", "home-to-home"]);
+
 console.log("\nnames and search");
 check("{area} is the barangay inside Davao City", areaName({ code: DAVAO_CITY_CODE, name: "Davao" }, { name: "Toril" }), "Toril");
 check("…and the city everywhere else", areaName({ code: "112401000", name: "Digos" }, { name: "Zone 1" }), "Digos");
@@ -56,6 +63,7 @@ check("Sta. / Sto. / Gen. abbreviations find the spelled-out names", [
 ], [["Santa Cruz"], ["Santo Tomas"], ["General Santos"]]);
 check("city found in an address", findCityInText("Blk 4 Lot 2, Matti, Digos City, Davao del Sur", places)?.name, "Digos");
 check("longest name wins (General Santos before Santos)", findCityInText("we are in general santos", [...places, { name: "Santos" }])?.name, "General Santos");
+check("a short city name only counts after taga / sa / in", [findCityInText("Mati ra ko, dili ko ganahan", [{ name: "Mati" }])?.name ?? null, findCityInText("taga Mati ko", [{ name: "Mati" }])?.name ?? null], [null, "Mati"]);
 check("nothing recognised -> null (Unsorted)", findCityInText("somewhere far away", places), null);
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }

@@ -144,7 +144,7 @@ export async function getWaitlist(now: Date = new Date()): Promise<WaitlistData>
   return {
     items,
     metrics: {
-      waiting: items.filter((i) => (OPEN_WAIT_STATUSES as string[]).includes(i.status)).length,
+      waiting: items.filter((i) => ["waiting", "messaged", "confirmed"].includes(i.status)).length,
       avgDaysWaiting: avgDaysWaiting(items, now),
       messagedToConfirmed: messagedToConfirmedRate(items, now, 30),
       jobsPerTrip: jobsPerTrip(tripRows),
@@ -180,7 +180,7 @@ export async function getTripPlan(ownerId: string, destCode: string, radiusOverr
   const point = (i: WaitlistItem): LatLng | null => (i.lat !== null && i.lng !== null ? { lat: i.lat, lng: i.lng } : null);
   const suggested = suggestForTrip({
     home: { lat: home.lat, lng: home.lng }, dest: { lat: dest.lat, lng: dest.lng }, radiusKm,
-    candidates: ready.map((i) => ({ item: i, point: point(i), sameCity: i.cityCode === dest.code })),
+    candidates: ready.map((i) => ({ item: i, point: point(i), sameCity: i.cityCode === dest.code, atHome: i.cityCode === home.code })),
   });
   return {
     home: { code: home.code, name: home.name, lat: home.lat, lng: home.lng }, dest, radiusKm,

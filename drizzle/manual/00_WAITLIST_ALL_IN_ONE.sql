@@ -123,7 +123,7 @@ INSERT INTO service_message_templates (key, name, body) VALUES
   ('area_trip', 'Trip announcement', 'Hi {first_name}! Mag-service mi sa {area} sa {date}. Gusto ka ba nga i-tune ang imong {piano}? Ma-schedule tika kung naay slot pa. Salamat! — Herrero Pianos'),
   ('follow_up', 'Follow-up', 'Hi {first_name}! Follow-up lang sa imong {piano} tuning sa {area}. Naa pa ba ka''y interest? Pwede ta mag-set og adlaw. Salamat! — Herrero Pianos'),
   ('confirm_day_before', 'Confirm the day before', 'Hi {first_name}! Reminder: ugma, {date} mga {time}, moadto mi sa {location} para sa imong {piano}. Si {tech_name} ang moabot. Palihug confirm kung naa ka. Salamat! — Herrero Pianos'),
-  ('recall', 'Tuning recall', 'Hi {first_name}! Panahon na para sa regular nga tuning sa imong {piano}. Naa mi''y schedule sa {area} karong {date}. Gusto ka ba nga i-book? Salamat! — Herrero Pianos')
+  ('recall', 'Tuning recall', 'Hi {first_name}! Panahon na para sa regular nga tuning sa imong {piano}. Gusto ka ba nga i-book karong bulana para sa {area}? Salamat! — Herrero Pianos')
 ON CONFLICT (key) DO NOTHING;
 
 -- ---- Saved routes

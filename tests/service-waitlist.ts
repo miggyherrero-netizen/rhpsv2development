@@ -49,6 +49,8 @@ check("fills every placeholder", fillTemplate("Hi {first_name}! {piano} sa {area
 check("the same placeholder twice", fillTemplate("{area} … {area}", { area: "Toril" }).text, "Toril … Toril");
 check("a missing value is reported and the sentence is tidied", fillTemplate("Hi {first_name}, naa mi sa {area} sa {date}.", { first_name: "Ana", date: "Sat" }), { text: "Hi Ana, naa mi sa sa Sat.", missing: ["area"] });
 check("a missing value at the end leaves no dangling comma", fillTemplate("Moabot si {tech_name}, {time}.", { tech_name: "Ariel" }).text, "Moabot si Ariel.");
+check("emoticons and a deliberate ' ?' are never rewritten", fillTemplate("Salamat :) ok ;) tinuod ?", {}).text, "Salamat :) ok ;) tinuod ?");
+check("a recall message with no {date} reads cleanly", fillTemplate(DEFAULT_TEMPLATES.find((t) => t.key === "recall")!.body, { first_name: "Ana", piano: "Yamaha U1", area: "Digos" }).text.includes("karong ."), false);
 check("unknown placeholders are left alone, not blanked", fillTemplate("Hi {nickname} {first_name}", { first_name: "Ana" }).text, "Hi {nickname} Ana");
 check("each seeded template only uses known placeholders", DEFAULT_TEMPLATES.every((t) => [...t.body.matchAll(/\{([a-z_]+)\}/g)].every((m) => (PLACEHOLDERS as readonly string[]).includes(m[1]!))), true);
 check("four seeded templates", DEFAULT_TEMPLATES.map((t) => t.key), ["area_trip", "follow_up", "confirm_day_before", "recall"]);

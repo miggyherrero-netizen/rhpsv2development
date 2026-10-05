@@ -2,7 +2,7 @@
  * Waitlist writes that other server code calls directly (job completion, website inquiries, the daily sweep).
  * Not a "use server" file on purpose: these are internal helpers, not endpoints a browser can invoke.
  */
-import { and, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   phCities, serviceCustomers, serviceLocations, servicePianos, serviceWaitlistEntries, serviceJobs,
@@ -62,8 +62,12 @@ export async function ensureRecallEntry(jobId: string): Promise<void> {
   if (!piano) return;
   const recall = recallEntryFor({ completedAt: job.completedAt }, piano.tuningIntervalMonths || 6);
   if (!recall) return;
+  // This piano was just tuned: any request still open for it (a phone call, a website inquiry, an older recall) is served.
+  await db.update(serviceWaitlistEntries).set({ status: "done", jobId: job.id, updatedAt: new Date() })
+    .where(and(eq(serviceWaitlistEntries.pianoId, piano.id), eq(serviceWaitlistEntries.serviceType, "tuning"), inArray(serviceWaitlistEntries.status, [...OPEN_WAIT_STATUSES, "not_now"] as WaitStatus[])));
+  // One open recall per piano: never a second while the first is still being worked.
   const [existing] = await db.select({ id: serviceWaitlistEntries.id }).from(serviceWaitlistEntries)
-    .where(and(eq(serviceWaitlistEntries.pianoId, piano.id), inArray(serviceWaitlistEntries.status, [...OPEN_WAIT_STATUSES, "not_now"] as WaitStatus[]))).limit(1);
+    .where(and(eq(serviceWaitlistEntries.pianoId, piano.id), eq(serviceWaitlistEntries.source, "recall"), inArray(serviceWaitlistEntries.status, [...OPEN_WAIT_STATUSES, "not_now"] as WaitStatus[]))).limit(1);
   if (existing) return;
   let place = await defaultPlaceForCustomer(db, job.customerId);
   if (job.locationId) {
@@ -82,6 +86,21 @@ export async function completeEntriesForJob(jobId: string): Promise<void> {
     .where(and(eq(serviceWaitlistEntries.jobId, jobId), inArray(serviceWaitlistEntries.status, ["confirmed", "scheduled", "waiting", "messaged"] as WaitStatus[])));
 }
 
+/**
+ * A booked job was cancelled (-> the client is waiting again, with a fresh follow-up) or a finished one was reopened
+ * (-> the entry goes back from "done" to "scheduled"). Without this the entry would be stranded and vanish from every list.
+ */
+export async function releaseEntriesForJob(jobId: string, why: "cancelled" | "reopened", now: Date = new Date()): Promise<void> {
+  if (why === "cancelled") {
+    await db.update(serviceWaitlistEntries)
+      .set({ status: "waiting", jobId: null, tripId: null, nextFollowUpAt: defaultNextFollowUp(now), updatedAt: now })
+      .where(and(eq(serviceWaitlistEntries.jobId, jobId), inArray(serviceWaitlistEntries.status, ["scheduled", "done"] as WaitStatus[])));
+  } else {
+    await db.update(serviceWaitlistEntries).set({ status: "scheduled", updatedAt: now })
+      .where(and(eq(serviceWaitlistEntries.jobId, jobId), eq(serviceWaitlistEntries.status, "done")));
+  }
+}
+
 /** Messaged three times with no yes and the last follow-up date passed -> "not now", back in 30 days. */
 export async function sweepNotNow(now: Date = new Date()): Promise<number> {
   const stale = await db.select().from(serviceWaitlistEntries)
@@ -94,27 +113,50 @@ export async function sweepNotNow(now: Date = new Date()): Promise<number> {
   return ids.length;
 }
 
+const digitsOf = (v: string | null | undefined): string => (v ?? "").replace(/\D/g, "");
+let cityNames: { at: number; rows: { code: string; name: string }[] } | null = null;
+
 /**
- * A website inquiry becomes a waitlist entry: reuse the customer with the same phone (or make one), find the
- * city in what they wrote, and when none is recognised the entry lands in "Unsorted". Never throws into the inquiry form.
+ * A website inquiry becomes a waitlist entry: reuse the customer with the same phone number (however it was typed), find
+ * the city in what they wrote, and when none is recognised the entry lands in "Unsorted". Public and unauthenticated, so it
+ * is defensive: text is capped, a repeat from the same person within a week adds nothing, and there is a global hourly
+ * ceiling. Never throws into the inquiry form.
  */
 export async function createWaitlistFromInquiry(input: { name: string; phone?: string | null; pianoContext?: string | null; message?: string | null }): Promise<void> {
   try {
-    const phone = (input.phone ?? "").trim();
-    let customerId: string | undefined;
-    if (phone) {
-      const [hit] = await db.select({ id: serviceCustomers.id }).from(serviceCustomers).where(eq(serviceCustomers.phone, phone)).limit(1);
-      customerId = hit?.id;
-    }
-    if (!customerId) {
-      const [created] = await db.insert(serviceCustomers).values({ name: input.name.trim(), phone: phone || null, source: "website", tags: ["from:website-inquiry"] }).returning({ id: serviceCustomers.id });
-      customerId = created!.id;
-    }
-    const cities = await db.select({ code: phCities.code, name: phCities.name }).from(phCities);
-    const text = [input.message, input.pianoContext].filter(Boolean).join(" ");
-    const found = findCityInText(text, cities);
-    const note = [input.pianoContext, input.message].filter(Boolean).join(" — ").slice(0, 1_000) || null;
-    await insertEntry(db, { customerId, cityCode: found?.code ?? null, barangayCode: null, serviceType: "tuning", source: "website", notes: note });
+    const name = input.name.trim().slice(0, 120);
+    const phone = (input.phone ?? "").trim().slice(0, 40);
+    const pianoContext = input.pianoContext?.trim().slice(0, 200) || null;
+    const message = input.message?.trim().slice(0, 1_000) || null;
+    if (!name) return;
+    // Global ceiling: a flood of junk can't bury the real waitlist.
+    const [{ n: lastHour }] = await db.select({ n: sql<number>`count(*)::int` }).from(serviceWaitlistEntries)
+      .where(and(eq(serviceWaitlistEntries.source, "website"), gte(serviceWaitlistEntries.createdAt, new Date(Date.now() - 3_600_000))));
+    if ((lastHour ?? 0) >= 40) return;
+
+    const digits = digitsOf(phone);
+    await db.transaction(async (tx) => {
+      let customerId: string | undefined;
+      if (digits.length >= 7) {
+        const [hit] = await tx.select({ id: serviceCustomers.id }).from(serviceCustomers)
+          .where(sql`regexp_replace(coalesce(${serviceCustomers.phone}, ''), '\D', '', 'g') = ${digits}`).limit(1);
+        customerId = hit?.id;
+      }
+      if (customerId) {
+        // Same person asking again within a week: the request is already on the list.
+        const [recent] = await tx.select({ id: serviceWaitlistEntries.id }).from(serviceWaitlistEntries)
+          .where(and(eq(serviceWaitlistEntries.customerId, customerId), eq(serviceWaitlistEntries.source, "website"),
+            inArray(serviceWaitlistEntries.status, [...OPEN_WAIT_STATUSES, "not_now"] as WaitStatus[]), gte(serviceWaitlistEntries.createdAt, new Date(Date.now() - 7 * 86_400_000)))).limit(1);
+        if (recent) return;
+      } else {
+        const [created] = await tx.insert(serviceCustomers).values({ name, phone: phone || null, source: "website", tags: ["from:website-inquiry"] }).returning({ id: serviceCustomers.id });
+        customerId = created!.id;
+      }
+      if (!cityNames || Date.now() - cityNames.at > 10 * 60_000) cityNames = { at: Date.now(), rows: await tx.select({ code: phCities.code, name: phCities.name }).from(phCities) };
+      const found = findCityInText([message, pianoContext].filter(Boolean).join(" "), cityNames.rows);
+      const note = [pianoContext, message].filter(Boolean).join(" — ").slice(0, 1_000) || null;
+      await insertEntry(tx, { customerId, cityCode: found?.code ?? null, barangayCode: null, serviceType: "tuning", source: "website", notes: note });
+    });
   } catch (err) {
     console.error("createWaitlistFromInquiry failed", err);
   }

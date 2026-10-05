@@ -109,20 +109,21 @@ export const firstName = (name: string): string => {
  */
 export function fillTemplate(body: string, vars: Partial<Record<Placeholder, string | null | undefined>>): { text: string; missing: Placeholder[] } {
   const missing = new Set<Placeholder>();
-  const text = body.replace(/\{([a-z_]+)\}/g, (whole, key: string) => {
+  const GAP = "\u0001";
+  const filled = body.replace(/\{([a-z_]+)\}/g, (whole, key: string) => {
     if (!(PLACEHOLDERS as readonly string[]).includes(key)) return whole;
     const v = vars[key as Placeholder];
-    if (v === null || v === undefined || String(v).trim() === "") { missing.add(key as Placeholder); return ""; }
+    if (v === null || v === undefined || String(v).trim() === "") { missing.add(key as Placeholder); return GAP; }
     return String(v).trim();
   });
-  const tidy = text
-    .replace(/[ \t]+/g, " ")
-    .replace(/ +([,.!?;:])/g, "$1")
-    .replace(/([,;:]) *([.!?])/g, "$2")
+  // Tidy ONLY where a value was left out (so ":)" and a deliberate " ?" elsewhere are never touched).
+  const text = filled
+    .replace(new RegExp(` *${GAP} *([,.!?;:])`, "g"), "$1")
+    .replace(new RegExp(` *${GAP} *`, "g"), " ")
+    .replace(/([,;:]) *([.!?])/g, missing.size ? "$2" : "$1 $2")
     .replace(/\( *\)/g, "")
-    .replace(/ *\n */g, "\n")
     .trim();
-  return { text: tidy, missing: [...missing] };
+  return { text, missing: [...missing] };
 }
 
 export function messengerHref(handle: string | null | undefined): string | null {
@@ -151,7 +152,7 @@ export const DEFAULT_TEMPLATES: { key: string; name: string; body: string }[] = 
   },
   {
     key: "recall", name: "Tuning recall",
-    body: "Hi {first_name}! Panahon na para sa regular nga tuning sa imong {piano}. Naa mi'y schedule sa {area} karong {date}. Gusto ka ba nga i-book? Salamat! — Herrero Pianos",
+    body: "Hi {first_name}! Panahon na para sa regular nga tuning sa imong {piano}. Gusto ka ba nga i-book karong bulana para sa {area}? Salamat! — Herrero Pianos",
   },
 ];
 

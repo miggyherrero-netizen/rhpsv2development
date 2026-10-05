@@ -30,6 +30,9 @@ export function CityPicker({
   const [picked, setPicked] = useState<PlaceHit | null>(null);
   const [brgys, setBrgys] = useState<{ code: string; name: string }[]>([]);
   const seq = useRef(0);
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const moved = useRef<"picked" | "cleared" | null>(null);
 
   useEffect(() => {
     const q = query.trim();
@@ -50,7 +53,15 @@ export function CityPicker({
     return () => { cancelled = true; };
   }, [needsBarangays, value.cityCode]);
 
+  // Keyboard / screen-reader focus follows the swap between the search box and the chosen-place block.
+  useEffect(() => {
+    if (moved.current === "picked") changeRef.current?.focus();
+    else if (moved.current === "cleared") inputRef.current?.focus();
+    moved.current = null;
+  }, [value.cityCode]);
+
   const choose = (h: PlaceHit) => {
+    moved.current = "picked";
     setPicked(h); setQuery(""); setHits([]); setOpen(false); setActive(-1);
     onChange({ cityCode: h.code, barangayCode: null }, h);
   };
@@ -64,8 +75,8 @@ export function CityPicker({
         <div className="flex items-center justify-between gap-2 rounded-xl px-3.5 min-h-11" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
           <span className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>{shownLabel ?? value.cityCode}</span>
           <button
-            type="button" aria-label="Change city" className="inline-flex items-center justify-center min-w-11 min-h-11 -mr-2 rounded-lg hover:bg-white/[0.06]"
-            style={{ color: "var(--color-svc-text-faint)" }} onClick={() => { setPicked(null); onChange({ cityCode: null, barangayCode: null }); }}
+            ref={changeRef} type="button" aria-label="Change city" className="inline-flex items-center justify-center min-w-11 min-h-11 -mr-2 rounded-lg hover:bg-white/[0.06]"
+            style={{ color: "var(--color-svc-text-faint)" }} onClick={() => { moved.current = "cleared"; setPicked(null); onChange({ cityCode: null, barangayCode: null }); }}
           >
             <X size={15} aria-hidden="true" />
           </button>
@@ -84,7 +95,7 @@ export function CityPicker({
     <div className="relative">
       <label htmlFor={`${id}-in`} className="block text-[11px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{label}</label>
       <TextInput
-        id={`${id}-in`} role="combobox" aria-expanded={open && list.length > 0} aria-controls={`${id}-list`} aria-autocomplete="list"
+        ref={inputRef} id={`${id}-in`} role="combobox" aria-expanded={open && list.length > 0} aria-controls={`${id}-list`} aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? `${id}-o${active}` : undefined} autoComplete="off" autoFocus={autoFocus}
         placeholder="Type a city or town — e.g. Digos, Gensan, Tagum" value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(-1); }}
@@ -97,6 +108,7 @@ export function CityPicker({
           else if (e.key === "Escape" && open) { e.preventDefault(); setOpen(false); }
         }}
       />
+      <p role="status" aria-live="polite" className="sr-only">{open && list.length > 0 ? `${list.length} places found` : ""}</p>
       {open && list.length > 0 && (
         <ul id={`${id}-list`} role="listbox" aria-label="Matching places" className="absolute z-30 left-0 right-0 mt-1 rounded-lg overflow-auto max-h-64 py-1 shadow-xl" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border-strong)" }}>
           {list.map((h, i) => (
