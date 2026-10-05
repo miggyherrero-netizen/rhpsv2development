@@ -3,15 +3,15 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Phone } from "lucide-react";
+import { Bell, Check, Phone, Trash2 } from "lucide-react";
 import { fmtDate } from "@/lib/format";
 import { telHref } from "@/lib/service-customer-list";
 import {
-  NOTE_MAX, PRESETS, SNOOZE_CHOICES, parseDayInput, presetDate, reminderLabel, reminderState, toDayInput,
+  NOTE_MAX, PRESETS, SNOOZE_CHOICES, parseDayInput, presetDate, reminderLabel, reminderState, softCaps, toDayInput,
 } from "@/lib/service-reminders";
 import { completeReminder, createReminder, deleteReminder, snoozeReminder } from "@/server/service-reminders";
 import type { ReminderRow } from "@/server/service-reminders-data";
-import { Chip, ErrorLine, Field, GhostButton, PrimaryButton, Select, SvcModal, TextArea, TextInput, TONE_TEXT } from "@/components/service-ui";
+import { Chip, ConfirmDialog, ErrorLine, Field, GhostButton, PrimaryButton, Select, SvcModal, TextArea, TextInput, TONE_TEXT } from "@/components/service-ui";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]";
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
@@ -106,16 +106,19 @@ export function RemindMeModal({
 /* ----------------------------------------------------------- one reminder */
 
 /**
- * One reminder. `showClient` puts the client's name first (Today, where several clients mix);
- * on the client's own page it is left out because the page already says who it is.
+ * One reminder. The client's name leads (Today / Reminders page, where several clients mix); on the client's own
+ * page `showClient` is off because the page already says who it is, and the note leads instead.
+ * Wide: who + note on the left, when in the middle, actions on the right. Narrow: stacked, Done gets the width.
  */
 export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date; showClient: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const tel = telHref(r.customerPhone);
   const state = reminderState(r.dueAt, now);
   const label = reminderLabel(r.dueAt, now);
+  const note = r.note ? softCaps(r.note) : null;
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -127,45 +130,79 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
   };
 
   return (
-    <li className="px-5 py-3.5 space-y-2.5">
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+    <li className="@container px-4 sm:px-5 py-4">
+      <div className="grid gap-x-5 gap-y-3 items-center @min-[40rem]:grid-cols-[minmax(0,1fr)_auto_auto]">
+        {/* Who + what */}
         <div className="min-w-0">
           {showClient ? (
-            <Link href={`/service/customers/${r.customerId}`} className={`text-[14.5px] font-medium hover:underline rounded-sm ${FOCUS}`} style={{ color: "var(--color-svc-text)" }}>
+            <Link
+              href={`/service/customers/${r.customerId}`}
+              className={`block text-[16px] font-semibold leading-snug break-words hover:underline rounded-sm ${FOCUS}`}
+              style={{ color: "var(--color-svc-text)" }}
+            >
               {r.customerName}
             </Link>
           ) : null}
-          <p className="text-[13px] break-words" style={r.note ? { color: "var(--color-svc-text)" } : FAINT}>
-            {r.note ?? "No note"}
+          <p
+            className={`break-words ${showClient ? "text-[13.5px] mt-0.5" : "text-[15px] font-medium"}`}
+            style={note ? { color: showClient ? "var(--color-svc-text-dim)" : "var(--color-svc-text)" } : FAINT}
+          >
+            {note ?? "No note"}
           </p>
+          {showClient && tel ? (
+            <a
+              href={tel}
+              aria-label={`Call ${r.customerName} at ${r.customerPhone}`}
+              className={`mt-1.5 inline-flex items-center gap-1.5 min-h-8 text-[12.5px] hover:underline rounded-sm ${FOCUS}`}
+              style={{ color: TONE_TEXT.azure }}
+            >
+              <Phone size={12} aria-hidden="true" /> <span className="svc-num">{r.customerPhone}</span>
+            </a>
+          ) : null}
         </div>
-        <span className="inline-flex items-center gap-2 shrink-0">
-          <span className="svc-num text-[12.5px]" style={DIM}>{fmtDate(r.dueAt)}</span>
+
+        {/* When */}
+        <p className="flex flex-wrap items-center gap-2 @min-[40rem]:justify-end">
+          <span className="svc-num text-[13px]" style={DIM}>{fmtDate(r.dueAt)}</span>
           {label ? <Chip tone={state === "overdue" ? "danger" : state === "today" ? "warn" : "slate"}>{label}</Chip> : null}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {showClient && tel ? (
-          <a href={tel} aria-label={`Call ${r.customerName}`} className={`btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[12.5px] ${FOCUS}`} style={{ color: TONE_TEXT.azure }}>
-            <Phone size={13} /> Call
-          </a>
-        ) : null}
-        <GhostButton type="button" disabled={pending} className="!min-h-11 inline-flex items-center gap-1.5" onClick={() => run(() => completeReminder(r.id))} aria-label={`Mark done: reminder for ${r.customerName}`}>
-          <Check size={13} /> Done
-        </GhostButton>
-        <Select
-          aria-label={`Snooze reminder for ${r.customerName}`} value="" disabled={pending}
-          onChange={(e) => { const d = Number(e.target.value); if (d) run(() => snoozeReminder(r.id, d)); }}
-          className="!w-auto !min-h-11 !text-[12.5px]"
-        >
-          <option value="">Snooze…</option>
-          {SNOOZE_CHOICES.map((c) => <option key={c.days} value={c.days}>{c.label}</option>)}
-        </Select>
-        <GhostButton type="button" disabled={pending} className="!min-h-11" onClick={() => run(() => deleteReminder(r.id))} aria-label={`Delete reminder for ${r.customerName}`}>
-          Delete
-        </GhostButton>
+        </p>
+
+        {/* What to do: Done is the one coloured action; Snooze is quiet; Delete is a small icon that asks first */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button" disabled={pending} onClick={() => run(() => completeReminder(r.id))}
+            aria-label={`Mark done: reminder for ${r.customerName}`}
+            className={`flex-1 @min-[40rem]:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl px-4 min-h-11 text-[13px] font-medium disabled:opacity-60 ${FOCUS}`}
+            style={{ background: "var(--color-svc-accent-soft)", color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}
+          >
+            <Check size={15} aria-hidden="true" /> Done
+          </button>
+          <Select
+            aria-label={`Snooze reminder for ${r.customerName}`} value="" disabled={pending}
+            onChange={(e) => { const d = Number(e.target.value); if (d) run(() => snoozeReminder(r.id, d)); }}
+            className="!w-auto !min-h-11 !text-[13px] !bg-transparent"
+          >
+            <option value="">Snooze</option>
+            {SNOOZE_CHOICES.map((c) => <option key={c.days} value={c.days}>{c.label}</option>)}
+          </Select>
+          <button
+            type="button" disabled={pending} onClick={() => setConfirmDelete(true)}
+            aria-label={`Delete reminder for ${r.customerName}`}
+            className={`inline-flex items-center justify-center w-11 min-h-11 rounded-xl hover:bg-white/[0.05] disabled:opacity-60 ${FOCUS}`}
+            style={{ color: "var(--color-svc-text-faint)" }}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <ErrorLine>{error}</ErrorLine>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this reminder?"
+        message={showClient ? `The reminder for ${r.customerName} will be removed.` : "This reminder will be removed."}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => { setConfirmDelete(false); run(() => deleteReminder(r.id)); }}
+      />
     </li>
   );
 }

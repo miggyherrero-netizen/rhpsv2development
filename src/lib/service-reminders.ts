@@ -94,3 +94,16 @@ export function groupReminders<T extends WithDue & { createdAt?: Date }>(list: T
   for (const r of sortByDue(list)) groups[reminderState(r.dueAt, now)].push(r);
   return groups;
 }
+
+/**
+ * Notes typed in ALL CAPS (pasted from Facebook, an old sheet…) shout over the client's name. For display only:
+ * a note that is mostly capitals is shown in sentence case. Normal notes (and short ones like "SMS") are left as typed.
+ */
+export function softCaps(note: string): string {
+  const letters = note.replace(/[^A-Za-z]/g, "");
+  if (letters.length < 4) return note;
+  const upper = letters.replace(/[^A-Z]/g, "").length;
+  if (upper / letters.length < 0.8) return note;
+  const lower = note.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}

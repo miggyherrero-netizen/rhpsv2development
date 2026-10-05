@@ -1,5 +1,5 @@
 /** Client follow-up reminders: dates, snooze, labels. No database. Run: npx tsx tests/service-reminders.ts */
-import { presetDate, parseDayInput, toDayInput, isTodayOrLater, daysUntil, reminderState, isDueNow, snoozedTo, reminderLabel, sortByDue, cleanNote, NOTE_MAX, groupReminders } from "../src/lib/service-reminders";
+import { presetDate, parseDayInput, toDayInput, isTodayOrLater, daysUntil, reminderState, isDueNow, snoozedTo, reminderLabel, sortByDue, cleanNote, NOTE_MAX, groupReminders, softCaps } from "../src/lib/service-reminders";
 
 let failures = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -44,6 +44,12 @@ console.log("\ngroups");
 const g = groupReminders([a, b, c, { id: "d", dueAt: D("2026-10-06") }], noon);
 check("overdue / today / upcoming, each in due order", [g.overdue.map((x) => x.id), g.today.map((x) => x.id), g.upcoming.map((x) => x.id)], [["b"], ["c"], ["d", "a"]]);
 check("nothing -> three empty groups", groupReminders([], noon), { overdue: [], today: [], upcoming: [] });
+
+console.log("\nall-caps notes");
+check("a shouting note becomes sentence case", softCaps("PIANO RETUNING > SERVICE AFTER SALES"), "Piano retuning > service after sales");
+check("normal notes are left alone", [softCaps("Ask about the Kawai quote"), softCaps("Call Dr. Reyes re: Yamaha"), softCaps("SMS")], ["Ask about the Kawai quote", "Call Dr. Reyes re: Yamaha", "SMS"]);
+check("mostly caps with a few lowercase still counts", softCaps("PIANO SERVICE for Eunice"), "PIANO SERVICE for Eunice");
+check("numbers and symbols do not count as letters", softCaps("PIANO 123 - TUNING"), "Piano 123 - tuning");
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log("\nall reminder checks passed");
