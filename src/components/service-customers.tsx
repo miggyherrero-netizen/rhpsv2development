@@ -1,5 +1,7 @@
 "use client";
 
+import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
+
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Search, Users, Phone, Mail, MapPin, Pencil, Trash2, Archive, Piano as PianoIcon } from "lucide-react";
@@ -347,7 +349,7 @@ export function CustomerSheet({
   onRestore: () => void;
   onAddLocation: (input: {
     label: string; addressLine: string; city: string; area: string; accessNotes: string;
-    travelMinutes: number; travelFee: number;
+    travelMinutes: number; travelFee: number; cityCode?: string | null; barangayCode?: string | null;
   }) => void;
   onDeleteLocation: (id: string) => void;
   onAddPiano: (input: {
@@ -589,9 +591,10 @@ function AddLocationModal({
   pending: boolean;
   onCreate: (input: {
     label: string; addressLine: string; city: string; area: string; accessNotes: string;
-    travelMinutes: number; travelFee: number;
+    travelMinutes: number; travelFee: number; cityCode?: string | null; barangayCode?: string | null;
   }) => void;
 }) {
+  const [place, setPlace] = useState<PlaceValue>({ cityCode: null, barangayCode: null });
   const [label, setLabel] = useState("Residence");
   const [addressLine, setAddressLine] = useState("");
   const [city, setCity] = useState("Davao City");
@@ -614,9 +617,7 @@ function AddLocationModal({
         <Field label="Address">
           <TextInput value={addressLine} onChange={(e) => setAddressLine(e.target.value)} placeholder="14 Palm Drive" />
         </Field>
-        <Field label="City">
-          <TextInput value={city} onChange={(e) => setCity(e.target.value)} />
-        </Field>
+        <CityPicker value={place} onChange={(v, hit) => { setPlace(v); if (hit) setCity(hit.name); }} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Travel (minutes)">
             <TextInput type="number" min={0} value={travelMinutes} onChange={(e) => setTravelMinutes(e.target.value)} />
@@ -635,7 +636,7 @@ function AddLocationModal({
             disabled={!addressLine.trim()}
             onClick={() =>
               onCreate({
-                label, addressLine, city, area, accessNotes,
+                label, addressLine, city, area, accessNotes, cityCode: place.cityCode, barangayCode: place.barangayCode,
                 travelMinutes: Number(travelMinutes) || 0,
                 travelFee: parsePesoInput(travelFee) ?? 0,
               })

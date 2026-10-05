@@ -12,7 +12,7 @@ import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
   serviceJobs, serviceJobItems, serviceJobEvents, serviceTimeLogs, serviceInvoices,
-  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, pianos,
+  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, pianos, phCities, phBarangays,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { addDays } from "@/lib/dates";
@@ -31,6 +31,7 @@ import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/s
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
 import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
 import { isBatchCustomer } from "@/lib/service-reports";
+import { completeEntriesForJob, ensureRecallEntry } from "@/server/service-waitlist-core";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -144,21 +145,45 @@ export type LocationInput = {
   customerId: string; label?: string | null; addressLine: string; city?: string | null;
   area?: string | null; landmark?: string | null; accessNotes?: string | null;
   travelMinutes?: number; travelFee?: number;
+  /** PSGC city/municipality code (province and region follow from it) and optional barangay code. */
+  cityCode?: string | null; barangayCode?: string | null;
 };
+
+/** Validates a picked city/barangay and returns the names that keep the older free-text `city` / `area` fields in step. */
+async function resolvePlace(cityCode?: string | null, barangayCode?: string | null): Promise<
+  { ok: true; cityCode: string | null; barangayCode: string | null; cityName: string | null; barangayName: string | null } | { ok: false; error: string }
+> {
+  const code = str(cityCode);
+  if (!code) return { ok: true, cityCode: null, barangayCode: null, cityName: null, barangayName: null };
+  const [city] = await db.select({ code: phCities.code, name: phCities.name }).from(phCities).where(eq(phCities.code, code)).limit(1);
+  if (!city) return { ok: false, error: "That city or municipality isn't in the list." };
+  const bCode = str(barangayCode);
+  let barangayName: string | null = null;
+  if (bCode) {
+    const [b] = await db.select({ name: phBarangays.name }).from(phBarangays).where(and(eq(phBarangays.code, bCode), eq(phBarangays.cityCode, code))).limit(1);
+    if (!b) return { ok: false, error: "That barangay doesn't belong to the chosen city." };
+    barangayName = b.name;
+  }
+  return { ok: true, cityCode: city.code, barangayCode: bCode || null, cityName: city.name, barangayName };
+}
 
 export async function createLocation(input: LocationInput): Promise<Result<{ id: string }>> {
   await requireUser();
   const addressLine = str(input.addressLine, 300);
   if (!input.customerId) return fail("Pick a customer first.");
   if (!addressLine) return fail("Address is required.");
+  const place = await resolvePlace(input.cityCode, input.barangayCode);
+  if (!place.ok) return fail(place.error);
   const [row] = await db
     .insert(serviceLocations)
     .values({
       customerId: input.customerId,
       label: strOr(input.label, "Residence").slice(0, 80),
       addressLine,
-      city: strOr(input.city, "Davao City").slice(0, 80),
-      area: str(input.area, 80),
+      cityCode: place.cityCode,
+      barangayCode: place.barangayCode,
+      city: place.cityName ?? strOr(input.city, "Davao City").slice(0, 80),
+      area: str(input.area, 80) ?? place.barangayName,
       landmark: str(input.landmark, 200),
       accessNotes: str(input.accessNotes, 1_000),
       travelMinutes: Math.max(0, intOr(input.travelMinutes, 0)),
@@ -172,9 +197,12 @@ export async function createLocation(input: LocationInput): Promise<Result<{ id:
 export async function updateLocation(id: string, patch: Partial<LocationInput>): Promise<Result> {
   await requireUser();
   if (!id) return fail("Missing location.");
+  const place = patch.cityCode !== undefined ? await resolvePlace(patch.cityCode, patch.barangayCode) : null;
+  if (place && !place.ok) return fail(place.error);
   await db
     .update(serviceLocations)
     .set({
+      ...(place && place.ok ? { cityCode: place.cityCode, barangayCode: place.barangayCode, ...(place.cityName ? { city: place.cityName } : {}), ...(place.barangayName ? { area: place.barangayName } : {}) } : {}),
       label: patch.label !== undefined ? strOr(patch.label, "Residence").slice(0, 80) : undefined,
       addressLine: patch.addressLine !== undefined ? strU(patch.addressLine, 300) : undefined,
       city: patch.city !== undefined ? strOr(patch.city, "Davao City").slice(0, 80) : undefined,
@@ -813,6 +841,7 @@ export async function recalcJobLabor(jobId: string): Promise<void> {
 
 /** After a tuning/maintenance visit, roll the piano's next-service date forward. */
 async function advanceRecall(jobId: string): Promise<void> {
+  await completeEntriesForJob(jobId);
   const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
   if (!job?.pianoId || job.jobType !== "service") return;
   // Only a tuning-type visit counts as "last tuned"; a repair or assessment leaves the recall date alone.
@@ -825,6 +854,8 @@ async function advanceRecall(jobId: string): Promise<void> {
     .update(servicePianos)
     .set({ lastServiceAt: servedAt, nextServiceDueAt: next, updatedAt: new Date() })
     .where(eq(servicePianos.id, piano.id));
+  // The recall also goes on the waitlist, due one tuning interval from now.
+  await ensureRecallEntry(jobId);
 }
 
 /* ---- job line items ---- */

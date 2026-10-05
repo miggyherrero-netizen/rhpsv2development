@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
+import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
 import { peso } from "@/lib/format";
 import { EXPENSE_KINDS, defaultKindForCategory } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
@@ -153,6 +154,8 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
 
   const [addPlace, setAddPlace] = useState(false);
   const [place, setPlace] = useState({ label: "Home", addressLine: "", area: "" });
+  const [placeCity, setPlaceCity] = useState<PlaceValue>({ cityCode: null, barangayCode: null });
+  const [placeCityName, setPlaceCityName] = useState("Davao City");
   const [addPiano, setAddPiano] = useState(false);
   const [piano, setPiano] = useState({ brand: "", model: "", type: "Upright", lastTuned: "" });
   const [inlineBusy, setInlineBusy] = useState(false);
@@ -162,12 +165,12 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
 
   const savePlace = async () => {
     setInlineBusy(true); setInlineErr(null);
-    const res = await createLocation({ customerId, label: place.label, addressLine: place.addressLine, area: place.area, city: "Davao City" });
+    const res = await createLocation({ customerId, label: place.label, addressLine: place.addressLine, area: place.area, city: placeCityName, cityCode: placeCity.cityCode, barangayCode: placeCity.barangayCode });
     setInlineBusy(false);
     if (!res.ok || !res.data) return setInlineErr(res.ok ? "Couldn't save the address." : res.error);
-    const created = { id: res.data.id, label: place.label || "Address", addressLine: place.addressLine, city: "Davao City", area: place.area || null, travelFeeCents: 0 };
+    const created = { id: res.data.id, label: place.label || "Address", addressLine: place.addressLine, city: placeCityName, area: place.area || null, travelFeeCents: 0 };
     setPlacesBy((cur) => ({ ...cur, [customerId]: { ...(cur[customerId] ?? NO_PLACES), locations: [...(cur[customerId]?.locations ?? []), created] } }));
-    setLocationId(res.data.id); setAddPlace(false); setPlace({ label: "Home", addressLine: "", area: "" });
+    setLocationId(res.data.id); setAddPlace(false); setPlace({ label: "Home", addressLine: "", area: "" }); setPlaceCity({ cityCode: null, barangayCode: null });
   };
   const savePiano = async () => {
     setInlineBusy(true); setInlineErr(null);
@@ -263,7 +266,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
         <InlineBox onCancel={() => { setAddPlace(false); setInlineErr(null); }} onSave={savePlace} busy={inlineBusy} err={inlineErr} saveLabel="Save address" canSave={!!place.addressLine.trim()}>
           <Field label="Label"><TextInput value={place.label} onChange={(e) => setPlace({ ...place, label: e.target.value })} placeholder="e.g. Home" /></Field>
           <Field label="Address"><TextInput value={place.addressLine} onChange={(e) => setPlace({ ...place, addressLine: e.target.value })} placeholder="e.g. 12 Acacia St, Matina" autoFocus /></Field>
-          <Field label="Area"><TextInput value={place.area} onChange={(e) => setPlace({ ...place, area: e.target.value })} placeholder="e.g. Matina" /></Field>
+          <CityPicker value={placeCity} onChange={(v, hit) => { setPlaceCity(v); if (hit) setPlaceCityName(hit.name); }} />
         </InlineBox>
       )}
       {addPiano && (

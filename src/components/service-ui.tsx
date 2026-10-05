@@ -19,7 +19,7 @@ import type { Tone } from "@/lib/service";
 
 export const TONE_TEXT: Record<Tone, string> = {
   slate: "var(--color-svc-text-dim)",
-  azure: "var(--color-svc-accent)",
+  azure: "var(--color-svc-accent-text, var(--color-svc-accent))",
   violet: "var(--color-svc-violet)",
   success: "var(--color-svc-success)",
   warn: "var(--color-svc-warn)",

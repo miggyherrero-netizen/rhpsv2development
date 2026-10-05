@@ -17,7 +17,12 @@ const SERIES = [
   { key: "expenseCents", label: "Expenses", color: "var(--color-svc-violet)" },
 ] as const;
 
-export default function FinanceClient({ report }: { report: FinanceReport }) {
+export type WaitlistFinance = {
+  waiting: number; avgDaysWaiting: number | null; jobsPerTrip: number | null; recallRevenueCents: number; recallJobs: number;
+  messagedToConfirmed: { messaged: number; confirmed: number; ratePct: number | null };
+};
+
+export default function FinanceClient({ report, waitlist }: { report: FinanceReport; waitlist: WaitlistFinance }) {
   const { kpis, split, months, aging, expenseByCategory, topCustomers, jobMargins, options, range, drafts, granularity } = report;
   const avgSub = options.avgInvoiceBasis === "job" ? "invoiced ÷ jobs completed" : "invoiced ÷ invoices issued";
   const revenueHeading = options.marginExcludesVat ? "Revenue excl. VAT" : "Invoiced";
@@ -98,6 +103,16 @@ export default function FinanceClient({ report }: { report: FinanceReport }) {
           After overhead: <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.netCents)}</b>
           {split.stockOnHandCents > 0 ? <> · <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.stockOnHandCents)}</b> tied up in unsold piano stock (not counted until sold)</> : null}
         </p>
+      </section>
+
+      <section aria-labelledby="fin-wait" className="space-y-2.5">
+        <h2 id="fin-wait" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>Waitlist &amp; recalls</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Recall revenue" value={<Money cents={waitlist.recallRevenueCents} />} tone="success" sub={`${waitlist.recallJobs} recall visit${waitlist.recallJobs === 1 ? "" : "s"} invoiced · ${range.label.toLowerCase()}`} />
+          <StatCard label="Waiting now" value={waitlist.waiting} sub={waitlist.avgDaysWaiting === null ? "nobody waiting" : `avg ${waitlist.avgDaysWaiting} days`} />
+          <StatCard label="Messaged → confirmed" value={waitlist.messagedToConfirmed.ratePct === null ? "—" : `${waitlist.messagedToConfirmed.ratePct}%`} sub={`${waitlist.messagedToConfirmed.confirmed} of ${waitlist.messagedToConfirmed.messaged} · last 30 days`} />
+          <StatCard label="Jobs per trip" value={waitlist.jobsPerTrip === null ? "—" : waitlist.jobsPerTrip} sub="trips with bookings" tone="azure" />
+        </div>
       </section>
 
       {report.pianoSales.length > 0 && (

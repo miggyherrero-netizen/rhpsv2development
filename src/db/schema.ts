@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   type AnyPgColumn,
   pgEnum,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Recurrence } from "@/lib/dates";
@@ -338,6 +339,41 @@ export const serviceCustomers = pgTable("service_customers", {
   nameIdx: index("service_customers_name_idx").on(t.name),
 }));
 
+/* ============ PHILIPPINE GEOGRAPHY (Mindanao) — seeded from PSGC, read-only reference data ============ */
+
+export const phRegions = pgTable("ph_regions", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  shortName: text("short_name").notNull(), // IX, X, XI, XII, XIII, BARMM
+});
+
+export const phProvinces = pgTable("ph_provinces", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  regionCode: text("region_code").notNull().references(() => phRegions.code, { onDelete: "cascade" }),
+}, (t) => ({ regionIdx: index("ph_provinces_region_idx").on(t.regionCode) }));
+
+export const phCities = pgTable("ph_cities", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  fullName: text("full_name").notNull(),
+  kind: text("kind").notNull().default("municipality"), // city | municipality
+  /** NULL for independent cities that PSGC lists without a province. */
+  provinceCode: text("province_code").references(() => phProvinces.code, { onDelete: "set null" }),
+  regionCode: text("region_code").notNull().references(() => phRegions.code, { onDelete: "cascade" }),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+}, (t) => ({
+  provinceIdx: index("ph_cities_province_idx").on(t.provinceCode),
+  regionIdx: index("ph_cities_region_idx").on(t.regionCode),
+}));
+
+export const phBarangays = pgTable("ph_barangays", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  cityCode: text("city_code").notNull().references(() => phCities.code, { onDelete: "cascade" }),
+}, (t) => ({ cityIdx: index("ph_barangays_city_idx").on(t.cityCode) }));
+
 export const serviceLocations = pgTable("service_locations", {
   id: uuid("id").defaultRandom().primaryKey(),
   customerId: uuid("customer_id")
@@ -351,10 +387,14 @@ export const serviceLocations = pgTable("service_locations", {
   accessNotes: text("access_notes"), // gate code, stairs, parking
   travelMinutes: integer("travel_minutes").notNull().default(0),
   travelFeeCents: integer("travel_fee_cents").notNull().default(0),
+  /** Where it is, from the PSGC lists: pick a city/municipality (province and region follow). Barangay is optional. */
+  cityCode: text("city_code").references(() => phCities.code, { onDelete: "set null" }),
+  barangayCode: text("barangay_code").references(() => phBarangays.code, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 }, (t) => ({
   customerIdx: index("service_locations_customer_idx").on(t.customerId),
+  cityIdx: index("service_locations_city_idx").on(t.cityCode),
 }));
 
 export const servicePianos = pgTable("service_pianos", {
@@ -396,6 +436,19 @@ export const serviceCatalog = pgTable("service_catalog", {
   /** Set on a member row to group it under a `package` row: picking the package adds every member as a line. */
   packageId: uuid("package_id").references((): AnyPgColumn => serviceCatalog.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** A planned run to one place (e.g. "Gensan, Oct 18"): the waitlist clients confirmed for it become its jobs. */
+export const serviceTrips = pgTable("service_trips", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  cityCode: text("city_code").references(() => phCities.code, { onDelete: "set null" }),
+  tripDate: timestamp("trip_date", { mode: "date" }),
+  /** planned | done | cancelled — "done" once the owner has seen the "still waiting nearby" prompt. */
+  status: text("status").notNull().default("planned"),
+  notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -442,9 +495,12 @@ export const serviceJobs = pgTable("service_jobs", {
   salePriceCents: integer("sale_price_cents").notNull().default(0),
   /** Deposit already received; balance = price − deposit until the sale is completed (collected at delivery). */
   depositCents: integer("deposit_cents").notNull().default(0),
+  /** The waitlist trip this visit belongs to, if it was planned from the waitlist. */
+  tripId: uuid("trip_id").references(() => serviceTrips.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 }, (t) => ({
+  tripIdx: index("service_jobs_trip_idx").on(t.tripId),
   jobTypeIdx: index("service_jobs_job_type_idx").on(t.jobType),
   salePianoIdx: index("service_jobs_sale_piano_idx").on(t.salePianoId),
   scheduledIdx: index("service_jobs_scheduled_idx").on(t.scheduledStart),
@@ -641,6 +697,9 @@ export const serviceSettings = pgTable("service_settings", {
   defaultHourlyRateCents: integer("default_hourly_rate_cents").notNull().default(25000),
   defaultTravelFeeCents: integer("default_travel_fee_cents").notNull().default(0),
   defaultTuningIntervalMonths: integer("default_tuning_interval_months").notNull().default(6),
+  /** Where trips start from (a PSGC city code; Davao City by default) and how far from the route / destination to look. */
+  homeBaseCityCode: text("home_base_city_code").notNull().default("112402000"),
+  tripRadiusKm: integer("trip_radius_km").notNull().default(40),
   reminderLeadDays: integer("reminder_lead_days").notNull().default(30),
   currency: text("currency").notNull().default("PHP"),
   workingHours: jsonb("working_hours").$type<WorkingHours>().notNull().default({}),
@@ -693,3 +752,59 @@ export type ServicePayment = typeof servicePayments.$inferSelect;
 export type ServiceDocumentShare = typeof serviceDocumentShares.$inferSelect;
 export type ServiceExpense = typeof serviceExpenses.$inferSelect;
 export type ServiceSetting = typeof serviceSettings.$inferSelect;
+
+/* ============ WAITLIST BY AREA ============ */
+
+export const serviceWaitlistStatus = pgEnum("service_waitlist_status", ["waiting", "messaged", "confirmed", "scheduled", "done", "not_now"]);
+export const serviceWaitlistSource = pgEnum("service_waitlist_source", ["website", "facebook", "phone", "recall", "walk_in"]);
+
+export const serviceWaitlistEntries = pgTable("service_waitlist_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  customerId: uuid("customer_id").notNull().references(() => serviceCustomers.id, { onDelete: "cascade" }),
+  pianoId: uuid("piano_id").references(() => servicePianos.id, { onDelete: "set null" }),
+  serviceType: text("service_type").notNull().default("tuning"),
+  /** The area, from the PSGC lists (defaults from the customer's location; NULL = "Unsorted"). */
+  cityCode: text("city_code").references(() => phCities.code, { onDelete: "set null" }),
+  barangayCode: text("barangay_code").references(() => phBarangays.code, { onDelete: "set null" }),
+  requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+  status: serviceWaitlistStatus("status").notNull().default("waiting"),
+  lastContactedAt: timestamp("last_contacted_at", { mode: "date" }),
+  /** Required: every entry always has a next nudge (default 3 days out). */
+  nextFollowUpAt: timestamp("next_follow_up_at", { mode: "date" }).notNull(),
+  followUpCount: integer("follow_up_count").notNull().default(0),
+  estValueCents: integer("est_value_cents").notNull().default(0),
+  notes: text("notes"),
+  tripId: uuid("trip_id").references(() => serviceTrips.id, { onDelete: "set null" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  source: serviceWaitlistSource("source").notNull().default("phone"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  statusIdx: index("service_waitlist_status_idx").on(t.status),
+  cityIdx: index("service_waitlist_city_idx").on(t.cityCode),
+  followUpIdx: index("service_waitlist_follow_up_idx").on(t.nextFollowUpAt),
+  customerIdx: index("service_waitlist_customer_idx").on(t.customerId),
+}));
+
+/** Editable message texts with {first_name} {area} {date} {time} {piano} {location} {price} {tech_name} placeholders. */
+export const serviceMessageTemplates = pgTable("service_message_templates", {
+  key: text("key").primaryKey(),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** A saved run ("South Run"): an ordered list of cities, used to filter the waitlist. */
+export const serviceRoutes = pgTable("service_routes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  cityCodes: jsonb("city_codes").$type<string[]>().notNull().default([]),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export type PhCity = typeof phCities.$inferSelect;
+export type ServiceWaitlistEntry = typeof serviceWaitlistEntries.$inferSelect;
+export type ServiceTrip = typeof serviceTrips.$inferSelect;
+export type ServiceRoute = typeof serviceRoutes.$inferSelect;
+export type ServiceMessageTemplate = typeof serviceMessageTemplates.$inferSelect;

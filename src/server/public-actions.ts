@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { inquiries } from "@/db/schema";
+import { createWaitlistFromInquiry } from "@/server/service-waitlist-core";
 
 export async function submitInquiry(input: {
   name: string; phone?: string; pianoContext?: string; message?: string; source?: string;
@@ -19,5 +20,7 @@ export async function submitInquiry(input: {
     message: input.message?.trim() || null,
     source: input.source || "assessment",
   });
+  // The inquiry also joins the Home Service waitlist (area read from what they wrote; "Unsorted" if unclear).
+  await createWaitlistFromInquiry({ name, phone, pianoContext: input.pianoContext, message: input.message });
   return { ok: true as const };
 }

@@ -31,7 +31,7 @@ const PAPER: React.CSSProperties = {
   ["--color-svc-text" as string]: "#172a3e", ["--color-svc-text-dim" as string]: "#4d6974", ["--color-svc-text-faint" as string]: "#5f7681",
   ["--color-svc-border" as string]: "rgba(23,42,62,0.14)", ["--color-svc-border-strong" as string]: "rgba(23,42,62,0.28)",
   ["--color-svc-surface" as string]: "#ffffff", ["--color-svc-surface-2" as string]: "#f1f6f5",
-  ["--color-svc-accent" as string]: "#1f5fbf", ["--color-svc-warn" as string]: "#8a5a14", ["--color-svc-success" as string]: "#1f7a52", ["--color-svc-danger" as string]: "#b03a3a",
+  ["--color-svc-accent" as string]: "#1f5fbf", ["--color-svc-accent-text" as string]: "#1f5fbf", ["--color-svc-warn" as string]: "#8a5a14", ["--color-svc-success" as string]: "#1f7a52", ["--color-svc-danger" as string]: "#b03a3a",
 };
 
 export default function InvoiceDetailClient({

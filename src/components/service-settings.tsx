@@ -1,5 +1,7 @@
 "use client";
 
+import TripSettings from "@/components/service-settings-trips";
+
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
 import { peso } from "@/lib/format";
@@ -28,11 +30,21 @@ export default function SettingsClient({
   technicians,
   catalog,
   hasData,
+  homeBase,
+  radiusKm,
+  routes,
+  templates,
+  cityLabels,
 }: {
   settings: ServiceSettings;
   technicians: ServiceTechnician[];
   catalog: ServiceCatalogItem[];
   hasData: boolean;
+  homeBase: string;
+  radiusKm: number;
+  routes: { id: string; name: string; cityCodes: string[] }[];
+  templates: { key: string; name: string; body: string }[];
+  cityLabels: Record<string, string>;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -308,6 +320,8 @@ export default function SettingsClient({
         </div>
 
       </SectionCard>
+
+      <TripSettings homeBase={homeBase} radiusKm={radiusKm} routes={routes} templates={templates} cityLabels={cityLabels} />
 
       {/* Appears only when something changed */}
       {dirty && (

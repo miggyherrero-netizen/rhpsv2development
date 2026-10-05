@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { canViewFinance } from "@/lib/service-flow";
-import { parseRange } from "@/lib/service-reports";
+import { parseRange, resolveRange } from "@/lib/service-reports";
 import { getFinanceReport, getServiceSettings } from "@/server/service-data";
 import FinanceClient from "@/components/service-finance";
+import { getWaitlist, getWaitlistFinance } from "@/server/service-waitlist-data";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export default async function ServiceFinancePage({ searchParams }: { searchParam
   if (!canViewFinance(user)) redirect("/service/today");
   const { range } = await searchParams;
   const settings = await getServiceSettings(user.id);
-  const report = await getFinanceReport(settings, parseRange(range));
-  return <FinanceClient report={report} />;
+  const rangeKey = parseRange(range);
+  const resolved = resolveRange(rangeKey);
+  const [report, waitlist, recall] = await Promise.all([getFinanceReport(settings, rangeKey), getWaitlist(), getWaitlistFinance(resolved.from, resolved.to)]);
+  return <FinanceClient report={report} waitlist={{ ...waitlist.metrics, ...recall }} />;
 }

@@ -288,7 +288,7 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
 .ow-divide > * + * { border-top: 1px solid var(--color-ow-border); }
 
 /* ---------- Home Service workspace surfaces ---------- */
-.svc-shell { background: var(--color-svc-bg); color: var(--color-svc-text); }
+.svc-shell { --color-svc-accent-text: #6ba2f5; /* azure for small text on tinted surfaces (4.5:1); defined here, not in @theme, so it is always emitted */ background: var(--color-svc-bg); color: var(--color-svc-text); }
 .svc-sidebar { background: var(--color-svc-sidebar); border-color: var(--color-svc-border); }
 
 .card-svc {

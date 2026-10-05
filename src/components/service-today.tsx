@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Sun, MapPin, Square, CheckCircle2, Phone, Wallet, Plus, Send, Copy, MessageCircle,
-  AlertTriangle, CalendarClock, FileClock, Check, TrendingUp, ClipboardCheck,
+  AlertTriangle, CalendarClock, FileClock, Check, TrendingUp, ClipboardCheck, ListChecks,
 } from "lucide-react";
 import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
 import { jobHeading } from "@/lib/service-reports";
@@ -15,6 +15,10 @@ import {
 } from "@/lib/service";
 import type { TodayBoard } from "@/server/service-data";
 import { stopTimer, createJob, setInvoiceStatus } from "@/server/service";
+import { closeTrip } from "@/server/service-waitlist";
+import MessageActions from "@/components/service-message-actions";
+import { WAIT_STATUS_LABEL } from "@/lib/service-waitlist";
+import type { TripPrompt, WaitlistItem } from "@/server/service-waitlist-data";
 import StepButton from "@/components/service-step-button";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import {
@@ -44,10 +48,16 @@ export default function TodayClient({
   board,
   customers,
   showroomPianos,
+  waitlistFollowUps,
+  tripPrompts,
+  templates,
 }: {
   board: TodayBoard;
   customers: { id: string; name: string; isBatch?: boolean }[];
   showroomPianos: ShowroomPiano[];
+  waitlistFollowUps: WaitlistItem[];
+  tripPrompts: TripPrompt[];
+  templates: { key: string; name: string; body: string }[];
 }) {
   // `clock` is null until mount — anything time-sensitive waits for it so the server and client markup agree.
   const clock = useNow(1_000);
@@ -77,6 +87,7 @@ export default function TodayClient({
   const counts = {
     now: visits.length + otherRunning.length,
     money: board.draftInvoices.length + board.unpaid.length + board.deliveryBalances.length,
+    waitlist: waitlistFollowUps.length + tripPrompts.length,
     next7: board.next7.length,
     followUps: board.staleQuotes.length + board.recalls.length + board.unfinished.length,
     week: weekHasData ? 1 : 0,
@@ -278,6 +289,50 @@ export default function TodayClient({
               </ul>
             </div>
           )}
+        </SectionCard>
+      )}
+
+      {/* Waitlist follow-ups */}
+      {counts.waitlist > 0 && (
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><ListChecks size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Follow up today ({waitlistFollowUps.length})</span>}
+          action={<Link href="/service/waitlist" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open waitlist</Link>}
+        >
+          {tripPrompts.length > 0 && (
+            <ul className="svc-divide">
+              {tripPrompts.map((t) => (
+                <li key={t.tripId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                  <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+                    <b className="font-medium">{t.name}</b> is done.{" "}
+                    {t.stillWaiting > 0 ? `${t.stillWaiting} other client${t.stillWaiting === 1 ? "" : "s"} in ${t.cityName ?? "that area"} still waiting — message them?` : "Nobody else is waiting there."}
+                  </p>
+                  <div className="flex gap-2">
+                    {t.stillWaiting > 0 && t.cityCode ? <Link href={`/service/waitlist/plan?city=${t.cityCode}`} onClick={() => { void closeTrip(t.tripId); }} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Message them</Link> : null}
+                    <GhostButton className="!min-h-11" disabled={pending} onClick={() => run(() => closeTrip(t.tripId))}>Not now</GhostButton>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ul className="svc-divide">
+            {waitlistFollowUps.map((w) => (
+              <li key={w.id} className="px-5 py-3 space-y-2.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-[13.5px] font-medium" style={{ color: "var(--color-svc-text)" }}>
+                    {w.customerName} <span className="text-[12px] font-normal" style={DIM}>· {w.pianoLabel ?? "piano"} · {w.cityName ?? "Unsorted"}</span>
+                  </p>
+                  <span className="text-[11.5px]" style={{ color: w.nextFollowUpAt.getTime() < board.date.getTime() ? "var(--color-svc-danger)" : "var(--color-svc-text-faint)" }}>
+                    {WAIT_STATUS_LABEL[w.status]} · message {w.followUpCount + 1}
+                  </span>
+                </div>
+                <MessageActions
+                  entryId={w.id} customerName={w.customerName} phone={w.customerPhone} messenger={w.messenger} compact
+                  template={templates.find((t) => t.key === (w.source === "recall" && w.status === "waiting" ? "recall" : "follow_up"))?.body ?? ""}
+                  vars={{ area: w.areaLabel, piano: w.pianoLabel ?? "piano" }}
+                />
+              </li>
+            ))}
+          </ul>
         </SectionCard>
       )}
 

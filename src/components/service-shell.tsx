@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -16,6 +16,7 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
       { href: "/service/today", label: "Today", icon: Sun },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
+      { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
       { href: "/service/time", label: "Time", icon: Timer },
     ],
   },
