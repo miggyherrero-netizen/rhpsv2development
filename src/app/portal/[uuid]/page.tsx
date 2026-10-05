@@ -30,14 +30,14 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
           <div className="flex items-center justify-between">
             <Link href="/" className="leading-none">
               <span className="font-serif text-xl font-medium tracking-[0.06em]">HERRERO</span>
-              <span className="block text-[12px] text-white/75 mt-0.5">Piano sales &amp; restoration</span>
+              <span className="block text-[12px] text-white/75 mt-0.5">Piano Sales &amp; Restoration</span>
             </Link>
             <span className="text-[13px] text-white/80 flex items-center gap-1.5">
-              <ShieldCheck size={13} /> Private exhibit
+              <ShieldCheck size={13} /> Private Exhibit
             </span>
           </div>
           <div className="mt-16">
-            <p className="pub-kicker !text-white/90">Prepared for</p>
+            <p className="pub-kicker !text-white/90">Prepared For</p>
             <h1 className="font-serif font-medium tracking-[-0.01em] text-4xl sm:text-5xl mt-3">{project.clientName}</h1>
             <p className="text-white/85 mt-3 text-[16px]">
               {project.pianoBrand} {project.pianoModel}
@@ -73,7 +73,7 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
                 )}
                 <div>
                   <p className="flex items-center gap-1.5 text-[14px] font-semibold text-gold">
-                    <Sparkles size={12} /> Latest update · {fmtDate(new Date(latest.updateDate))}
+                    <Sparkles size={12} /> Latest Update · {fmtDate(new Date(latest.updateDate))}
                   </p>
                   <h3 className="font-serif font-medium text-[1.6rem] mt-1.5 leading-tight text-ink">{latest.title}</h3>
                   {latest.body && <p className="text-subtle text-[15.5px] leading-relaxed mt-2">{latest.body}</p>}
@@ -86,8 +86,8 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
 
       {/* timeline */}
       <main className="max-w-4xl mx-auto px-6 py-20">
-        <p className="text-center text-[15px] font-semibold text-gold">The journey of your instrument</p>
-        <h2 className="text-center font-serif font-medium text-[2.4rem] sm:text-5xl mt-3 text-ink">Restoration journal</h2>
+        <p className="text-center text-[15px] font-semibold text-gold">The Journey of Your Instrument</p>
+        <h2 className="text-center font-serif font-medium text-[2.4rem] sm:text-5xl mt-3 text-ink">Restoration Journal</h2>
 
         {updates.length === 0 ? (
           <p className="text-center text-subtle text-[16px] mt-16 max-w-md mx-auto leading-relaxed">

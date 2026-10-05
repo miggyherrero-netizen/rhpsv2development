@@ -36,7 +36,7 @@ export function PhoneText({ text }: { text: string }): ReactNode {
   return <>{parts}</>;
 }
 
-export function MessengerButton({ className = "", label = "Message us on Messenger" }: { className?: string; label?: string }) {
+export function MessengerButton({ className = "", label = "Message Us on Messenger" }: { className?: string; label?: string }) {
   return (
     <a
       href={MESSENGER_URL}
@@ -65,10 +65,10 @@ export function MobileContactBar({ content, home }: { content: WebsiteContent; h
           <Phone size={17} />
         </a>
         <a href={MESSENGER_URL} target="_blank" rel="noopener noreferrer" className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-gold/60 text-gold text-[14px] font-semibold ${FOCUS_RING}`}>
-          <MessageCircle size={15} /> Message us
+          <MessageCircle size={15} /> Message Us
         </a>
         <a href={home ? "#assessment" : "/#assessment"} className={`btn-brass flex h-11 flex-[1.3] items-center justify-center rounded-full text-[14px] font-semibold ${FOCUS_RING}`}>
-          Book an assessment
+          Book an Assessment
         </a>
       </div>
     </div>
@@ -98,7 +98,7 @@ export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boo
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[72px] flex items-center justify-between">
         <a href={home ? "#top" : "/"} className={`leading-none rounded-sm ${FOCUS_RING}`}>
           <span className="font-serif text-[1.45rem] font-medium tracking-[0.06em] text-ink">HERRERO</span>
-          <span className="block text-[12px] text-subtle mt-0.5">Piano sales &amp; restoration</span>
+          <span className="block text-[12px] text-subtle mt-0.5">Piano Sales &amp; Restoration</span>
         </a>
         <nav aria-label="Primary" className="hidden md:flex items-center gap-8 text-[14.5px] font-medium text-ink">
           {nav.map(([label, href]) => (
@@ -120,7 +120,7 @@ export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boo
             href={home ? "#assessment" : "/#assessment"}
             className={`hidden sm:inline-flex items-center text-[14px] rounded-full px-5 min-h-10 transition-all btn-brass ${FOCUS_RING}`}
           >
-            Book an assessment
+            Book an Assessment
           </a>
         </div>
       </div>
@@ -135,7 +135,7 @@ export function SiteFooter({ content, home }: { content: WebsiteContent; home: b
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid md:grid-cols-4 gap-10 text-[14px]">
         <div>
           <p className="font-serif text-2xl font-medium tracking-[0.06em] text-ink">HERRERO</p>
-          <p className="text-[13px] mt-1">Piano sales &amp; restoration</p>
+          <p className="text-[13px] mt-1">Piano Sales &amp; Restoration</p>
           <p className="mt-5 leading-relaxed max-w-[220px]">Piano sales, tuning, repair, restoration, transport, and buying guidance — Davao.</p>
         </div>
         <div>
@@ -149,15 +149,15 @@ export function SiteFooter({ content, home }: { content: WebsiteContent; home: b
           <ul className="space-y-2.5">
             <li><a href="/showroom" className={`hover:text-ink transition-colors ${FOCUS_RING}`}>Showroom</a></li>
             <li><a href={`${base}#restorations`} className={`hover:text-ink transition-colors ${FOCUS_RING}`}>Restorations</a></li>
-            <li><a href={`${base}#assessment`} className={`hover:text-ink transition-colors ${FOCUS_RING}`}>Book an assessment</a></li>
+            <li><a href={`${base}#assessment`} className={`hover:text-ink transition-colors ${FOCUS_RING}`}>Book an Assessment</a></li>
           </ul>
         </div>
         <div>
-          <p className="text-ink text-[15px] font-semibold mb-4">Private access</p>
+          <p className="text-ink text-[15px] font-semibold mb-4">Private Access</p>
           <ul className="space-y-2.5">
             <li><span>Client portal links are issued privately.</span></li>
-            <li><Link href="/workshop" className={`hover:text-ink transition-colors flex items-center gap-1.5 ${FOCUS_RING}`}><Hammer size={13} /> Workshop kiosk</Link></li>
-            <li><Link href="/login-gate" className={`hover:text-ink transition-colors flex items-center gap-1.5 ${FOCUS_RING}`}><Sparkles size={13} /> Owner sign-in</Link></li>
+            <li><Link href="/workshop" className={`hover:text-ink transition-colors flex items-center gap-1.5 ${FOCUS_RING}`}><Hammer size={13} /> Workshop Kiosk</Link></li>
+            <li><Link href="/login-gate" className={`hover:text-ink transition-colors flex items-center gap-1.5 ${FOCUS_RING}`}><Sparkles size={13} /> Owner Sign-In</Link></li>
           </ul>
         </div>
       </div>

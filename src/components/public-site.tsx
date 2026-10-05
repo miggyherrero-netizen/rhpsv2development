@@ -15,6 +15,7 @@ import { FEATURED_COUNT, HERO_IMAGE, SERVING_SINCE_YEAR } from "@/lib/site-confi
 import { featuredGroups, groupPianos, type ShowroomGroup } from "@/lib/showroom";
 import { PianoCard, PianoDialog } from "@/components/piano-card";
 import { PUB_ROOT } from "@/lib/pub-fonts";
+import { titleCase } from "@/lib/pub-text";
 import { FOCUS_RING, MessengerButton, MobileContactBar, PhoneText, SiteFooter, SiteHeader } from "@/components/public-chrome";
 
 const px = (id: number, w = 1200, h = 800) =>
@@ -56,16 +57,9 @@ const CRAFT = [
   { img: px(12214094, 700, 900), cap: "Final inspection", sub: "Played, played, and played again" },
 ];
 
-/** "How We Work" -> "How we work". Only touches labels where every word starts with a capital; anything else (A=442, WiFi) is left alone. */
-const sentenceCase = (t: string) => {
-  const words = t.trim().split(/\s+/);
-  const titleCased = words.length > 1 && words.every((w) => /^[A-Z][a-z'’]*$/.test(w) || /^(&|and|of|the|in|for|to)$/i.test(w));
-  return titleCased ? t.charAt(0) + t.slice(1).replace(/\b([A-Z])([a-z'’]*)\b/g, (_m, c: string, r: string) => c.toLowerCase() + r) : t;
-};
-
-/** Section label: a short rule + sentence case. A leading "01 —" is dropped: these sections are not a sequence. */
+/** Section label: a short rule + Title Case. A leading "01 —" is dropped: these sections are not a sequence. */
 function Overline({ children }: { children: React.ReactNode; light?: boolean }) {
-  const text = typeof children === "string" ? sentenceCase(children.replace(/^\s*\d+\s*[—–-]\s*/, "")) : children;
+  const text = typeof children === "string" ? titleCase(children.replace(/^\s*\d+\s*[—–-]\s*/, "")) : children;
   return <p className="pub-kicker">{text}</p>;
 }
 
@@ -108,7 +102,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
         {/* Phones: the words span the full width, so tint the whole photo a little more */}
         <div className="absolute inset-0 bg-coal/35 sm:hidden" />
         <div className="relative max-w-7xl mx-auto px-5 sm:px-8 pb-24 pt-40 w-full">
-          <p className="pub-kicker !text-white/95 mb-5 anim-fade-up">{content.hero.eyebrow}</p>
+          <p className="pub-kicker !text-white/95 mb-5 anim-fade-up">{titleCase(content.hero.eyebrow)}</p>
           <h1 className="font-serif font-medium tracking-[-0.015em] text-white text-[2.75rem] leading-[1.03] sm:text-6xl lg:text-[4.9rem] max-w-3xl anim-fade-up" style={{ animationDelay: "90ms" }}>
             {content.hero.title.split("\n").map((line, index) => (
               <span key={`${line}-${index}`}>
@@ -122,12 +116,12 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
           </p>
           <div className="flex flex-wrap items-center gap-4 mt-9 anim-fade-up" style={{ animationDelay: "260ms" }}>
             <a href="#assessment" className={`btn-brass inline-flex items-center text-[15px] rounded-full px-7 min-h-12 transition-colors ${FOCUS_RING}`}>
-              {content.hero.primaryCta}
+              {titleCase(content.hero.primaryCta)}
             </a>
             <a href="#showroom" className={`text-white text-[15px] font-semibold border border-white/45 bg-coal/40 backdrop-blur-sm rounded-full px-7 min-h-12 hover:bg-white/10 transition-colors flex items-center gap-2 ${FOCUS_RING}`}>
-              {content.hero.secondaryCta} <ArrowUpRight size={15} />
+              {titleCase(content.hero.secondaryCta)} <ArrowUpRight size={15} />
             </a>
-            <MessengerButton label="Message us" className="!border-white/40 !text-white !bg-coal/40 backdrop-blur-sm hover:!bg-white/10" />
+            <MessengerButton label="Message Us" className="!border-white/40 !text-white !bg-coal/40 backdrop-blur-sm hover:!bg-white/10" />
           </div>
         </div>
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70" aria-hidden="true">
@@ -139,10 +133,10 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       {(() => {
         // "Serving Davao since" only appears once SERVING_SINCE_YEAR is set in src/lib/site-config.ts.
         const stats = [
-          ...(SERVING_SINCE_YEAR ? [{ n: String(SERVING_SINCE_YEAR), l: "Serving Davao since", caption: undefined as string | undefined }] : []),
-          { n: "1,300+", l: "Pianos tuned & serviced", caption: undefined as string | undefined },
-          { n: String(availableCount), l: "pianos in the showroom", caption: undefined as string | undefined },
-          { n: "A=442", l: "Tuning pitch", caption: "concert pitch standard" as string | undefined },
+          ...(SERVING_SINCE_YEAR ? [{ n: String(SERVING_SINCE_YEAR), l: "Serving Davao Since", caption: undefined as string | undefined }] : []),
+          { n: "1,300+", l: "Pianos Tuned & Serviced", caption: undefined as string | undefined },
+          { n: String(availableCount), l: "Pianos in the Showroom", caption: undefined as string | undefined },
+          { n: "A=442", l: "Tuning Pitch", caption: "Concert Pitch Standard" as string | undefined },
         ];
         return (
           <section className="border-b border-white/8 bg-parchment">
@@ -165,7 +159,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
           <div className="flex items-end justify-between flex-wrap gap-4 mb-12">
             <div>
               <Overline>01 — The Showroom</Overline>
-              <h2 className={H2}>Instruments ready for a home</h2>
+              <h2 className={H2}>Instruments Ready for a Home</h2>
             </div>
             <p className="text-subtle text-[16px] max-w-sm leading-relaxed">
               Every piano below is for sale, priced as marked. Ask a technician for the full story on any instrument before you decide.
@@ -181,7 +175,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
         </div>
         <div className="mt-12 flex justify-center">
           <Link href="/showroom" className={`inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink text-ink hover:bg-ink hover:text-paper transition-colors px-8 min-h-12 text-[15px] font-semibold ${FOCUS_RING}`}>
-            See all {pianos.length} instruments <ArrowRight size={15} />
+            See All {pianos.length} Instruments <ArrowRight size={15} />
           </Link>
         </div>
       </section>
@@ -191,7 +185,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal>
             <Overline light={false}>02 — Recent Restorations</Overline>
-            <h2 className={`${H2} max-w-2xl`}>Before &amp; after, told honestly</h2>
+            <h2 className={`${H2} max-w-2xl`}>Before &amp; After, Told Honestly</h2>
           </Reveal>
           <div className="mt-16 space-y-20">
             {CASES.map((c, i) => (
@@ -210,7 +204,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                     </figure>
                   </div>
                   <div className={i % 2 ? "lg:pr-4" : "lg:pl-4"}>
-                    <p className="text-[14px] font-medium text-gold">{c.place}</p>
+                    <p className="text-[14px] font-medium text-gold">{titleCase(c.place)}</p>
                     <h3 className="font-serif font-medium text-[2rem] leading-tight text-ink mt-2">{c.piano}</h3>
                     <ul className="mt-5 space-y-2.5">
                       {c.work.map((w) => (
@@ -232,7 +226,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       <section id="craft" className="max-w-7xl mx-auto px-5 sm:px-8 py-24">
         <Reveal>
           <Overline>03 — Inside the Atelier</Overline>
-          <h2 className={H2}>The work speaks first</h2>
+          <h2 className={H2}>The Work Speaks First</h2>
         </Reveal>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-12">
           {CRAFT.map((c, i) => (
@@ -242,7 +236,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                 <img src={c.img} alt={`${c.cap} — ${c.sub}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-coal/90 via-coal/20 to-transparent" />
                 <figcaption className="absolute bottom-4 left-4 right-4">
-                  <p className="text-white font-serif font-medium text-[1.3rem] leading-tight">{c.cap}</p>
+                  <p className="text-white font-serif font-medium text-[1.3rem] leading-tight">{titleCase(c.cap)}</p>
                   <p className="text-white/95 text-[13.5px] mt-0.5">{c.sub}</p>
                 </figcaption>
               </figure>
@@ -255,7 +249,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       <section id="process" className="bg-parchment border-y border-white/8 py-24">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal><Overline>{content.process.eyebrow}</Overline>
-            <h2 className={`${H2} max-w-2xl`}>{content.process.title}</h2>
+            <h2 className={`${H2} max-w-2xl`}>{titleCase(content.process.title)}</h2>
           </Reveal>
           <div className="grid md:grid-cols-3 gap-10 mt-14">
             {content.process.steps.map((s, i) => {
@@ -265,7 +259,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                 <div>
                   <Icon size={30} strokeWidth={1.5} className="text-gold" />
                   <p className="text-[14.5px] font-semibold text-gold mt-5">{s.label}</p>
-                  <h3 className="font-serif font-medium text-[1.65rem] leading-tight mt-1.5 text-ink">{s.title}</h3>
+                  <h3 className="font-serif font-medium text-[1.65rem] leading-tight mt-1.5 text-ink">{titleCase(s.title)}</h3>
                   <p className="text-subtle text-[15.5px] leading-relaxed mt-3 max-w-xs">{s.body}</p>
                 </div>
               </Reveal>
@@ -273,10 +267,10 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
           </div>
           <Reveal delay={150}>
             <div className="mt-16">
-              <p className="text-[15px] font-semibold text-ink mb-4">What we check during an assessment</p>
+              <p className="text-[15px] font-semibold text-ink mb-4">What We Check During an Assessment</p>
               <div className="flex flex-wrap gap-2.5">
                 {content.process.checks.map((c) => (
-                  <span key={c} className="text-[14px] bg-card border border-white/10 rounded-full px-4 py-2 text-ink">{c}</span>
+                  <span key={c} className="text-[14px] bg-card border border-white/10 rounded-full px-4 py-2 text-ink">{titleCase(c)}</span>
                 ))}
               </div>
             </div>
@@ -288,7 +282,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       <section id="voices" className="pub-dark bg-dusk text-ink py-24">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
         <Reveal><Overline>Voices</Overline>
-          <h2 className={H2}>Trusted in homes &amp; institutions</h2>
+          <h2 className={H2}>Trusted in Homes &amp; Institutions</h2>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-6 mt-14">
           {content.testimonials.map((t, i) => (
@@ -307,7 +301,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                   )}
                   <div className="min-w-0">
                     <p className="text-[15px] font-semibold text-ink">{t.name}</p>
-                    <p className="text-[13.5px] text-subtle mt-0.5">{t.role}</p>
+                    <p className="text-[13.5px] text-subtle mt-0.5">{titleCase(t.role)}</p>
                     {(t.location || t.year) && (
                       <p className="text-[13.5px] text-subtle mt-0.5">{[t.location, t.year].filter(Boolean).join(" · ")}</p>
                     )}
@@ -330,7 +324,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
         <div className="max-w-7xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-14 items-start">
           <Reveal>
             <Overline>Begin</Overline>
-            <h2 className={H2}>Tell us about your piano</h2>
+            <h2 className={H2}>Tell Us About Your Piano</h2>
             <p className="text-subtle text-[16px] leading-relaxed mt-5 max-w-md">
               Brand and model if you know them; a sentence about its history if you don&apos;t. Add photographs later by messenger — a technician, not a sales agent, reads every inquiry.
             </p>
@@ -346,7 +340,7 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
             {sent ? (
               <div className="glass-dark rounded-2xl p-10 text-center">
                 <BadgeCheck size={36} className="mx-auto text-emerald-700" strokeWidth={1.5} />
-                <h3 className="font-serif font-medium text-[1.75rem] text-ink mt-4">Received — thank you.</h3>
+                <h3 className="font-serif font-medium text-[1.75rem] text-ink mt-4">Received — Thank You.</h3>
                 <p className="text-subtle text-[15.5px] mt-3 leading-relaxed">A technician will review your note and reply within one working day with a recommended next step.</p>
               </div>
             ) : (
@@ -368,16 +362,16 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[14.5px] font-medium text-ink mb-1.5">The piano</label>
+                  <label className="block text-[14.5px] font-medium text-ink mb-1.5">The Piano</label>
                   <input className="input-dark" value={form.pianoContext} onChange={(e) => setForm({ ...form, pianoContext: e.target.value })} placeholder="e.g. Yamaha U1, about 30 years old" />
                 </div>
                 <div>
-                  <label className="block text-[14.5px] font-medium text-ink mb-1.5">Your situation</label>
+                  <label className="block text-[14.5px] font-medium text-ink mb-1.5">Your Situation</label>
                   <textarea className="input-dark min-h-[104px] resize-y" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="What would you like help with?" />
                 </div>
                 {err && <p role="alert" className="text-red-700 text-[14px]">{err}</p>}
                 <button type="submit" disabled={busy} className={`w-full btn-brass text-[15.5px] rounded-full min-h-12 transition flex items-center justify-center gap-2 ${FOCUS_RING}`}>
-                  {busy && <Spinner className="text-onbrass" />} Send for assessment
+                  {busy && <Spinner className="text-onbrass" />} Send for Assessment
                 </button>
                 <p className="text-[13.5px] text-subtle text-center">Reviewed by a technician · no obligation · replies within one working day</p>
               </form>

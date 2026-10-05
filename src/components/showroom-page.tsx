@@ -26,10 +26,10 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
       <SiteHeader home={false} solid />
       <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-28 pb-24">
         <Link href="/" className={`inline-flex items-center gap-1.5 text-[14.5px] text-subtle hover:text-ink transition-colors rounded-sm min-h-10 ${FOCUS_RING}`}>
-          <ArrowLeft size={14} /> Back to home
+          <ArrowLeft size={14} /> Back to Home
         </Link>
-        <p className="pub-kicker mt-8">The showroom</p>
-        <h1 className="font-serif font-medium tracking-[-0.01em] text-[2.6rem] sm:text-5xl lg:text-[3.25rem] leading-[1.06] mt-3.5">All instruments</h1>
+        <p className="pub-kicker mt-8">The Showroom</p>
+        <h1 className="font-serif font-medium tracking-[-0.01em] text-[2.6rem] sm:text-5xl lg:text-[3.25rem] leading-[1.06] mt-3.5">All Instruments</h1>
         <p className="text-subtle text-[16px] max-w-xl leading-relaxed mt-4">
           Every piano below is for sale, priced as marked. Identical models are grouped — open one to choose a specific unit.
         </p>
