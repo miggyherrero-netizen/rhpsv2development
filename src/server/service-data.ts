@@ -606,6 +606,7 @@ export type InvoiceDetail = {
   customer: ServiceCustomer;
   job: ServiceJob | null;
   settings: ServiceSettings;
+  catalog: ServiceCatalogItem[];
 };
 
 export async function getInvoiceDetail(id: string, ownerId: string, now: Date = new Date()): Promise<InvoiceDetail | null> {
@@ -623,11 +624,12 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
     .limit(1);
   if (!row) return null;
 
-  const [items, payments, settings] = await Promise.all([
+  const [items, payments, settings, catalog] = await Promise.all([
     db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.invoiceId, id))
       .orderBy(asc(serviceInvoiceItems.position), asc(serviceInvoiceItems.id)),
     db.select().from(servicePayments).where(eq(servicePayments.invoiceId, id)).orderBy(desc(servicePayments.receivedAt)),
     getServiceSettings(ownerId),
+    getCatalog(true),
   ]);
 
   const derived = invoiceStatus(row.invoice, now);
@@ -647,6 +649,7 @@ export async function getInvoiceDetail(id: string, ownerId: string, now: Date = 
     customer: row.customer,
     job: row.job,
     settings,
+    catalog,
   };
 }
 

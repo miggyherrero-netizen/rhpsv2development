@@ -28,6 +28,7 @@ const testFiles = [
   { name: "dashboard-helpers", file: "tests/dashboard-helpers.ts" },
   { name: "service-reports", file: "tests/service-reports.ts" },
   { name: "service-flow", file: "tests/service-flow.ts" },
+  { name: "service-lines", file: "tests/service-lines.ts" },
 ];
 
 function runTest(name, file) {

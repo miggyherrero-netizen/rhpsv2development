@@ -415,6 +415,7 @@ export default function SettingsClient({
                 {ITEM_KINDS.map((k) => (
                   <option key={k.key} value={k.key}>{k.label}</option>
                 ))}
+                <option value="package">Package (bundle)</option>
               </Select>
             </Field>
             <Field label="Price">
@@ -458,7 +459,7 @@ export default function SettingsClient({
               <table className="w-full text-left">
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                    {["Item", "Type", "Price", "Minutes", ""].map((h) => (
+                    {["Item", "Type", "Price", "Minutes", "Quick add", "In package", ""].map((h) => (
                       <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
                     ))}
                   </tr>
@@ -486,6 +487,7 @@ export default function SettingsClient({
                           {ITEM_KINDS.map((k) => (
                             <option key={k.key} value={k.key}>{k.label}</option>
                           ))}
+                          <option value="package">Package (bundle)</option>
                         </Select>
                       </td>
                       <td className="py-2 pr-4">
@@ -508,6 +510,31 @@ export default function SettingsClient({
                           onBlur={(e) => run(() => updateCatalogItem(item.id, { estimatedMinutes: Number(e.target.value) }))}
                           className="input-svc !w-20 !py-1 !px-2 text-[12px]"
                         />
+                      </td>
+                      <td className="py-2 pr-4">
+                        <label className="inline-flex items-center gap-2 min-h-11 text-[12px] cursor-pointer" style={{ color: "var(--color-svc-text-dim)" }}>
+                          <input
+                            type="checkbox" className="w-5 h-5" defaultChecked={item.isQuickAdd} aria-label={`Quick add chip for ${item.name}`}
+                            onChange={(e) => run(() => updateCatalogItem(item.id, { isQuickAdd: e.target.checked }))}
+                          />
+                          Chip
+                        </label>
+                      </td>
+                      <td className="py-2 pr-4">
+                        {item.kind === "package" ? (
+                          <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                            {catalog.filter((c) => c.packageId === item.id).length} item(s)
+                          </span>
+                        ) : (
+                          <Select
+                            aria-label={`Package for ${item.name}`} defaultValue={item.packageId ?? ""}
+                            onChange={(e) => run(() => updateCatalogItem(item.id, { packageId: e.target.value || null }))}
+                            className="!py-1 !px-2 text-[12px] !w-auto max-w-40"
+                          >
+                            <option value="">—</option>
+                            {catalog.filter((c) => c.kind === "package").map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </Select>
+                        )}
                       </td>
                       <td className="py-2 text-right">
                         <button

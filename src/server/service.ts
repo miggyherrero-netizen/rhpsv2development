@@ -26,6 +26,7 @@ import { titleCaseName } from "@/lib/service-reports";
 import {
   canViewFinance, confirmMatches, nextJobStep, stepEffect, type StepKey,
 } from "@/lib/service-flow";
+import { partsCostFromLines } from "@/lib/service-lines";
 import { getServiceSettings } from "@/server/service-data";
 import { invoiceCode, jobCode } from "@/lib/service";
 
@@ -319,10 +320,23 @@ export async function deleteTechnician(id: string): Promise<Result> {
  * Price book
  * ============================================================ */
 
+/** Price-book rows are the line types plus "package" (a bundle that adds its members as lines). */
+const CATALOG_KINDS: string[] = [...ITEM_KINDS.map((k) => k.key), "package"];
+
 export type CatalogInput = {
   name: string; description?: string | null; kind?: string | null; unitPrice?: number;
   taxable?: boolean; estimatedMinutes?: number; active?: boolean;
+  isQuickAdd?: boolean; packageId?: string | null;
 };
+
+/** A package member can't itself be a package row's parent twice over, and can't point at itself. */
+async function validPackageId(value: string | null | undefined, selfId?: string): Promise<string | null> {
+  const id = str(value);
+  if (!id || id === selfId) return null;
+  const [parent] = await db.select({ id: serviceCatalog.id, packageId: serviceCatalog.packageId, kind: serviceCatalog.kind })
+    .from(serviceCatalog).where(eq(serviceCatalog.id, id)).limit(1);
+  return parent && parent.kind === "package" && !parent.packageId ? parent.id : null;
+}
 
 export async function createCatalogItem(input: CatalogInput): Promise<Result<{ id: string }>> {
   await requireUser();
@@ -336,11 +350,13 @@ export async function createCatalogItem(input: CatalogInput): Promise<Result<{ i
     .values({
       name,
       description: str(input.description, 1_000),
-      kind: oneOf(input.kind, ITEM_KINDS.map((k) => k.key), "service"),
+      kind: oneOf(input.kind, CATALOG_KINDS, "service"),
       unitPriceCents: moneyToCents(input.unitPrice),
       taxable: boolOr(input.taxable, true),
       estimatedMinutes: Math.max(0, intOr(input.estimatedMinutes, 60)),
       active: boolOr(input.active, true),
+      isQuickAdd: boolOr(input.isQuickAdd, false),
+      packageId: await validPackageId(input.packageId),
       position: (max ?? 0) + 1,
     })
     .returning({ id: serviceCatalog.id });
@@ -356,11 +372,13 @@ export async function updateCatalogItem(id: string, patch: Partial<CatalogInput>
     .set({
       name: patch.name !== undefined ? strU(patch.name, 160) : undefined,
       description: patch.description !== undefined ? str(patch.description, 1_000) : undefined,
-      kind: patch.kind !== undefined ? oneOf(patch.kind, ITEM_KINDS.map((k) => k.key), "service") : undefined,
+      kind: patch.kind !== undefined ? oneOf(patch.kind, CATALOG_KINDS, "service") : undefined,
       unitPriceCents: patch.unitPrice !== undefined ? moneyToCents(patch.unitPrice) : undefined,
       taxable: patch.taxable !== undefined ? boolOr(patch.taxable, true) : undefined,
       estimatedMinutes: patch.estimatedMinutes !== undefined ? Math.max(0, intOr(patch.estimatedMinutes, 60)) : undefined,
       active: patch.active !== undefined ? boolOr(patch.active, true) : undefined,
+      isQuickAdd: patch.isQuickAdd !== undefined ? boolOr(patch.isQuickAdd, false) : undefined,
+      packageId: patch.packageId !== undefined ? await validPackageId(patch.packageId, id) : undefined,
       updatedAt: new Date(),
     })
     .where(eq(serviceCatalog.id, id));
@@ -632,9 +650,8 @@ export async function deleteJob(id: string, confirmCode: string): Promise<Result
 export async function recalcJobMoney(jobId: string): Promise<void> {
   const items = await db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
   const quotedCents = items.reduce((sum, i) => sum + lineTotalCents(i), 0);
-  const partsCostCents = items
-    .filter((i) => i.kind === "part")
-    .reduce((sum, i) => sum + lineTotalCents(i), 0);
+  // Explicit per-line costs win; a part line without one keeps costing what it is priced at.
+  const partsCostCents = partsCostFromLines(items);
   await db
     .update(serviceJobs)
     .set({ quotedCents: Math.max(0, quotedCents), partsCostCents, updatedAt: new Date() })
@@ -684,30 +701,59 @@ async function advanceRecall(jobId: string): Promise<void> {
 export type JobItemInput = {
   kind?: string; description: string; qty?: number; unitPrice?: number;
   taxable?: boolean; minutes?: number | null; catalogItemId?: string | null;
+  /** Per-unit cost in pesos (optional, for margin). */
+  cost?: number;
+  /** Where the line sits; used by Undo to put a removed line back. */
+  position?: number;
 };
 
-export async function addJobItem(jobId: string, input: JobItemInput): Promise<Result> {
-  await requireUser();
-  const description = str(input.description, 300);
-  if (!description) return fail("Describe the line item.");
-  const [{ max }] = await db
-    .select({ max: sql<number>`coalesce(max(${serviceJobItems.position}), 0)::int` })
-    .from(serviceJobItems)
-    .where(eq(serviceJobItems.jobId, jobId));
-  await db.insert(serviceJobItems).values({
+const MAX_LINES_PER_BATCH = 30;
+
+function jobItemValues(jobId: string, input: JobItemInput, position: number) {
+  return {
     jobId,
     kind: oneOf(input.kind, ITEM_KINDS.map((k) => k.key), "service"),
-    description,
-    qty: Math.max(1, intOr(input.qty, 1)),
+    description: str(input.description, 300) ?? "",
+    qty: Math.min(9_999, Math.max(1, intOr(input.qty, 1))),
     unitPriceCents: moneyToCents(input.unitPrice),
     taxable: boolOr(input.taxable, true),
     minutes: input.minutes ? Math.max(0, intOr(input.minutes, 0)) : null,
+    costCents: Math.max(0, moneyToCents(input.cost)),
     catalogItemId: str(input.catalogItemId) || null,
-    position: (max ?? 0) + 1,
+    position,
+  };
+}
+
+/** Adds one or more lines in one transaction (a price-book package adds several at once). Returns the new ids, in order. */
+export async function addJobItems(jobId: string, inputs: JobItemInput[]): Promise<Result<{ ids: string[]; positions: number[] }>> {
+  await requireUser();
+  if (!Array.isArray(inputs) || inputs.length === 0) return fail("Nothing to add.");
+  if (inputs.length > MAX_LINES_PER_BATCH) return fail("Too many lines at once.");
+  if (inputs.some((i) => !str(i.description, 300))) return fail("Describe the line item.");
+  const [job] = await db.select({ id: serviceJobs.id }).from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
+  if (!job) return fail("Job not found.");
+  const ids = await db.transaction(async (tx) => {
+    const [{ max }] = await tx
+      .select({ max: sql<number>`coalesce(max(${serviceJobItems.position}), 0)::int` })
+      .from(serviceJobItems)
+      .where(eq(serviceJobItems.jobId, jobId));
+    const out: { id: string; position: number }[] = [];
+    let next = (max ?? 0) + 1;
+    for (const input of inputs) {
+      const position = typeof input.position === "number" && inputs.length === 1 ? Math.max(0, Math.round(input.position)) : next++;
+      const [row] = await tx.insert(serviceJobItems).values(jobItemValues(jobId, input, position)).returning({ id: serviceJobItems.id });
+      out.push({ id: row!.id, position });
+    }
+    return out;
   });
   await recalcJobMoney(jobId);
   touch();
-  return ok();
+  return ok({ ids: ids.map((r) => r.id), positions: ids.map((r) => r.position) });
+}
+
+export async function addJobItem(jobId: string, input: JobItemInput): Promise<Result<{ id: string }>> {
+  const res = await addJobItems(jobId, [input]);
+  return res.ok ? ok({ id: res.data!.ids[0]! }) : res;
 }
 
 export async function updateJobItem(id: string, patch: Partial<JobItemInput>): Promise<Result> {
@@ -719,10 +765,11 @@ export async function updateJobItem(id: string, patch: Partial<JobItemInput>): P
     .set({
       kind: patch.kind ? oneOf(patch.kind, ITEM_KINDS.map((k) => k.key), "service") : undefined,
       description: patch.description !== undefined ? str(patch.description, 300) || item.description : undefined,
-      qty: patch.qty !== undefined ? Math.max(1, intOr(patch.qty, 1)) : undefined,
+      qty: patch.qty !== undefined ? Math.min(9_999, Math.max(1, intOr(patch.qty, 1))) : undefined,
       unitPriceCents: patch.unitPrice !== undefined ? moneyToCents(patch.unitPrice) : undefined,
       taxable: patch.taxable !== undefined ? boolOr(patch.taxable, true) : undefined,
       minutes: patch.minutes !== undefined ? (patch.minutes ? Math.max(0, intOr(patch.minutes, 0)) : null) : undefined,
+      costCents: patch.cost !== undefined ? Math.max(0, moneyToCents(patch.cost)) : undefined,
       updatedAt: new Date(),
     })
     .where(eq(serviceJobItems.id, id));
@@ -1052,28 +1099,46 @@ export async function updateInvoice(
   return ok();
 }
 
-export async function addInvoiceItem(
-  invoiceId: string,
-  input: { description: string; qty?: number; unitPrice?: number; taxable?: boolean },
-): Promise<Result> {
+export type InvoiceItemInput = { description: string; qty?: number; unitPrice?: number; taxable?: boolean; position?: number };
+
+/** Adds one or more invoice lines in one transaction. Returns the new ids, in order. */
+export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInput[]): Promise<Result<{ ids: string[]; positions: number[] }>> {
   await requireUser();
-  const description = str(input.description, 300);
-  if (!description) return fail("Describe the line item.");
-  const [{ max }] = await db
-    .select({ max: sql<number>`coalesce(max(${serviceInvoiceItems.position}), 0)::int` })
-    .from(serviceInvoiceItems)
-    .where(eq(serviceInvoiceItems.invoiceId, invoiceId));
-  await db.insert(serviceInvoiceItems).values({
-    invoiceId,
-    description,
-    qty: Math.max(1, intOr(input.qty, 1)),
-    unitPriceCents: moneyToCents(input.unitPrice),
-    taxable: boolOr(input.taxable, true),
-    position: (max ?? 0) + 1,
+  if (!Array.isArray(inputs) || inputs.length === 0) return fail("Nothing to add.");
+  if (inputs.length > MAX_LINES_PER_BATCH) return fail("Too many lines at once.");
+  if (inputs.some((i) => !str(i.description, 300))) return fail("Describe the line item.");
+  const [inv] = await db.select({ id: serviceInvoices.id, voidedAt: serviceInvoices.voidedAt }).from(serviceInvoices).where(eq(serviceInvoices.id, invoiceId)).limit(1);
+  if (!inv) return fail("Invoice not found.");
+  if (inv.voidedAt) return fail("This invoice is void — reopen it before changing lines.");
+  const ids = await db.transaction(async (tx) => {
+    const [{ max }] = await tx
+      .select({ max: sql<number>`coalesce(max(${serviceInvoiceItems.position}), 0)::int` })
+      .from(serviceInvoiceItems)
+      .where(eq(serviceInvoiceItems.invoiceId, invoiceId));
+    const out: { id: string; position: number }[] = [];
+    let next = (max ?? 0) + 1;
+    for (const input of inputs) {
+      const position = typeof input.position === "number" && inputs.length === 1 ? Math.max(0, Math.round(input.position)) : next++;
+      const [row] = await tx.insert(serviceInvoiceItems).values({
+        invoiceId,
+        description: str(input.description, 300) ?? "",
+        qty: Math.min(9_999, Math.max(1, intOr(input.qty, 1))),
+        unitPriceCents: moneyToCents(input.unitPrice),
+        taxable: boolOr(input.taxable, true),
+        position,
+      }).returning({ id: serviceInvoiceItems.id });
+      out.push({ id: row!.id, position });
+    }
+    return out;
   });
   await recalcInvoice(invoiceId);
   touch();
-  return ok();
+  return ok({ ids: ids.map((r) => r.id), positions: ids.map((r) => r.position) });
+}
+
+export async function addInvoiceItem(invoiceId: string, input: InvoiceItemInput): Promise<Result<{ id: string }>> {
+  const res = await addInvoiceItems(invoiceId, [input]);
+  return res.ok ? ok({ id: res.data!.ids[0]! }) : res;
 }
 
 export async function updateInvoiceItem(

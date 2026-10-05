@@ -3,21 +3,23 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Printer, Send, Ban, FileX2, Pencil, Check, X, Undo2, FileText } from "lucide-react";
+import { ArrowLeft, Printer, Send, Ban, FileX2, Pencil, Check, FileText, Trash2 } from "lucide-react";
 import { fmtDate, peso, toLocalInput } from "@/lib/format";
 import {
   INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PAYMENT_METHOD_LABEL,
   computeTotals, invoiceCode, taxLineLabel,
 } from "@/lib/service";
 import { parsePesoInput } from "@/lib/service-flow";
+import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
+import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
 import type { InvoiceDetail } from "@/server/service-data";
 import {
-  updateInvoice, addInvoiceItem, updateInvoiceItem, deleteInvoiceItem, setInvoiceStatus,
+  updateInvoice, addInvoiceItems, updateInvoiceItem, deleteInvoiceItem, setInvoiceStatus, createCatalogItem,
   recordPayment, deletePayment, deleteInvoice,
 } from "@/server/service";
 import {
   Chip, ConfirmTypeDialog, DateField, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PesoInput,
-  PrimaryButton, SectionCard, Select, SuccessLine, SvcModal, TextArea, TextInput, TONE_TEXT, UnitInput, type MoreItem,
+  PrimaryButton, SectionCard, Select, SvcModal, TextArea, TextInput, TONE_TEXT, UnitInput, type MoreItem,
 } from "@/components/service-ui";
 
 /**
@@ -32,8 +34,6 @@ const PAPER: React.CSSProperties = {
   ["--color-svc-accent" as string]: "#1f5fbf", ["--color-svc-warn" as string]: "#8a5a14", ["--color-svc-success" as string]: "#1f7a52", ["--color-svc-danger" as string]: "#b03a3a",
 };
 
-type LineDraft = { id: string; qty: string; price: string; removed: boolean };
-
 export default function InvoiceDetailClient({
   detail,
   invoicePrefix,
@@ -45,29 +45,35 @@ export default function InvoiceDetailClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [itemOpen, setItemOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [lines, setLines] = useState<LineDraft[]>([]);
-  const [lineError, setLineError] = useState<string | null>(null);
-  const [savedNote, setSavedNote] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [reference, setReference] = useState("");
 
   const { invoice, items, payments, customer, settings } = detail;
-  // While editing, totals preview the unsaved lines so the owner sees the effect before saving.
-  const shownItems = editing
-    ? items.flatMap((i) => {
-        const d = lines.find((l) => l.id === i.id);
-        if (!d) return [i];
-        if (d.removed) return [];
-        const q = Number(d.qty);
-        const pr = parsePesoInput(d.price);
-        return [{ ...i, qty: Number.isInteger(q) && q > 0 ? q : i.qty, unitPriceCents: pr === null ? i.unitPriceCents : Math.round(pr * 100) }];
-      })
-    : items;
+  // The editor owns the lines while it is open; totals follow what it shows, saved or still saving.
+  const editorLines = useMemo<EditorLine[]>(() => items.map((i) => ({
+    id: i.id, kind: "service", description: i.description, qty: i.qty, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
+    costCents: 0, catalogItemId: null, minutes: null, position: i.position,
+  })), []); // eslint-disable-line react-hooks/exhaustive-deps -- seeded once; the editor keeps its own state afterwards
+  const [liveLines, setLiveLines] = useState<EditorLine[] | null>(null);
+  const lineAdapter = useMemo<LineAdapter>(() => ({
+    addMany: async (lines, position) => {
+      const res = await addInvoiceItems(invoice.id, lines.map((l) => ({ ...toServerLine(l), position })));
+      return res.ok ? { ok: true, ids: res.data!.ids, positions: res.data!.positions } : res;
+    },
+    update: (id, patch) => updateInvoiceItem(id, patch),
+    remove: (id) => deleteInvoiceItem(id),
+    saveToPriceBook: async (l) => {
+      const res = await createCatalogItem({ name: l.description, kind: "service", unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: 60 });
+      if (!res.ok) return res;
+      const now = new Date();
+      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: "service", unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: 60, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
+    },
+  }), [invoice.id]);
+  const shownItems = liveLines ?? items;
   const totals = computeTotals(shownItems, {
     discountCents: invoice.discountCents,
     taxRateBps: invoice.taxRateBps,
@@ -88,44 +94,8 @@ export default function InvoiceDetailClient({
   const tone = INVOICE_STATUS_TONE[invoice.status] ?? "slate";
   const isDraft = invoice.status === "draft";
 
-  const startEdit = () => {
-    setLines(items.map((i) => ({ id: i.id, qty: String(i.qty), price: String(i.unitPriceCents / 100), removed: false })));
-    setLineError(null);
-    setEditing(true);
-  };
-  const cancelEdit = () => { setEditing(false); setLineError(null); };
-  const saveEdit = () => {
-    for (const l of lines) {
-      if (l.removed) continue;
-      const q = Number(l.qty);
-      if (!Number.isInteger(q) || q < 1) return setLineError("Quantity must be a whole number, 1 or more.");
-      if (parsePesoInput(l.price) === null) return setLineError("Check the unit prices — use numbers like 2,500.");
-    }
-    if (lines.length > 0 && lines.every((l) => l.removed)) return setLineError("An invoice needs at least one line. Void or delete the invoice instead.");
-    setLineError(null);
-    startTransition(async () => {
-      for (const l of lines) {
-        const orig = items.find((i) => i.id === l.id);
-        if (!orig) continue;
-        if (l.removed) {
-          const r = await deleteInvoiceItem(l.id);
-          if (!r.ok) return setLineError(r.error);
-          continue;
-        }
-        const qty = Number(l.qty);
-        const price = parsePesoInput(l.price)!;
-        const qtyChanged = qty !== orig.qty;
-        const priceChanged = Math.round(price * 100) !== orig.unitPriceCents;
-        if (qtyChanged || priceChanged) {
-          const r = await updateInvoiceItem(l.id, { ...(qtyChanged ? { qty } : {}), ...(priceChanged ? { unitPrice: price } : {}) });
-          if (!r.ok) return setLineError(r.error);
-        }
-      }
-      setEditing(false);
-      setSavedNote(true);
-      setTimeout(() => setSavedNote(false), 2800);
-    });
-  };
+  // Draft invoices are always live; a sent/paid one stays read-only until "Edit lines" (a void one never edits).
+  const live = invoice.status !== "void" && (isDraft || unlocked);
 
   const moreItems: MoreItem[] = [
     ...(isDraft ? [{ label: "Mark as sent", icon: <Send size={14} />, onSelect: () => run(() => setInvoiceStatus(invoice.id, "sent")) }] : []),
@@ -156,12 +126,14 @@ export default function InvoiceDetailClient({
           <Link href={`/service/invoices/${invoice.id}/document`} className="btn-svc-ghost rounded-xl px-3.5 min-h-10 text-[12.5px] inline-flex items-center gap-1.5">
             <Printer size={13} /> Print / PDF / Share
           </Link>
-          {!editing && (
-            <GhostButton onClick={startEdit} className="inline-flex items-center gap-1.5 !min-h-10" disabled={invoice.status === "void"}>
-              <Pencil size={13} /> Edit
-            </GhostButton>
+          {!isDraft && invoice.status !== "void" && (
+            unlocked ? (
+              <PrimaryButton onClick={() => setUnlocked(false)} className="!min-h-10 !text-white"><Check size={14} /> Done editing</PrimaryButton>
+            ) : (
+              <GhostButton onClick={() => setUnlocked(true)} className="inline-flex items-center gap-1.5 !min-h-10"><Pencil size={13} /> Edit lines</GhostButton>
+            )
           )}
-          {isDraft && !editing && (
+          {isDraft && (
             <PrimaryButton pending={pending} onClick={() => run(() => setInvoiceStatus(invoice.id, "sent"))} className="!min-h-10">
               <Send size={13} /> Mark sent
             </PrimaryButton>
@@ -217,86 +189,50 @@ export default function InvoiceDetailClient({
           ) : null}
         </div>
 
-        {/* Items — read-only until Edit is pressed */}
-        {editing && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: "var(--color-svc-surface-2)" }} data-print-hide>
-            <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
-              Editing lines — nothing is saved until you press <b className="font-medium">Save</b>.
-            </p>
-            <div className="flex gap-2">
-              <GhostButton onClick={cancelEdit} disabled={pending} className="inline-flex items-center gap-1.5 !min-h-10"><X size={13} /> Cancel</GhostButton>
-              <PrimaryButton pending={pending} onClick={saveEdit} className="!min-h-10 !text-white"><Check size={14} /> Save changes</PrimaryButton>
-            </div>
+        {/* Items — live (autosave) on drafts and while unlocked; read-only otherwise */}
+        {live ? (
+          <div className="mt-5 -mx-5" data-print-hide>
+            <LineEditor
+              initialLines={editorLines}
+              catalog={detail.catalog}
+              adapter={lineAdapter}
+              onChange={setLiveLines}
+              showType={false}
+              vatEnabled={hasVat}
+              noun="line"
+            />
+            {!isDraft ? (
+              <p className="px-5 pt-2 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                This invoice was already sent — changes save as you type and update the balance.
+              </p>
+            ) : null}
           </div>
-        )}
-        {lineError && <p role="alert" className="mt-2 text-[12.5px]" style={{ color: TONE_TEXT.danger }}>{lineError}</p>}
-        <SuccessLine>{savedNote ? "Saved" : null}</SuccessLine>
-
-        <div className="mt-5 overflow-x-auto thin-scroll">
-          <table className="w-full text-left">
-            <thead>
-              <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                {["Description", "Qty", "Unit price", "Amount", ""].map((h, i) => (
-                  <th key={i} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h || (editing ? "Remove" : "")}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const d = lines.find((l) => l.id === item.id);
-                const removed = editing && !!d?.removed;
-                const patch = (next: Partial<LineDraft>) => setLines((cur) => cur.map((l) => (l.id === item.id ? { ...l, ...next } : l)));
-                const qty = editing && d ? Number(d.qty) : item.qty;
-                const price = editing && d ? parsePesoInput(d.price) : item.unitPriceCents / 100;
-                const amountCents = Number.isInteger(qty) && qty > 0 && price !== null ? Math.round(qty * price * 100) : item.qty * item.unitPriceCents;
-                return (
-                  // A removed line is struck through and greyed with a colour (not opacity) so it stays readable.
-                  <tr key={item.id} style={{ borderTop: "1px solid var(--color-svc-border)", color: removed ? "var(--color-svc-text-faint)" : undefined, textDecoration: removed ? "line-through" : undefined }}>
-                    <td className="py-2.5 pr-4 text-[13px]" style={{ color: removed ? "var(--color-svc-text-faint)" : "var(--color-svc-text)" }}>
+        ) : (
+          <div className="mt-5 overflow-x-auto thin-scroll">
+            <table className="w-full text-left">
+              <thead>
+                <tr style={{ color: "var(--color-svc-text-faint)" }}>
+                  {["Description", "Qty", "Unit price", "Amount"].map((h) => (
+                    <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} style={{ borderTop: "1px solid var(--color-svc-border)" }}>
+                    <td className="py-2.5 pr-4 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                       {item.description}
                       {hasVat && !item.taxable ? (
                         <span className="ml-2 text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>VAT exempt</span>
                       ) : null}
                     </td>
-                    <td className="py-2.5 pr-4 text-[13px] svc-num">
-                      {editing && d ? (
-                        <input
-                          type="number" min={1} inputMode="numeric" aria-label={`Quantity for ${item.description}`} value={d.qty} disabled={removed}
-                          onChange={(e) => patch({ qty: e.target.value })} className="input-svc svc-num !w-20 !py-1 !px-2 text-[13px]"
-                        />
-                      ) : item.qty}
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      {editing && d ? (
-                        <PesoInput aria-label={`Unit price for ${item.description}`} value={d.price} disabled={removed} onChange={(v) => patch({ price: v })} className="!w-36 !py-1 text-[13px]" />
-                      ) : <Money cents={item.unitPriceCents} className="text-[13px]" />}
-                    </td>
-                    <td className="py-2.5 pr-4"><Money cents={amountCents} className="text-[13px]" /></td>
-                    <td className="py-2.5 text-right" data-print-hide>
-                      {editing && d ? (
-                        <button
-                          type="button" onClick={() => patch({ removed: !d.removed })}
-                          className="inline-grid place-items-center h-10 w-10 rounded-lg hover:bg-black/[0.06] focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
-                          style={{ color: d.removed ? "var(--color-svc-accent)" : "var(--color-svc-danger)" }}
-                          aria-label={d.removed ? `Keep ${item.description}` : `Remove ${item.description}`}
-                          title={d.removed ? "Keep this line" : "Remove this line"}
-                        >
-                          {d.removed ? <Undo2 size={15} /> : <X size={16} />}
-                        </button>
-                      ) : null}
-                    </td>
+                    <td className="py-2.5 pr-4 text-[13px] svc-num">{item.qty}</td>
+                    <td className="py-2.5 pr-4"><Money cents={item.unitPriceCents} className="text-[13px]" /></td>
+                    <td className="py-2.5 pr-4"><Money cents={item.qty * item.unitPriceCents} className="text-[13px]" /></td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {editing && (
-          <div className="flex justify-end mt-3" data-print-hide>
-            <GhostButton onClick={() => setItemOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10">
-              <Plus size={13} /> Add line
-            </GhostButton>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -436,14 +372,6 @@ export default function InvoiceDetailClient({
         onSave={(patch) => run(() => updateInvoice(invoice.id, patch))}
       />
 
-      <AddInvoiceItemModal
-        open={itemOpen}
-        onClose={() => setItemOpen(false)}
-        showVat={hasVat}
-        pending={pending}
-        onCreate={(input) => run(() => addInvoiceItem(invoice.id, input))}
-      />
-
       <ConfirmTypeDialog
         open={confirmDelete}
         title="Delete this invoice?"
@@ -545,62 +473,3 @@ function EditInvoiceModal({
   );
 }
 
-function AddInvoiceItemModal({
-  open,
-  onClose,
-  showVat,
-  pending,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  /** Hide the taxable select on invoices that carry no VAT. */
-  showVat: boolean;
-  pending: boolean;
-  onCreate: (input: { description: string; qty: number; unitPrice: number; taxable: boolean }) => void;
-}) {
-  const [description, setDescription] = useState("");
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
-  const [taxable, setTaxable] = useState(true);
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="Add line item">
-      <div className="space-y-3.5">
-        <Field label="Description">
-          <TextInput value={description} onChange={(e) => setDescription(e.target.value)} autoFocus />
-        </Field>
-        <div className={`grid gap-3 ${showVat ? "grid-cols-3" : "grid-cols-2"}`}>
-          <Field label="Qty">
-            <TextInput type="number" min={1} inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
-          </Field>
-          <Field label="Price">
-            <PesoInput value={price} onChange={setPrice} />
-          </Field>
-          {showVat ? (
-            <Field label="VAT">
-              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-                <option value="yes">Taxable</option>
-                <option value="no">Exempt</option>
-              </Select>
-            </Field>
-          ) : null}
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton
-            pending={pending}
-            disabled={!description.trim()}
-            onClick={() => {
-              onCreate({ description: description.trim(), qty: Number(qty) || 1, unitPrice: parsePesoInput(price) ?? 0, taxable });
-              onClose();
-              setDescription(""); setPrice(""); setQty("1");
-            }}
-          >
-            Add line
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
-  );
-}

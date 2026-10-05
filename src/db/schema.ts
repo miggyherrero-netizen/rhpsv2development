@@ -10,6 +10,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Recurrence } from "@/lib/dates";
@@ -389,6 +390,10 @@ export const serviceCatalog = pgTable("service_catalog", {
   taxable: boolean("taxable").notNull().default(true),
   estimatedMinutes: integer("estimated_minutes").notNull().default(60),
   active: boolean("active").notNull().default(true),
+  /** Shown as a one-tap chip under the line editor. */
+  isQuickAdd: boolean("is_quick_add").notNull().default(false),
+  /** Set on a member row to group it under a `package` row: picking the package adds every member as a line. */
+  packageId: uuid("package_id").references((): AnyPgColumn => serviceCatalog.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -444,6 +449,8 @@ export const serviceJobItems = pgTable("service_job_items", {
   unitPriceCents: integer("unit_price_cents").notNull().default(0),
   taxable: boolean("taxable").notNull().default(true),
   minutes: integer("minutes"),
+  /** Optional per-unit cost to the business, for job margin. 0 = not entered. */
+  costCents: integer("cost_cents").notNull().default(0),
   catalogItemId: uuid("catalog_item_id").references(() => serviceCatalog.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

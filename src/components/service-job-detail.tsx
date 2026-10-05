@@ -16,9 +16,11 @@ import {
 import { countable } from "@/lib/service-reports";
 import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
 import { ExpenseFormModal, JobFormModal } from "@/components/service-forms";
+import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
+import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
 import type { JobDetail } from "@/server/service-data";
 import {
-  advanceJob, updateJob, setJobStatus, addJobItem, updateJobItem, deleteJobItem, addJobNote,
+  advanceJob, updateJob, setJobStatus, addJobItems, updateJobItem, deleteJobItem, addJobNote, createCatalogItem,
   startTimer, stopTimer, addManualTime, deleteTimeLog, createInvoiceFromJob, createExpense,
   deleteExpense, deleteJob,
 } from "@/server/service";
@@ -52,7 +54,6 @@ export default function JobDetailClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [itemOpen, setItemOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -60,9 +61,29 @@ export default function JobDetailClient({
   const [note, setNote] = useState("");
 
   const { job } = detail;
+  // The editor owns the lines while the page is open; totals follow what it shows, saved or still saving.
+  const editorLines = useMemo<EditorLine[]>(() => detail.items.map((i) => ({
+    id: i.id, kind: i.kind, description: i.description, qty: i.qty, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
+    costCents: i.costCents, catalogItemId: i.catalogItemId, minutes: i.minutes, position: i.position,
+  })), []); // eslint-disable-line react-hooks/exhaustive-deps -- seeded once; the editor keeps its own state afterwards
+  const [liveLines, setLiveLines] = useState<EditorLine[]>(editorLines);
+  const lineAdapter = useMemo<LineAdapter>(() => ({
+    addMany: async (lines, position) => {
+      const res = await addJobItems(detail.job.id, lines.map((l) => ({ ...toServerLine(l), position })));
+      return res.ok ? { ok: true, ids: res.data!.ids, positions: res.data!.positions } : res;
+    },
+    update: (id, patch) => updateJobItem(id, patch),
+    remove: (id) => deleteJobItem(id),
+    saveToPriceBook: async (l) => {
+      const res = await createCatalogItem({ name: l.description, kind: l.kind, unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60 });
+      if (!res.ok) return res;
+      const now = new Date();
+      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: l.kind, unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
+    },
+  }), [detail.job.id]);
   const totals = useMemo(
-    () => computeTotals(detail.items, { taxRateBps, vatEnabled }),
-    [detail.items, taxRateBps, vatEnabled],
+    () => computeTotals(liveLines, { taxRateBps, vatEnabled }),
+    [liveLines, taxRateBps, vatEnabled],
   );
   const workMinutes = detail.timeLogs.filter((l) => l.kind === "work").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const travelMinutes = detail.timeLogs.filter((l) => l.kind === "travel").reduce((s, l) => s + (l.minutes ?? 0), 0);
@@ -270,100 +291,29 @@ export default function JobDetailClient({
             </div>
           </SectionCard>
 
-          {/* Line items */}
-          <SectionCard
-            title="Quote lines"
-            action={
-              <GhostButton onClick={() => setItemOpen(true)} className="inline-flex items-center gap-1.5">
-                <Plus size={13} /> Add line
-              </GhostButton>
-            }
-          >
-            {detail.items.length === 0 ? (
-              <EmptyState
-                icon={<Receipt size={19} strokeWidth={1.7} />}
-                title="No line items yet"
-                hint="Add the services, parts, and fees for this visit."
+          {/* Line items: always-editable rows + an empty row at the bottom; every edit autosaves. */}
+          <SectionCard title="Quote lines">
+            <div className="pt-3 pb-1">
+              <LineEditor
+                initialLines={editorLines}
+                catalog={detail.catalog}
+                adapter={lineAdapter}
+                onChange={setLiveLines}
+                vatEnabled={vatEnabled}
+                allowCost={showJobMargins}
+                noun="line"
               />
-            ) : (
-              <>
-                <div className="overflow-x-auto thin-scroll">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                        {["Description", "Type", "Qty", "Unit price", "Amount", ""].map((h) => (
-                          <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="svc-divide">
-                      {detail.items.map((item) => (
-                        <tr key={item.id} className="group">
-                          <td className="px-5 py-2.5 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
-                            {item.description}
-                          </td>
-                          <td className="px-5 py-2.5 text-[11.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
-                            {item.kind}
-                            {vatEnabled && !item.taxable ? " · no VAT" : ""}
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <input
-                              type="number"
-                              min={1}
-                              aria-label={`Quantity for ${item.description}`}
-                              defaultValue={item.qty}
-                              onBlur={(e) => {
-                                const qty = Number(e.target.value);
-                                if (qty > 0 && qty !== item.qty) run(() => updateJobItem(item.id, { qty }));
-                              }}
-                              className="input-svc !w-16 !py-1 !px-2 text-[12px]"
-                            />
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <UnitInput
-                              type="number"
-                              prefix="₱"
-                              aria-label={`Unit price for ${item.description}`}
-                              min={0}
-                              step="50"
-                              defaultValue={item.unitPriceCents / 100}
-                              onBlur={(e) => {
-                                const value = Number(e.target.value);
-                                if (!Number.isNaN(value)) run(() => updateJobItem(item.id, { unitPrice: value }));
-                              }}
-                              className="input-svc !w-28 !py-1 !px-2 text-[12px]"
-                            />
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <Money cents={lineTotalCents(item)} className="text-[13px]" />
-                          </td>
-                          <td className="px-5 py-2.5 text-right">
-                            <button
-                              onClick={() => run(() => deleteJobItem(item.id))}
-                              className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
-                              style={{ color: "var(--color-svc-text-faint)" }}
-                              aria-label="Remove line"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div
-                  className="px-5 py-3 space-y-1.5 text-[12.5px]"
-                  style={{ borderTop: "1px solid var(--color-svc-border)" }}
-                >
-                  <Row label="Subtotal"><Money cents={totals.subtotalCents} /></Row>
-                  {vatEnabled ? (
-                    <Row label={taxLineLabel(taxLabel, taxRateBps)}><Money cents={totals.taxCents} /></Row>
-                  ) : null}
-                  <Row label="Total" strong><Money cents={totals.totalCents} /></Row>
-                </div>
-              </>
-            )}
+            </div>
+            <div
+              className="px-5 py-3 space-y-1.5 text-[12.5px]"
+              style={{ borderTop: "1px solid var(--color-svc-border)" }}
+            >
+              <Row label="Subtotal"><Money cents={totals.subtotalCents} /></Row>
+              {vatEnabled ? (
+                <Row label={taxLineLabel(taxLabel, taxRateBps)}><Money cents={totals.taxCents} /></Row>
+              ) : null}
+              <Row label="Total" strong><Money cents={totals.totalCents} /></Row>
+            </div>
           </SectionCard>
 
           {/* Time log */}
@@ -622,14 +572,6 @@ export default function JobDetailClient({
         }}
         onSubmit={(values) => run(() => updateJob(job.id, values))}
       />
-      <AddItemModal
-        open={itemOpen}
-        onClose={() => setItemOpen(false)}
-        catalog={detail.catalog}
-        vatEnabled={vatEnabled}
-        pending={pending}
-        onCreate={(input) => run(() => addJobItem(job.id, input))}
-      />
       <ManualTimeModal
         open={timeOpen}
         onClose={() => setTimeOpen(false)}
@@ -688,103 +630,6 @@ function Row({ label, children, strong }: { label: string; children: React.React
       <span style={{ color: strong ? "var(--color-svc-text)" : "var(--color-svc-text-dim)" }}>{label}</span>
       <span className={strong ? "font-medium" : ""}>{children}</span>
     </div>
-  );
-}
-
-function AddItemModal({
-  open,
-  onClose,
-  catalog,
-  vatEnabled,
-  pending,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  catalog: JobDetail["catalog"];
-  /** VAT off: the taxable select is hidden and the line keeps its price-book default. */
-  vatEnabled: boolean;
-  pending: boolean;
-  onCreate: (input: { kind: string; description: string; qty: number; unitPrice: number; taxable: boolean; catalogItemId?: string | null }) => void;
-}) {
-  const [kind, setKind] = useState("service");
-  const [description, setDescription] = useState("");
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
-  const [taxable, setTaxable] = useState(true);
-
-  const pickFromCatalog = (id: string) => {
-    const item = catalog.find((c) => c.id === id);
-    if (!item) return;
-    setDescription(item.name);
-    setPrice(String(item.unitPriceCents / 100));
-    setKind(item.kind);
-    setTaxable(item.taxable);
-  };
-
-  return (
-    <SvcModal open={open} onClose={onClose} title="Add quote line">
-      <div className="space-y-3.5">
-        {catalog.length > 0 && (
-          <Field label="From price book" hint="Prefills the fields below">
-            <Select defaultValue="" onChange={(e) => pickFromCatalog(e.target.value)}>
-              <option value="">Choose an item…</option>
-              {catalog.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} — {peso(c.unitPriceCents)}</option>
-              ))}
-            </Select>
-          </Field>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Type">
-            <Select value={kind} onChange={(e) => setKind(e.target.value)}>
-              {ITEM_KINDS.map((k) => (
-                <option key={k.key} value={k.key}>{k.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Quantity">
-            <TextInput type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Description">
-          <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Concert tuning" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Unit price" hint="Pesos">
-            <PesoInput value={price} onChange={setPrice} />
-          </Field>
-          {vatEnabled ? (
-            <Field label="VAT">
-              <Select value={taxable ? "yes" : "no"} onChange={(e) => setTaxable(e.target.value === "yes")}>
-                <option value="yes">Taxable</option>
-                <option value="no">Exempt</option>
-              </Select>
-            </Field>
-          ) : null}
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton
-            pending={pending}
-            disabled={!description.trim()}
-            onClick={() => {
-              onCreate({
-                kind,
-                description: description.trim(),
-                qty: Number(qty) || 1,
-                unitPrice: parsePesoInput(price) ?? 0,
-                taxable,
-              });
-              onClose();
-              setDescription(""); setPrice(""); setQty("1");
-            }}
-          >
-            Add line
-          </PrimaryButton>
-        </div>
-      </div>
-    </SvcModal>
   );
 }
 

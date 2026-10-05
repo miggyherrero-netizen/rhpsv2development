@@ -75,7 +75,6 @@ check("no travel fee -> items untouched", quoteLines(li, 0).length, 1);
 console.log("finance access");
 check("owner only", [canViewFinance({ role: "owner" }), canViewFinance({ role: "technician" }), canViewFinance({ role: null }), canViewFinance(null)], [true, false, false, false]);
 
-if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nall service flow checks passed");
 
 check("quote re-sent after acceptance shows Sent", quoteStatus("quoted", [{ type: "quote_accepted" }]), "sent");
@@ -84,3 +83,5 @@ check("accepted quote stays accepted once scheduled", quoteStatus("scheduled", [
 check("messenger rejects profile.php", parseMessengerHandle("https://facebook.com/profile.php?id=123"), null);
 check("messenger rejects trailing dot", parseMessengerHandle("juan."), null);
 check("messenger accepts m.me link", parseMessengerHandle("https://m.me/juan.dela.cruz"), "juan.dela.cruz");
+
+if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
