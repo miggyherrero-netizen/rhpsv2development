@@ -126,23 +126,28 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
       </section>
 
       {/* ================= STATS ================= */}
-      <section className="border-b border-white/8 bg-paper">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            // TODO(owner): set SERVING_SINCE_YEAR in src/lib/site-config.ts — "[YEAR]" shows until then.
-            { n: SERVING_SINCE_YEAR ? String(SERVING_SINCE_YEAR) : "[YEAR]", l: "Serving Davao since" },
-            { n: "1,300+", l: "Pianos tuned & serviced" },
-            { n: String(availableCount), l: "pianos in the showroom" },
-            { n: "A=442", l: "Tuning pitch", caption: "concert pitch standard" },
-          ].map((st) => (
-            <div key={st.l}>
-              <p className="font-serif text-3xl text-ink">{st.n}</p>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-subtle mt-1">{st.l}</p>
-              {st.caption && <p className="text-[12px] text-subtle/90 mt-0.5">{st.caption}</p>}
+      {(() => {
+        // "Serving Davao since" only appears once SERVING_SINCE_YEAR is set in src/lib/site-config.ts.
+        const stats = [
+          ...(SERVING_SINCE_YEAR ? [{ n: String(SERVING_SINCE_YEAR), l: "Serving Davao since", caption: undefined as string | undefined }] : []),
+          { n: "1,300+", l: "Pianos tuned & serviced", caption: undefined as string | undefined },
+          { n: String(availableCount), l: "pianos in the showroom", caption: undefined as string | undefined },
+          { n: "A=442", l: "Tuning pitch", caption: "concert pitch standard" as string | undefined },
+        ];
+        return (
+          <section className="border-b border-white/8 bg-paper">
+            <div className={`max-w-7xl mx-auto px-5 sm:px-8 py-8 grid grid-cols-2 gap-6 ${stats.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+              {stats.map((st) => (
+                <div key={st.l}>
+                  <p className="font-serif text-3xl text-ink">{st.n}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-subtle mt-1">{st.l}</p>
+                  {st.caption && <p className="text-[12px] text-subtle/90 mt-0.5">{st.caption}</p>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
       {/* ================= SHOWROOM ================= */}
       <section id="showroom" className="max-w-7xl mx-auto px-5 sm:px-8 py-24">

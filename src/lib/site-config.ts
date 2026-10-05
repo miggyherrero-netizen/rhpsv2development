@@ -16,7 +16,7 @@ export const HERO_IMAGE = {
 
 /**
  * TODO(owner): the year Herrero Pianos started serving Davao, e.g. 2009.
- * While this is null the stat shows a visible "[YEAR]" placeholder.
+ * While this is null the "Serving Davao since" stat is simply left out of the home page.
  */
 export const SERVING_SINCE_YEAR: number | null = null;
 
