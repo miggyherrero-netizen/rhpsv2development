@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { and, asc, desc, eq, gte, lt, isNull, isNotNull, or, ne, sql, inArray, type SQL } from "drizzle-orm";
 import { SERVED_STATUSES, lastServiceDate } from "@/lib/service-last-service";
+import { getNextReminderByCustomer } from "@/server/service-reminders-data";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
@@ -80,6 +81,8 @@ export type CustomerCard = ServiceCustomer & {
   jobCount: number;
   openJobCount: number;
   lastServiceAt: Date | null;
+  /** Day of this client's soonest open follow-up reminder, if any. */
+  nextReminderAt: Date | null;
   billedCents: number;
   paidCents: number;
   outstandingCents: number;
@@ -141,6 +144,7 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
     moneyStats.set(inv.customerId, m);
   }
 
+  const nextReminder = await getNextReminderByCustomer();
   const jobMap = new Map(jobStats.map((j) => [j.customerId, j]));
   const locationMap = new Map(locations.map((l) => [l.id, l]));
 
@@ -154,6 +158,7 @@ export async function getCustomersBundle(includeArchived = false): Promise<Custo
       pianos: pianos
         .filter((p) => p.customerId === c.id)
         .map((p) => ({ ...p, locationLabel: p.locationId ? locationMap.get(p.locationId)?.label ?? null : null })),
+      nextReminderAt: nextReminder.get(c.id) ?? null,
       jobCount: jobs?.total ?? 0,
       openJobCount: jobs?.open ?? 0,
       lastServiceAt: lastServiceDate(

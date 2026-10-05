@@ -37,6 +37,7 @@ const testFiles = [
   { name: "service-geo", file: "tests/service-geo.ts" },
   { name: "service-last-service", file: "tests/service-last-service.ts" },
   { name: "service-customer-list", file: "tests/service-customer-list.ts" },
+  { name: "service-reminders", file: "tests/service-reminders.ts" },
 ];
 
 function runTest(name, file) {

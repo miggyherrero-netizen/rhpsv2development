@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Phone, Mail, MessageCircle, Pencil, Plus, Piano as PianoIcon, ExternalLink } from "lucide-react";
+import { ArrowLeft, Bell, MapPin, Phone, Mail, MessageCircle, Pencil, Plus, Piano as PianoIcon, ExternalLink } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
 import {
   INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, JOB_STATUS_LABEL, JOB_STATUS_TONE, invoiceCode, jobCode,
@@ -12,6 +12,8 @@ import { billedHeadline, messengerHandle, withMessenger, parseMessengerHandle } 
 import { hasQuote, isBatchCustomer, jobHeading, withCustomerType } from "@/lib/service-reports";
 import { telHref } from "@/lib/dashboard";
 import type { CustomerDetail } from "@/server/service-data";
+import type { ReminderRow } from "@/server/service-reminders-data";
+import { ReminderItem, RemindMeModal } from "@/components/service-reminders";
 import {
   archiveCustomer, createJob, updateCustomer, createLocation, deleteLocation, createPiano, updatePiano, deletePiano,
 } from "@/server/service";
@@ -26,9 +28,11 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 
 export default function CustomerDetailClient({
-  detail, invoicePrefix, jobPrefix, technicians, showroomPianos, canSeeMoney,
+  detail, reminders, invoicePrefix, jobPrefix, technicians, showroomPianos, canSeeMoney,
 }: {
   detail: CustomerDetail;
+  /** This client's open reminders, soonest first. */
+  reminders: ReminderRow[];
   invoicePrefix: string;
   jobPrefix: string;
   technicians: { id: string; name: string }[];
@@ -40,6 +44,8 @@ export default function CustomerDetailClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newJob, setNewJob] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const [now] = useState(() => new Date());
   const [manage, setManage] = useState(false);
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [confirm, setConfirm] = useState<{ kind: "location" | "piano"; id: string } | null>(null);
@@ -63,7 +69,7 @@ export default function CustomerDetailClient({
     ...customer, locations,
     pianos: pianos.map((p) => ({ ...p, locationLabel: locations.find((l) => l.id === p.locationId)?.label ?? null })),
     jobCount: jobs.length, openJobCount: jobs.filter((j) => !["completed", "invoiced", "paid", "cancelled"].includes(j.status)).length,
-    lastServiceAt: lastServiceDate(jobs, pianos), billedCents: detail.billedCents, paidCents: 0, outstandingCents: detail.outstandingCents,
+    lastServiceAt: lastServiceDate(jobs, pianos), nextReminderAt: reminders[0]?.dueAt ?? null, billedCents: detail.billedCents, paidCents: 0, outstandingCents: detail.outstandingCents,
     draftCount: detail.drafts.count, draftCents: detail.drafts.totalCents,
   } as Parameters<typeof CustomerSheet>[0]["customer"];
 
@@ -86,6 +92,7 @@ export default function CustomerDetailClient({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PrimaryButton onClick={() => setNewJob(true)} className="!min-h-11"><Plus size={15} /> New job for this customer</PrimaryButton>
+            <GhostButton onClick={() => setRemindOpen(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Bell size={13} /> Remind me</GhostButton>
             <GhostButton onClick={() => setManage(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit & manage</GhostButton>
           </div>
         </div>
@@ -162,6 +169,17 @@ export default function CustomerDetailClient({
         </SectionCard>
       </div>
 
+      {reminders.length > 0 && (
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders · {reminders.length}</span>}
+          action={<GhostButton onClick={() => setRemindOpen(true)} className="inline-flex items-center gap-1 !min-h-10"><Plus size={13} /> Add</GhostButton>}
+        >
+          <ul className="svc-divide">
+            {reminders.map((r) => <ReminderItem key={r.id} r={r} now={now} showClient={false} />)}
+          </ul>
+        </SectionCard>
+      )}
+
       <SectionCard title={`Jobs · ${jobs.length}`} action={<GhostButton onClick={() => setNewJob(true)} className="inline-flex items-center gap-1 !min-h-10"><Plus size={13} /> New job</GhostButton>}>
         {jobs.length === 0 ? (
           <EmptyState title="No jobs yet" hint="Create the first visit for this customer." />
@@ -222,6 +240,7 @@ export default function CustomerDetailClient({
         <SectionCard title="Notes"><p className="px-5 py-4 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.notes}</p></SectionCard>
       ) : null}
 
+      <RemindMeModal open={remindOpen} onClose={() => setRemindOpen(false)} customerId={customer.id} customerName={customer.name} />
       <JobFormModal
         open={newJob}
         mode="new"

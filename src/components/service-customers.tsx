@@ -4,12 +4,13 @@ import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Search, Users, Phone, Mail, MapPin, Pencil, Trash2, Archive, Piano as PianoIcon } from "lucide-react";
+import { Bell, Plus, Search, Users, Phone, Mail, MapPin, Pencil, Trash2, Archive, Piano as PianoIcon } from "lucide-react";
 import { fmtDate } from "@/lib/format";
 import {
   CUSTOMER_SOURCES, CUSTOMER_SOURCE_LABEL, PIANO_TYPES, EXPENSE_CATEGORIES,
 } from "@/lib/service";
 import { isBatchCustomer, withCustomerType } from "@/lib/service-reports";
+import { reminderLabel, reminderState } from "@/lib/service-reminders";
 import { customerRowSummary, dueLabel, dueSortKey, telHref, type CustomerRowSummary } from "@/lib/service-customer-list";
 import { parsePesoInput } from "@/lib/service-flow";
 import type { CustomerCard, RecallRow } from "@/server/service-data";
@@ -190,7 +191,7 @@ export default function CustomersClient({
           />
         </SectionCard>
       ) : (
-        <CustomerList rows={filtered} />
+        <CustomerList rows={filtered} now={now} />
       )}
 
       <NewCustomerModal open={newOpen} onClose={() => setNewOpen(false)} pending={pending} onCreate={(i) => run(() => createCustomer(i))} />
@@ -206,7 +207,7 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus
 
 type ListRow = { c: CustomerCard; sum: CustomerRowSummary };
 
-function CustomerList({ rows }: { rows: ListRow[] }) {
+function CustomerList({ rows, now }: { rows: ListRow[]; now: Date }) {
   return (
     <div className="@container">
       <div className="card-svc overflow-hidden">
@@ -219,7 +220,7 @@ function CustomerList({ rows }: { rows: ListRow[] }) {
         </div>
         <ul>
           {rows.map(({ c, sum }, i) => (
-            <CustomerRow key={c.id} c={c} sum={sum} first={i === 0} />
+            <CustomerRow key={c.id} c={c} sum={sum} now={now} first={i === 0} />
           ))}
         </ul>
       </div>
@@ -227,7 +228,7 @@ function CustomerList({ rows }: { rows: ListRow[] }) {
   );
 }
 
-function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
+function CustomerRow({ c, sum, now, first }: ListRow & { now: Date; first: boolean }) {
   const batch = isBatchCustomer(c.tags, c.name);
   const tel = telHref(c.phone);
   const sub = c.company || (batch ? "Trip / batch" : CUSTOMER_SOURCE_LABEL[c.source] ?? c.source);
@@ -235,6 +236,13 @@ function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
   const dueText = dueLabel(sum);
   const dueTone = sum.dueState === "overdue" ? "danger" : sum.dueState === "soon" ? "warn" : "slate";
   const owes = c.outstandingCents > 0;
+  // "Follow up" marker: the client has an open reminder (the full text is on their page and on Today).
+  const remState = c.nextReminderAt ? reminderState(new Date(c.nextReminderAt), now) : null;
+  const followUp = c.nextReminderAt ? (
+    <Chip tone={remState === "overdue" ? "danger" : remState === "today" ? "warn" : "slate"}>
+      <Bell size={11} aria-hidden="true" /> Follow up {reminderLabel(new Date(c.nextReminderAt), now) ?? fmtDate(new Date(c.nextReminderAt))}
+    </Chip>
+  ) : null;
 
   const nextDue = sum.nextDueAt ? (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -255,6 +263,7 @@ function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
           <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>
             {sub}{c.openJobCount > 0 ? <span style={{ color: TONE_TEXT.azure }}> · {c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}</span> : null}
           </p>
+          {followUp ? <div className="mt-1">{followUp}</div> : null}
         </div>
         <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{sum.area ?? <Dash />}</p>
         <div className="min-w-0">{tel ? <CallLink tel={tel} phone={c.phone!} name={c.name} /> : <Dash />}</div>
@@ -270,7 +279,7 @@ function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
           <p className="text-[12.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
             {[sum.area, last ? `Last service ${last}` : null].filter(Boolean).join(" · ") || sub}
           </p>
-          {(sum.nextDueAt || owes || c.openJobCount > 0) ? (
+          {(sum.nextDueAt || owes || c.openJobCount > 0 || followUp) ? (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[12.5px]">
               {sum.nextDueAt ? (
                 <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
@@ -279,6 +288,7 @@ function CustomerRow({ c, sum, first }: ListRow & { first: boolean }) {
               ) : null}
               {owes ? <span className="inline-flex items-center gap-1" style={{ color: TONE_TEXT.warn }}>Owes <Money cents={c.outstandingCents} className="!text-[12.5px]" /></span> : null}
               {c.openJobCount > 0 ? <span style={{ color: TONE_TEXT.azure }}>{c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}</span> : null}
+              {followUp}
             </p>
           ) : null}
         </div>

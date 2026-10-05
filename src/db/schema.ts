@@ -808,3 +808,23 @@ export type ServiceWaitlistEntry = typeof serviceWaitlistEntries.$inferSelect;
 export type ServiceTrip = typeof serviceTrips.$inferSelect;
 export type ServiceRoute = typeof serviceRoutes.$inferSelect;
 export type ServiceMessageTemplate = typeof serviceMessageTemplates.$inferSelect;
+
+/** "Remind me to follow up with this client" — a dated nudge with a note. Shown on Today when due. */
+export const serviceReminderStatus = pgEnum("service_reminder_status", ["open", "done"]);
+
+export const serviceReminders = pgTable("service_reminders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  customerId: uuid("customer_id").notNull().references(() => serviceCustomers.id, { onDelete: "cascade" }),
+  /** What the follow-up is about, e.g. "ask about the Yamaha quote". */
+  note: text("note"),
+  dueAt: timestamp("due_at", { mode: "date" }).notNull(),
+  status: serviceReminderStatus("status").notNull().default("open"),
+  doneAt: timestamp("done_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  customerIdx: index("service_reminders_customer_idx").on(t.customerId),
+  openDueIdx: index("service_reminders_status_due_idx").on(t.status, t.dueAt),
+}));
+
+export type ServiceReminder = typeof serviceReminders.$inferSelect;

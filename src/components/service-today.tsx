@@ -5,11 +5,14 @@ import Link from "next/link";
 import {
   Sun, MapPin, Square, CheckCircle2, Phone, Wallet, Plus, Send, Copy, MessageCircle,
   AlertTriangle, CalendarClock, FileClock, Check, TrendingUp, ClipboardCheck, ListChecks,
+  Bell,
 } from "lucide-react";
 import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
 import { jobHeading } from "@/lib/service-reports";
 import { telHref } from "@/lib/dashboard";
 import { groupByManilaDay, isAllClear, reminderText } from "@/lib/service-today";
+import { ReminderItem } from "@/components/service-reminders";
+import type { ReminderRow } from "@/server/service-reminders-data";
 import {
   JOB_STATUS_LABEL, JOB_STATUS_TONE, SERVICE_TYPE_LABEL, fmtMinutes,
 } from "@/lib/service";
@@ -49,6 +52,7 @@ export default function TodayClient({
   customers,
   showroomPianos,
   waitlistFollowUps,
+  reminders,
   tripPrompts,
   templates,
 }: {
@@ -56,6 +60,8 @@ export default function TodayClient({
   customers: { id: string; name: string; isBatch?: boolean }[];
   showroomPianos: ShowroomPiano[];
   waitlistFollowUps: WaitlistItem[];
+  /** Client reminders due today or earlier. */
+  reminders: ReminderRow[];
   tripPrompts: TripPrompt[];
   templates: { key: string; name: string; body: string }[];
 }) {
@@ -87,6 +93,7 @@ export default function TodayClient({
   const counts = {
     now: visits.length + otherRunning.length,
     money: board.draftInvoices.length + board.unpaid.length + board.deliveryBalances.length,
+    reminders: reminders.length,
     waitlist: waitlistFollowUps.length + tripPrompts.length,
     next7: board.next7.length,
     followUps: board.staleQuotes.length + board.recalls.length + board.unfinished.length,
@@ -201,6 +208,15 @@ export default function TodayClient({
                 </li>
               );
             })}
+          </ul>
+        </SectionCard>
+      )}
+
+      {/* Client reminders — who to follow up with today */}
+      {counts.reminders > 0 && (
+        <SectionCard title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders ({reminders.length})</span>}>
+          <ul className="svc-divide">
+            {reminders.map((r) => <ReminderItem key={r.id} r={r} now={board.date} showClient />)}
           </ul>
         </SectionCard>
       )}
