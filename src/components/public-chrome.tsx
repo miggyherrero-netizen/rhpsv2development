@@ -98,7 +98,7 @@ export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boo
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[72px] flex items-center justify-between">
         <a href={home ? "#top" : "/"} className={`leading-none rounded-sm ${FOCUS_RING}`}>
           <span className="font-serif text-[1.45rem] font-medium tracking-[0.06em] text-ink">HERRERO</span>
-          <span className="block text-[12px] text-subtle mt-0.5">Piano Sales &amp; Restoration</span>
+          <span className="block text-[12px] text-subtle mt-0.5">Piano Sales &amp; Services</span>
         </a>
         <nav aria-label="Primary" className="hidden md:flex items-center gap-8 text-[14.5px] font-medium text-ink">
           {nav.map(([label, href]) => (
@@ -135,7 +135,7 @@ export function SiteFooter({ content, home }: { content: WebsiteContent; home: b
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid md:grid-cols-4 gap-10 text-[14px]">
         <div>
           <p className="font-serif text-2xl font-medium tracking-[0.06em] text-ink">HERRERO</p>
-          <p className="text-[13px] mt-1">Piano Sales &amp; Restoration</p>
+          <p className="text-[13px] mt-1">Piano Sales &amp; Services</p>
           <p className="mt-5 leading-relaxed max-w-[220px]">Piano sales, tuning, repair, restoration, transport, and buying guidance — Davao.</p>
         </div>
         <div>

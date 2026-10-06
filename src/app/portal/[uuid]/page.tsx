@@ -30,7 +30,7 @@ export default async function PortalPage({ params }: { params: Promise<{ uuid: s
           <div className="flex items-center justify-between">
             <Link href="/" className="leading-none">
               <span className="font-serif text-xl font-medium tracking-[0.06em]">HERRERO</span>
-              <span className="block text-[12px] text-white/75 mt-0.5">Piano Sales &amp; Restoration</span>
+              <span className="block text-[12px] text-white/75 mt-0.5">Piano Sales &amp; Services</span>
             </Link>
             <span className="text-[13px] text-white/80 flex items-center gap-1.5">
               <ShieldCheck size={13} /> Private Exhibit
