@@ -61,6 +61,7 @@ Reviewed and installed from aitmpl.com — use proactively when relevant, no nee
 - `ui-design-system` / `tailwind-design-system` — design tokens, component variants, design-dev handoff
 - `frontend-design` — aesthetic direction, typography, avoiding templated-default UI choices (highest-downloaded skill in the whole catalog, 4,338)
 - `web-design-guidelines` — review UI code against web interface best-practice guidelines
+- `landing-page-design` — **Part A only** (intake, page structure, conversion copy, SEO/AEO). Its Part B visual rules (fonts, colors, spacing, motion, tagline reveal) are deliberately ignored: they conflict with the public site's ivory & slate theme and the other area themes. The override is written at the top of its SKILL.md.
 - `accessibility-auditor` — WCAG/ARIA compliance, keyboard nav, semantic HTML review
 
 **Database:**

@@ -11,6 +11,10 @@ A landing page is not a homepage. A homepage serves multiple intents. A landing 
 
 This skill has two halves. **Part A** decides what the page says and how it is structured. **Part B** is the non negotiable visual system. Work through A before touching B.
 
+## Project override (Herrero Pianos)
+
+In this repo, **only Part A applies** (intake, page structure, conversion rules, copywriting, SEO). **Ignore Part B** (fonts, type scale, spacing, radius, backgrounds, hero heading gradient, icons, motion, tagline reveal, content rules). The public site keeps its own ivory & slate theme (Fraunces + Instrument Sans, terracotta accent) defined in CLAUDE.md, and admin, owner and service keep their own themes. Never restyle existing pages to match Part B.
+
 ## Scope
 
 Apply to all web UI work: landing pages, marketing sites, components, dashboards, prototypes, and design reviews. When a rule here conflicts with a framework default, this file wins. When the user's explicit prompt conflicts with a rule, the user wins.
