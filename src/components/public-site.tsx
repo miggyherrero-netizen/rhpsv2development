@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight, ArrowUpRight, ChevronDown, BadgeCheck, MapPin,
@@ -16,6 +16,7 @@ import { featuredGroups, groupPianos, type ShowroomGroup } from "@/lib/showroom"
 import { PianoCard, PianoDialog } from "@/components/piano-card";
 import { PUB_ROOT } from "@/lib/pub-fonts";
 import { titleCase } from "@/lib/pub-text";
+import { FALLBACK_SHADE, READ_MARGIN, percentile, relLuminance, scrimStrength } from "@/lib/pub-hero";
 import { FOCUS_RING, MessengerButton, MobileContactBar, PhoneText, SiteFooter, SiteHeader } from "@/components/public-chrome";
 
 const px = (id: number, w = 1200, h = 800) =>
@@ -72,6 +73,48 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const assessRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+  const heroSrc = content.hero.imageVersion ? `/hero-image?v=${content.hero.imageVersion}` : HERO_IMAGE.src;
+  // How much shade the words need: measured from the photo itself (0 for a dark photo, more for a bright one).
+  const [shade, setShade] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    const measure = () => {
+      const box = heroRef.current?.getBoundingClientRect();
+      if (!box || !box.width || !img.naturalWidth) return;
+      try {
+        const cw = 96, ch = Math.max(24, Math.round((cw * box.height) / box.width));
+        const canvas = document.createElement("canvas");
+        canvas.width = cw; canvas.height = ch;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("no canvas");
+        // Draw it the way the hero does (object-fit: cover, centred), then read the area the words sit on:
+        // the left column on wide screens, the whole lower part on phones.
+        const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+        const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+        ctx.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+        const wide = box.width >= 640;
+        const x1 = Math.floor(cw * (wide ? 0.58 : 1)), y0 = Math.floor(ch * (wide ? 0.3 : 0.38));
+        const px = ctx.getImageData(0, y0, x1, ch - y0).data;
+        const lums: number[] = [];
+        for (let i = 0; i < px.length; i += 4) lums.push(relLuminance(px[i]!, px[i + 1]!, px[i + 2]!));
+        if (alive) setShade(scrimStrength(percentile(lums, 0.9) * READ_MARGIN));
+      } catch {
+        // The browser would not let us read the photo: use a middle setting rather than none.
+        if (alive) setShade(FALLBACK_SHADE);
+      }
+    };
+    img.onload = measure;
+    img.onerror = () => { if (alive) setShade(FALLBACK_SHADE); };
+    img.src = heroSrc;
+    const onResize = () => { clearTimeout(timer); timer = setTimeout(measure, 250); };
+    window.addEventListener("resize", onResize);
+    return () => { alive = false; clearTimeout(timer); window.removeEventListener("resize", onResize); };
+  }, [heroSrc]);
 
   const groups = useMemo(() => groupPianos(pianos), [pianos]);
   const featured = useMemo(() => featuredGroups(groups, FEATURED_COUNT), [groups]);
@@ -90,18 +133,16 @@ export default function PublicSite({ pianos, content }: { pianos: PianoRow[]; co
 
   return (
     <div className={`${PUB_ROOT} bg-paper text-ink`}>
-      <SiteHeader home />
+      <SiteHeader home heroShade={shade} />
 
       {/* ================= HERO ================= */}
-      <section id="top" className="pub-dark relative min-h-[100svh] flex items-end overflow-hidden bg-coal">
+      <section id="top" ref={heroRef} className="pub-dark relative min-h-[100svh] flex items-end overflow-hidden bg-coal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={content.hero.imageVersion ? `/hero-image?v=${content.hero.imageVersion}` : HERO_IMAGE.src} alt={content.hero.imageAlt || HERO_IMAGE.alt} style={{ objectPosition: HERO_IMAGE.position }} className="absolute inset-0 h-full w-full object-cover" />
-        {/* Slate-tinted scrims, strongest only behind the words so the room stays visible: a bottom-up fade, a left-side scrim, and a light top fade for the nav. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-coal/95 via-coal/75 via-50% to-transparent to-92%" />
-        <div className="absolute inset-0 bg-gradient-to-r from-coal/80 via-coal/35 via-55% to-transparent" />
-        {/* Phones: the words span the full width, so tint the whole photo a little more */}
-        <div className="absolute inset-0 bg-coal/35 sm:hidden" />
-        <div className="relative max-w-7xl mx-auto px-5 sm:px-8 pb-24 pt-40 w-full">
+        <img src={heroSrc} alt={content.hero.imageAlt || HERO_IMAGE.alt} style={{ objectPosition: HERO_IMAGE.position }} className="absolute inset-0 h-full w-full object-cover" />
+        {/* The photo is shown as it is. A shade sits behind the words only when the photo is bright enough to need one (measured above: none for a dark photo), and a text shadow keeps the letters crisp. */}
+        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-coal/85 via-coal/50 to-transparent transition-opacity duration-500 max-sm:hidden" style={{ opacity: shade }} />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[88%] bg-gradient-to-t from-coal/90 via-coal/70 via-45% to-transparent transition-opacity duration-500" style={{ opacity: shade }} />
+        <div className="relative max-w-7xl mx-auto px-5 sm:px-8 pb-24 pt-40 w-full [text-shadow:0_1px_3px_rgba(20,20,26,0.45),0_2px_28px_rgba(20,20,26,0.4)]">
           <p className="pub-kicker !text-white/95 mb-5 anim-fade-up">{titleCase(content.hero.eyebrow)}</p>
           <h1 className="font-serif font-medium tracking-[-0.015em] text-white text-[2.75rem] leading-[1.03] sm:text-6xl lg:text-[4.9rem] max-w-3xl anim-fade-up" style={{ animationDelay: "90ms" }}>
             {content.hero.title.split("\n").map((line, index) => (

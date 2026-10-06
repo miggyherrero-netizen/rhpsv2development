@@ -76,7 +76,7 @@ export function MobileContactBar({ content, home }: { content: WebsiteContent; h
 }
 
 /** `home` keeps anchors in-page; elsewhere they point back at the homepage. `solid` = never transparent. */
-export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boolean }) {
+export function SiteHeader({ home, solid = false, heroShade }: { home: boolean; solid?: boolean; /** 0–1: how much the top of the hero photo needs shading behind the nav (home page only). */ heroShade?: number }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -94,7 +94,8 @@ export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boo
     ["Voices", `${base}#voices`],
   ];
   return (
-    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "pub-dark bg-gradient-to-b from-coal/85 via-coal/45 to-transparent"}`}>
+    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "pub-dark"}`}>
+      {!light ? <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-b from-coal/85 via-coal/45 to-transparent transition-opacity duration-500" style={{ opacity: heroShade ?? 0.6 }} /> : null}
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[72px] flex items-center justify-between">
         <a href={home ? "#top" : "/"} className={`leading-none rounded-sm ${FOCUS_RING}`}>
           <span className="font-serif text-[1.45rem] font-medium tracking-[0.06em] text-ink">HERRERO</span>
