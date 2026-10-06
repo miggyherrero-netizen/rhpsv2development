@@ -5,41 +5,37 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
-const GROUPS: { label: string; items: { href: string; label: string; icon: typeof Sun }[] }[] = [
+const GROUPS: { label: string; collapsible?: boolean; items: { href: string; label: string; icon: typeof Sun }[] }[] = [
   {
-    label: "Operations",
+    label: "Daily",
     items: [
       { href: "/service/today", label: "Today", icon: Sun },
       { href: "/service/reminders", label: "Reminders", icon: Bell },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
+      { href: "/service/invoices", label: "Invoices", icon: Receipt },
+      { href: "/service/customers", label: "Customers", icon: Users },
+    ],
+  },
+  {
+    // Collapsed by default on desktop (opens itself when one of its pages is active).
+    label: "More",
+    collapsible: true,
+    items: [
       { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
       { href: "/service/time", label: "Time", icon: Timer },
-    ],
-  },
-  {
-    label: "Money",
-    items: [
-      { href: "/service/invoices", label: "Invoices", icon: Receipt },
       { href: "/service/expenses", label: "Expenses", icon: Wallet },
       { href: "/service/finance", label: "Finance", icon: LineChart },
+      { href: "/service/settings", label: "Settings", icon: Settings },
     ],
-  },
-  {
-    label: "People & places",
-    items: [{ href: "/service/customers", label: "Customers", icon: Users }],
-  },
-  {
-    label: "Setup",
-    items: [{ href: "/service/settings", label: "Settings", icon: Settings }],
   },
 ];
 
-/** The five tabs on a phone. "More" opens the full menu (Time, Expenses, Finance, Customers, Settings…). */
+/** The tabs on a phone. "More" opens the full menu (Reminders, Customers, Waitlist, Time, Expenses, Finance, Settings…). */
 const TABS = [
   { href: "/service/today", label: "Today", icon: Sun },
   { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
@@ -87,14 +83,8 @@ export default function ServiceShell({
   const onTab = TABS.some((t) => isActive(t.href));
   const nav = (
     <nav aria-label="Home Service sections" className="flex-1 px-3 py-2 space-y-5 overflow-y-auto thin-scroll">
-      {groups.map((group) => (
-        <div key={group.label}>
-          <p
-            className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em]"
-            style={{ color: "var(--color-svc-text-faint)" }}
-          >
-            {group.label}
-          </p>
+      {groups.filter((g) => g.items.length > 0).map((group) => {
+        const items = (
           <div className="space-y-0.5">
             {group.items.map((item) => (
               <Link
@@ -122,8 +112,29 @@ export default function ServiceShell({
               </Link>
             ))}
           </div>
-        </div>
-      ))}
+        );
+        return group.collapsible ? (
+          <details key={group.label} open={group.items.some((i) => isActive(i.href))}>
+            <summary
+              className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em] cursor-pointer select-none"
+              style={{ color: "var(--color-svc-text-faint)" }}
+            >
+              {group.label}
+            </summary>
+{items}
+          </details>
+        ) : (
+          <div key={group.label}>
+            <p
+              className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em]"
+              style={{ color: "var(--color-svc-text-faint)" }}
+            >
+              {group.label}
+            </p>
+{items}
+          </div>
+        );
+      })}
 
       <div>
         <p
@@ -138,14 +149,21 @@ export default function ServiceShell({
             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
-            <LayoutDashboard size={16} strokeWidth={1.8} /> Piano Management
+            <LayoutDashboard size={16} strokeWidth={1.8} /> Shop
           </Link>
           <Link
             href="/owner/today"
             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
-            <Calendar size={16} strokeWidth={1.8} /> Personal Workspace
+            <Calendar size={16} strokeWidth={1.8} /> My Desk
+          </Link>
+          <Link
+            href="/os/today"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
+            style={{ color: "var(--color-svc-text-dim)" }}
+          >
+            <TrendingUp size={16} strokeWidth={1.8} /> Growth OS
           </Link>
         </div>
       </div>

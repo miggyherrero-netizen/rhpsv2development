@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
-  Sun, Calendar, ListChecks, Inbox, AlarmClock, CalendarRange, Settings,
-  Menu, X, LayoutDashboard, Home, LogOut,
+  Sun, Calendar, ListChecks, Inbox, Settings,
+  Menu, X, LayoutDashboard, Home, LogOut, TrendingUp,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -14,8 +14,6 @@ const NAV = [
   { href: "/owner/calendar", label: "Calendar", icon: Calendar },
   { href: "/owner/tasks", label: "Tasks", icon: ListChecks },
   { href: "/owner/inbox", label: "Inbox", icon: Inbox },
-  { href: "/owner/overdue", label: "Overdue", icon: AlarmClock },
-  { href: "/owner/upcoming", label: "Upcoming", icon: CalendarRange },
   { href: "/owner/settings", label: "Settings", icon: Settings },
 ];
 
@@ -43,7 +41,10 @@ export default function OwnerShell({ children, userName }: { children: ReactNode
         <Home size={16} strokeWidth={1.8} /> Home Service
       </Link>
       <Link href="/admin" className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] transition-colors">
-        <LayoutDashboard size={16} strokeWidth={1.8} /> Piano Management
+        <LayoutDashboard size={16} strokeWidth={1.8} /> Shop
+      </Link>
+      <Link href="/os/today" className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] transition-colors">
+        <TrendingUp size={16} strokeWidth={1.8} /> Growth OS
       </Link>
     </nav>
   );

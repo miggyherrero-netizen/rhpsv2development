@@ -19,7 +19,7 @@ export default function LoginClient() {
     setError("");
     const res = await login(email, password);
     if (res.ok) {
-      router.push("/admin");
+      router.push("/start");
       router.refresh();
     } else {
       setError(res.error ?? "Sign in failed.");

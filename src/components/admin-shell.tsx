@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Workflow, ListChecks, Boxes, Users, BookImage, Palette,
-  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut, Piano,
+  Radar, Settings, Menu, X, Globe, Hammer, CalendarDays, Home, LogOut, Piano, TrendingUp,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -48,7 +48,8 @@ export default function AdminShell({ children, userName }: { children: ReactNode
       <div className="pt-5 pb-2 px-3.5 text-[10.5px] uppercase tracking-[0.18em] text-subtle">Beyond the shop</div>
       {[
         { href: "/service/today", label: "Home Service", icon: Home },
-        { href: "/owner/today", label: "Personal Workspace", icon: CalendarDays },
+        { href: "/owner/today", label: "My Desk", icon: CalendarDays },
+        { href: "/os/today", label: "Growth OS", icon: TrendingUp },
         { href: "/workshop", label: "Workshop Kiosk", icon: Hammer },
         { href: "/", label: "Public Website", icon: Globe },
       ].map((item) => (
@@ -67,7 +68,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
         <div className="px-5 pt-6 pb-5">
           <Link href="/admin">
             <p className="font-serif text-lg text-white tracking-wide leading-none">HERRERO</p>
-            <p className="text-[10px] uppercase tracking-[0.24em] text-subtle mt-1.5">Command Center</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-subtle mt-1.5">Shop</p>
           </Link>
         </div>
         {navList}
