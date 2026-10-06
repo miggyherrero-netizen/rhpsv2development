@@ -136,6 +136,11 @@ export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle
         ))}
       </div>
 
+      <div className="flex gap-5 -mt-3 mb-6 text-[12px] text-[var(--color-ow-text-dim)]">
+        <Link href="/owner/overdue" className="hover:text-[var(--color-ow-text)]">Overdue tasks →</Link>
+        <Link href="/owner/upcoming" className="hover:text-[var(--color-ow-text)]">Upcoming →</Link>
+      </div>
+
       {/* next up */}
       {next && (
         <div className="card-ow p-4 mb-6 flex items-center gap-4">

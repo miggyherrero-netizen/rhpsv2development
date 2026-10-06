@@ -4,13 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import AddInquiry from "@/components/gos/add-inquiry";
-import { CalendarCheck, Users, Briefcase, TrendingUp, Settings } from "lucide-react";
+import { CalendarCheck, Users, Settings } from "lucide-react";
 
 const NAV = [
   { href: "/os/today", label: "Today", Icon: CalendarCheck },
   { href: "/os/customers", label: "Customers", Icon: Users },
-  { href: "/os/work", label: "Work", Icon: Briefcase },
-  { href: "/os/growth", label: "Growth", Icon: TrendingUp },
   { href: "/os/settings", label: "Settings", Icon: Settings },
 ] as const;
 
@@ -45,7 +43,7 @@ export default function GosShell({ userName, overdue = 0, children }: { userName
           <div className="flex justify-end"><AddInquiry /></div>
           {children}
         </main>
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-[var(--gos-line)] bg-white lg:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-3 border-t border-[var(--gos-line)] bg-white lg:hidden">
         {NAV.map(({ href, label, Icon }) => {
           const active = path.startsWith(href);
           return (
