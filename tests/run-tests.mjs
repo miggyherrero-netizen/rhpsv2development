@@ -39,7 +39,6 @@ const testFiles = [
   { name: "service-customer-list", file: "tests/service-customer-list.ts" },
   { name: "service-reminders", file: "tests/service-reminders.ts" },
   { name: "pub-text", file: "tests/pub-text.ts" },
-  { name: "pub-hero", file: "tests/pub-hero.ts" },
 ];
 
 function runTest(name, file) {

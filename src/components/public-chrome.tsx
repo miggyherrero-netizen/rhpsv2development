@@ -76,7 +76,7 @@ export function MobileContactBar({ content, home }: { content: WebsiteContent; h
 }
 
 /** `home` keeps anchors in-page; elsewhere they point back at the homepage. `solid` = never transparent. */
-export function SiteHeader({ home, solid = false, heroShade }: { home: boolean; solid?: boolean; /** 0–1: how much the top of the hero photo needs shading behind the nav (home page only). */ heroShade?: number }) {
+export function SiteHeader({ home, solid = false }: { home: boolean; solid?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -94,8 +94,7 @@ export function SiteHeader({ home, solid = false, heroShade }: { home: boolean; 
     ["Voices", `${base}#voices`],
   ];
   return (
-    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "pub-dark"}`}>
-      {!light ? <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-b from-coal/85 via-coal/45 to-transparent transition-opacity duration-500" style={{ opacity: heroShade ?? 0.6 }} /> : null}
+    <header className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${light ? "glass-light" : "pub-dark [text-shadow:0_1px_3px_rgba(20,20,26,0.6),0_2px_16px_rgba(20,20,26,0.45)]"}`}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[72px] flex items-center justify-between">
         <a href={home ? "#top" : "/"} className={`leading-none rounded-sm ${FOCUS_RING}`}>
           <span className="font-serif text-[1.45rem] font-medium tracking-[0.06em] text-ink">HERRERO</span>
@@ -112,7 +111,7 @@ export function SiteHeader({ home, solid = false, heroShade }: { home: boolean; 
             aria-label="Open private login"
             title="Open private login"
             className={`grid h-10 w-10 place-items-center rounded-full transition-all border ${FOCUS_RING} ${
-              light ? "bg-card text-ink border-white/10 hover:bg-white/10" : "bg-white/10 text-white border-white/25 backdrop-blur-md hover:bg-white/20"
+              light ? "bg-card text-ink border-white/10 hover:bg-white/10" : "bg-white/10 text-white border-white/25 hover:bg-white/20"
             }`}
           >
             <Lock size={14} />
