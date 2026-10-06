@@ -104,7 +104,7 @@ Unlike skills (passive reference docs I read myself), agents are subagent person
 - Default to dispatching even when the inline fix looks fast — the point is using the installed roster, not just having it available.
 
 **Deliberately not installed, with reason** — every one of aitmpl.com's 29 categories was opened and its listing (title+description) reviewed; full content was only read for skills actually installed:
-- Git skills (`commit-smart`, `find-bugs`, `deslop`, etc.) — no git repo in this project yet; revisit once one exists.
+- Git skills (`commit-smart`, `find-bugs`, `deslop`, etc.) — a git repo now exists (branch work happens on `claude/*` branches); revisit if wanted.
 - `playwright-skill` / `browser-automation` (utilities) — redundant with `webapp-testing`, already covers this.
 - Offensive/pentest security skills (SQL injection, XSS exploitation, WordPress/SSH/cloud pentest, red-team tooling) — for authorized penetration-testing engagements against *other* systems, not for defending our own app.
 - Planning/meta skills (`plan-writing`, `think-tank`, `requirements-clarity`, `skill-creator`, `using-superpowers`, etc.) — overlaps with Claude Code's native plan mode; adding parallel process skills risks conflicting instructions rather than adding value.
@@ -118,6 +118,7 @@ Unlike skills (passive reference docs I read myself), agents are subagent person
 - `/owner/*` — the shop owner's **personal** workspace (today/calendar/tasks/inbox/overdue/upcoming/settings) — dark "Personal Workspace" theme, see below.
 - `/service/*` — **home service** (in-home visits): today/schedule/jobs/customers/invoices/expenses/time/finance/settings. Its own dark graphite + azure theme (`--color-svc-*`), its own tables (`service_*`), and its own field crew (`service_technicians`, separate from the workshop `workers` roster). See `SERVICE_WORKSPACE_PLAN.md`.
 - `/portal/[uuid]` — private client-facing restoration journal, no login (secret UUID link)
+- `/os/*` — **Growth OS** (owner-only): today/customers/growth/work/settings. Code in `src/components/gos/`, `src/server/gos/`, `src/lib/gos/`, tables in `src/db/gos-schema.ts` (`gos_*`); `/os/work` and `/os/growth` are placeholders. See `docs/ARCHITECTURE.md`.
 - `/workshop` — PIN-based kiosk for technicians (clock in/out, claim tasks, breaks) — separate auth from `users` (uses `workers` table + signed cookie, not session table)
 
 ## Code layout convention
@@ -148,5 +149,6 @@ Dark, premium theme — deliberately different from the rest of the app. Tokens 
 
 ## Workflow notes
 - User prefers me to test changes live (Docker rebuild + browser pane) rather than just asserting they work — always verify before reporting done.
-- No git repository in this project yet.
+- Git repo exists (GitHub). Cloud sessions develop on `claude/*` branches; don't open PRs unless asked.
+- `docs/ARCHITECTURE.md` is the up-to-date map of areas, tables, data flow and complexity hotspots. Older briefs are in `docs/archive/`.
 - When large/ambiguous feature requests come in, ask scoping questions before implementing (esp. for anything touching money/payroll or auth) rather than guessing.

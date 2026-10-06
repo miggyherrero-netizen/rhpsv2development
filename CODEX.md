@@ -14,10 +14,9 @@ personal owner workspace, private client journals, and technician workshop kiosk
 - `src/lib/`: authentication, signing/hashing, dates, formatting, owner helpers, and configuration maps.
 - `src/app/globals.css`: global styles and theme tokens.
 
-Read the implementation as the source of truth. `CODER_BRIEF.md` and `ARENA_BUNDLE.md`
-provide broader product context, but may describe planned rather than implemented behavior.
-The existing `CLAUDE.md` remains the Claude-specific guide. There is currently no Git
-repository in this workspace; do not claim to have reviewed a Git diff or created a commit.
+Read the implementation as the source of truth. `CLAUDE.md` is the main project guide and
+`docs/ARCHITECTURE.md` maps every area, data flow, and coupling hotspot. Older briefs live in
+`docs/archive/` and may describe planned rather than implemented behavior.
 
 ## Routes and boundaries
 
@@ -29,6 +28,7 @@ repository in this workspace; do not claim to have reviewed a Git diff or create
 | `/service/*` | Home service: today, schedule/dispatch, jobs, customers, invoices, expenses, time, finance, settings |
 | `/portal/[uuid]` | Client restoration journal accessed through a secret UUID link |
 | `/workshop` | Technician kiosk with worker PIN authentication |
+| `/os/*` | Growth OS: owner-only today, customers, growth, work, settings (`src/components/gos/`, `src/server/gos/`) |
 
 Admin/owner authentication uses database sessions and httpOnly cookies in
 `src/lib/auth.ts`. Workshop identity uses a separate signed worker cookie.
