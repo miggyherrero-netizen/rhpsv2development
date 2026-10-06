@@ -809,7 +809,7 @@ export async function deleteJob(id: string, confirmCode: string): Promise<Result
 /* ---- derived job money/time ---- */
 
 /** Recomputes quote total and parts cost from the job's line items. */
-export async function recalcJobMoney(jobId: string): Promise<void> {
+async function recalcJobMoney(jobId: string): Promise<void> {
   const items = await db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
   const quotedCents = items.reduce((sum, i) => sum + lineTotalCents(i), 0);
   // Explicit per-line costs win; a part line without one keeps costing what it is priced at.
@@ -821,7 +821,7 @@ export async function recalcJobMoney(jobId: string): Promise<void> {
 }
 
 /** Recomputes worked/travel minutes and labor cost from stopped time logs. */
-export async function recalcJobLabor(jobId: string): Promise<void> {
+async function recalcJobLabor(jobId: string): Promise<void> {
   const logs = await db
     .select()
     .from(serviceTimeLogs)
