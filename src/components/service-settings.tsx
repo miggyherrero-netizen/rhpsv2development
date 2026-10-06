@@ -1,18 +1,19 @@
 "use client";
 
 import TripSettings from "@/components/service-settings-trips";
+import PriceBook from "@/components/service-price-book";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Plus, Trash2, Users, Tags, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
+import { Plus, Trash2, Users, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
 import { peso } from "@/lib/format";
 import { DAYS_SHORT } from "@/lib/config";
-import { ITEM_KINDS, type AvgInvoiceBasis } from "@/lib/service";
+import type { AvgInvoiceBasis } from "@/lib/service";
 import { parsePesoInput } from "@/lib/service-flow";
 import type { ServiceSettings } from "@/server/service-data";
 import type { ServiceCatalogItem, ServiceTechnician } from "@/db/schema";
 import {
   updateSettings, createTechnician, updateTechnician, deleteTechnician,
-  createCatalogItem, updateCatalogItem, deleteCatalogItem, seedServiceDemo,
+  seedServiceDemo,
 } from "@/server/service";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
@@ -70,7 +71,6 @@ export default function SettingsClient({
   const [showFinance, setShowFinance] = useState(settings.showFinance);
   const [showJobMargins, setShowJobMargins] = useState(settings.showJobMargins);
 
-  const [newItem, setNewItem] = useState({ name: "", kind: "service", price: "", minutes: "60" });
 
   // "Unsaved changes" = the form no longer matches the last saved snapshot.
   const current = useMemo(
@@ -414,160 +414,7 @@ export default function SettingsClient({
       </SectionCard>
 
       {/* Price book */}
-      <SectionCard title={<>Price book <span className="font-normal text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>· saves instantly</span></>}>
-        <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_130px_120px_90px_auto] gap-2 items-end">
-            <Field label="Item name">
-              <TextInput
-                value={newItem.name}
-                onChange={(e) => setNewItem((s) => ({ ...s, name: e.target.value }))}
-                placeholder="Concert tuning"
-              />
-            </Field>
-            <Field label="Type">
-              <Select value={newItem.kind} onChange={(e) => setNewItem((s) => ({ ...s, kind: e.target.value }))}>
-                {ITEM_KINDS.map((k) => (
-                  <option key={k.key} value={k.key}>{k.label}</option>
-                ))}
-                <option value="package">Package (bundle)</option>
-              </Select>
-            </Field>
-            <Field label="Price">
-              <PesoInput value={newItem.price} onChange={(v) => setNewItem((s) => ({ ...s, price: v }))} />
-            </Field>
-            <Field label="Minutes">
-              <TextInput
-                type="number"
-                step="15"
-                value={newItem.minutes}
-                onChange={(e) => setNewItem((s) => ({ ...s, minutes: e.target.value }))}
-              />
-            </Field>
-            <PrimaryButton
-              pending={pending}
-              disabled={!newItem.name.trim()}
-              onClick={() => {
-                run(() =>
-                  createCatalogItem({
-                    name: newItem.name.trim(),
-                    kind: newItem.kind,
-                    unitPrice: parsePesoInput(newItem.price) ?? 0,
-                    estimatedMinutes: Number(newItem.minutes) || 60,
-                  }),
-                );
-                setNewItem({ name: "", kind: "service", price: "", minutes: "60" });
-              }}
-            >
-              <Plus size={14} /> Add
-            </PrimaryButton>
-          </div>
-
-          {catalog.length === 0 ? (
-            <EmptyState
-              icon={<Tags size={19} strokeWidth={1.7} />}
-              title="Price book is empty"
-              hint="Save your standard services and parts so quoting a visit takes seconds."
-            />
-          ) : (
-            <div className="overflow-x-auto thin-scroll pt-2">
-              <table className="w-full text-left">
-                <thead>
-                  <tr style={{ color: "var(--color-svc-text-faint)" }}>
-                    {["Item", "Type", "Price", "Minutes", "Quick add", "In package", ""].map((h) => (
-                      <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="svc-divide">
-                  {catalog.map((item) => (
-                    <tr key={item.id} className="group">
-                      <td className="py-2 pr-4">
-                        <input
-                          aria-label="Item name"
-                          defaultValue={item.name}
-                          onBlur={(e) => {
-                            if (e.target.value !== item.name) run(() => updateCatalogItem(item.id, { name: e.target.value }));
-                          }}
-                          className="input-svc !py-1 !px-2 text-[12.5px]"
-                        />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Select
-                          aria-label="Type"
-                          defaultValue={item.kind}
-                          onChange={(e) => run(() => updateCatalogItem(item.id, { kind: e.target.value }))}
-                          className="!py-1 !px-2 text-[12px] !w-auto"
-                        >
-                          {ITEM_KINDS.map((k) => (
-                            <option key={k.key} value={k.key}>{k.label}</option>
-                          ))}
-                          <option value="package">Package (bundle)</option>
-                        </Select>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <UnitInput
-                          type="number"
-                          prefix="₱"
-                          step="50"
-                          aria-label="Price"
-                          defaultValue={item.unitPriceCents / 100}
-                          onBlur={(e) => run(() => updateCatalogItem(item.id, { unitPrice: Number(e.target.value) }))}
-                          className="input-svc !w-28 !py-1 !px-2 text-[12px]"
-                        />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <input
-                          type="number"
-                          step="15"
-                          aria-label="Minutes"
-                          defaultValue={item.estimatedMinutes}
-                          onBlur={(e) => run(() => updateCatalogItem(item.id, { estimatedMinutes: Number(e.target.value) }))}
-                          className="input-svc !w-20 !py-1 !px-2 text-[12px]"
-                        />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <label className="inline-flex items-center gap-2 min-h-11 text-[12px] cursor-pointer" style={{ color: "var(--color-svc-text-dim)" }}>
-                          <input
-                            type="checkbox" className="w-5 h-5" defaultChecked={item.isQuickAdd} aria-label={`Quick add chip for ${item.name}`}
-                            onChange={(e) => run(() => updateCatalogItem(item.id, { isQuickAdd: e.target.checked }))}
-                          />
-                          Chip
-                        </label>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {item.kind === "package" ? (
-                          <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                            {catalog.filter((c) => c.packageId === item.id).length} item(s)
-                          </span>
-                        ) : (
-                          <Select
-                            aria-label={`Package for ${item.name}`} defaultValue={item.packageId ?? ""}
-                            onChange={(e) => run(() => updateCatalogItem(item.id, { packageId: e.target.value || null }))}
-                            className="!py-1 !px-2 text-[12px] !w-auto max-w-40"
-                          >
-                            <option value="">—</option>
-                            {catalog.filter((c) => c.kind === "package").map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </Select>
-                        )}
-                      </td>
-                      <td className="py-2 text-right">
-                        <button
-                          onClick={() => run(() => deleteCatalogItem(item.id))}
-                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
-                          style={{ color: "var(--color-svc-text-faint)" }}
-                          aria-label="Delete item"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </SectionCard>
+      <PriceBook catalog={catalog} />
 
       {/* Demo data */}
       {!hasData && (

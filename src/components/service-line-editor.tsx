@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Plus, X, Undo2 } from "lucide-react";
+import { DETAILS_MAX } from "@/lib/service-lines";
 import { ITEM_KINDS, lineTotalCents } from "@/lib/service";
 import { parsePesoInput } from "@/lib/service-flow";
 import {
@@ -26,7 +27,7 @@ export type LineAdapter = {
 
 /** Pesos on the wire (the server converts once to centavos). */
 export const toServerLine = (l: NewLine & { position?: number }) => ({
-  kind: l.kind, description: l.description, qty: l.qty, unitPrice: l.unitPriceCents / 100, taxable: l.taxable,
+  kind: l.kind, description: l.description, details: l.details ?? null, qty: l.qty, unitPrice: l.unitPriceCents / 100, taxable: l.taxable,
   minutes: l.minutes, cost: l.costCents / 100, catalogItemId: l.catalogItemId, position: l.position,
 });
 
@@ -244,7 +245,7 @@ export default function LineEditor({
               >
                 <Plus size={12} aria-hidden="true" />
                 {c.name}
-                {c.kind !== "package" && c.unitPriceCents > 0 ? <span style={DIM}>{peso(c.unitPriceCents)}</span> : null}
+                {c.unitPriceCents > 0 ? <span style={DIM}>{peso(c.unitPriceCents)}</span> : null}
               </button>
             ))}
           </div>
@@ -265,6 +266,30 @@ export default function LineEditor({
   );
 }
 
+/** The small print under an item name. Hidden behind a "+ Details" link until it is wanted or already filled. */
+function DetailsField({
+  value, open, label, onOpen, onChange, onBlur, onKeyDown,
+}: {
+  value: string; open: boolean; label: string;
+  onOpen: () => void; onChange: (v: string) => void; onBlur: () => void; onKeyDown: (e: React.KeyboardEvent) => void;
+}) {
+  if (!open) {
+    return (
+      <button type="button" onClick={onOpen} className="mt-0.5 inline-flex items-center min-h-8 text-[12px] hover:underline" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}>
+        + Details
+      </button>
+    );
+  }
+  return (
+    <input
+      aria-label={label} value={value} maxLength={DETAILS_MAX} autoComplete="off"
+      placeholder="Printed under the name, e.g. Includes: tuning · cleaning · pedal adjustment"
+      className={`${FIELD} mt-1 !text-[12px]`} style={{ color: "var(--color-svc-text-dim)" }}
+      onChange={(e) => onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown}
+    />
+  );
+}
+
 /* ------------------------------------------------------------- existing row */
 
 function LineRow({
@@ -275,6 +300,8 @@ function LineRow({
   onBlur: () => void; onEnter: () => void; onRemove: () => void;
 }) {
   const [desc, setDesc] = useState(row.description);
+  const [details, setDetails] = useState(row.details ?? "");
+  const [showDetails, setShowDetails] = useState(!!row.details);
   const [qty, setQty] = useState(String(row.qty));
   const [price, setPrice] = useState(textOf(row.unitPriceCents));
   const [cost, setCost] = useState(textOf(row.costCents));
@@ -292,6 +319,12 @@ function LineRow({
           aria-label={`Description for line ${n}`} value={desc} aria-invalid={desc.trim() === "" || undefined} className={FIELD} maxLength={300}
           onChange={(e) => { setDesc(e.target.value); if (e.target.value.trim()) onEdit({ description: e.target.value.trim() }, { description: e.target.value.trim() }); }}
           onBlur={() => { if (!desc.trim()) setDesc(row.description); onBlur(); }} onKeyDown={keys}
+        />
+        <DetailsField
+          value={details} open={showDetails} label={`Details for line ${n}`}
+          onOpen={() => setShowDetails(true)}
+          onChange={(v) => { setDetails(v); const d = v.trim() || null; onEdit({ details: d }, { details: d }); }}
+          onBlur={onBlur} onKeyDown={keys}
         />
       </Cell>
       <Cell show label="Qty">
@@ -370,6 +403,8 @@ function BlankRow({
   onAdd: (lines: NewLine[]) => Promise<boolean>;
 }) {
   const [desc, setDesc] = useState("");
+  const [details, setDetails] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [cost, setCost] = useState("");
@@ -390,7 +425,7 @@ function BlankRow({
   const amount = lineTotalCents({ qty: parseQty(qty) ?? 1, unitPriceCents: priceCents });
 
   const reset = () => {
-    setDesc(""); setQty("1"); setPrice(""); setCost(""); setKind("service"); setTaxable(true);
+    setDesc(""); setDetails(""); setShowDetails(false); setQty("1"); setPrice(""); setCost(""); setKind("service"); setTaxable(true);
     setMinutes(null); setCatalogItemId(null); setOpen(false); setActive(-1);
   };
 
@@ -399,7 +434,7 @@ function BlankRow({
     if (price.trim() !== "" && parsePesoInput(price) === null) return;
     busy.current = true;
     const line: NewLine = {
-      kind, description: desc.trim(), qty: parseQty(qty) ?? 1, unitPriceCents: priceCents, taxable,
+      kind, description: desc.trim(), details: details.trim() || null, qty: parseQty(qty) ?? 1, unitPriceCents: priceCents, taxable,
       costCents: Math.round((parsePesoInput(cost) ?? 0) * 100), catalogItemId, minutes,
     };
     const ok = await onAdd([line]);
@@ -420,6 +455,7 @@ function BlankRow({
     }
     const l = lines[0]!;
     setDesc(l.description); setPrice(textOf(l.unitPriceCents)); setKind(l.kind); setTaxable(l.taxable);
+    setDetails(l.details ?? ""); setShowDetails(!!l.details);
     setMinutes(l.minutes); setCatalogItemId(l.catalogItemId); setQty("1");
     qtyRef.current?.focus(); qtyRef.current?.select();
   };
@@ -458,6 +494,10 @@ function BlankRow({
             onChange={(e) => { setDesc(e.target.value); setCatalogItemId(null); setOpen(true); setActive(-1); }}
             onFocus={() => setOpen(true)} onKeyDown={onDescKey}
           />
+          <DetailsField
+            value={details} open={showDetails} label={`New ${noun} details`}
+            onOpen={() => setShowDetails(true)} onChange={setDetails} onBlur={() => {}} onKeyDown={onFieldKey}
+          />
           {open && results.length > 0 ? (
             <ul
               id={listId} role="listbox" aria-label="Price book suggestions"
@@ -471,9 +511,12 @@ function BlankRow({
                   className="px-3 py-2 min-h-11 flex items-center justify-between gap-3 cursor-pointer text-[13px]"
                   style={{ background: i === active ? "var(--color-svc-accent-soft)" : undefined, color: "var(--color-svc-text)" }}
                 >
-                  <span className="truncate">{c.name}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate">{c.name}</span>
+                    {c.kind === "package" ? <span className="block truncate text-[11.5px]" style={MUTED}>Package · {peso(c.unitPriceCents)}</span> : null}
+                  </span>
                   <span className="shrink-0 text-[12px]" style={MUTED}>
-                    {c.kind === "package" ? "Package" : peso(c.unitPriceCents)}
+                    {c.kind === "package" ? "" : peso(c.unitPriceCents)}
                   </span>
                 </li>
               ))}

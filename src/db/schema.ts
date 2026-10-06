@@ -425,6 +425,7 @@ export const servicePianos = pgTable("service_pianos", {
 export const serviceCatalog = pgTable("service_catalog", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  /** Shown under the item name on quotes and invoices. For a `package`: what is included, one item per line. */
   description: text("description"),
   kind: text("kind").notNull().default("service"), // service | part | fee | package
   unitPriceCents: integer("unit_price_cents").notNull().default(0),
@@ -433,7 +434,7 @@ export const serviceCatalog = pgTable("service_catalog", {
   active: boolean("active").notNull().default(true),
   /** Shown as a one-tap chip under the line editor. */
   isQuickAdd: boolean("is_quick_add").notNull().default(false),
-  /** Set on a member row to group it under a `package` row: picking the package adds every member as a line. */
+  /** Legacy: a member row pointing at a `package` row. New packages are one price with an "includes" list in `description`; this is only read as a fallback when a package has no list. */
   packageId: uuid("package_id").references((): AnyPgColumn => serviceCatalog.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -522,6 +523,8 @@ export const serviceJobItems = pgTable("service_job_items", {
   minutes: integer("minutes"),
   /** Optional per-unit cost to the business, for job margin. 0 = not entered. */
   costCents: integer("cost_cents").notNull().default(0),
+  /** Small print under the item name on the quote and invoice ("Includes: tuning · cleaning"). */
+  details: text("details"),
   catalogItemId: uuid("catalog_item_id").references(() => serviceCatalog.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -611,6 +614,8 @@ export const serviceInvoiceItems = pgTable("service_invoice_items", {
     .references(() => serviceInvoices.id, { onDelete: "cascade" }),
   jobItemId: uuid("job_item_id").references(() => serviceJobItems.id, { onDelete: "set null" }),
   description: text("description").notNull(),
+  /** Small print under the item name (copied from the job line, or typed on the invoice). */
+  details: text("details"),
   qty: integer("qty").notNull().default(1),
   unitPriceCents: integer("unit_price_cents").notNull().default(0),
   taxable: boolean("taxable").notNull().default(true),

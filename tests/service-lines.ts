@@ -1,8 +1,5 @@
 /** Inline line editor: validation, price book, packages, cost, debounced autosave + undo. No database. Run: npx tsx tests/service-lines.ts */
-import {
-  parseQty, isRowSavable, lineCostCents, partsCostFromLines, filterCatalog, expandCatalogEntry, quickAddEntries,
-  shouldOfferPriceBook, LineSaver, type CatalogEntry, type EditorLine, type SaveOutcome,
-} from "../src/lib/service-lines";
+import { parseQty, isRowSavable, lineCostCents, partsCostFromLines, filterCatalog, expandCatalogEntry, quickAddEntries, shouldOfferPriceBook, LineSaver, type CatalogEntry, type EditorLine, type SaveOutcome, cleanDetails, parseIncludes, includesLine, packageIncludes } from "../src/lib/service-lines";
 
 let failures = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -18,7 +15,8 @@ const catalog: CatalogEntry[] = [
   entry({ id: "t", name: "Standard tuning", unitPriceCents: 250_000, isQuickAdd: true, estimatedMinutes: 90 }),
   entry({ id: "p", name: "Pitch raise", unitPriceCents: 150_000 }),
   entry({ id: "s", name: "Hammer felt set", kind: "part", unitPriceCents: 800_000 }),
-  entry({ id: "pk", name: "Full service package", kind: "package", unitPriceCents: 0, isQuickAdd: true }),
+  entry({ id: "pk", name: "Full service package", kind: "package", unitPriceCents: 0, isQuickAdd: true }), // legacy: members, no list
+  entry({ id: "bp", name: "Basic piano service package", kind: "package", unitPriceCents: 300_000, description: "Standard tuning\nAction cleaning\n  - Pedal adjustment\nstandard tuning" }),
   entry({ id: "m1", name: "Tuning (package)", unitPriceCents: 250_000, packageId: "pk" }),
   entry({ id: "m2", name: "Action regulation", unitPriceCents: 400_000, packageId: "pk" }),
   entry({ id: "old", name: "Retired item", active: false }),
@@ -43,18 +41,25 @@ check("sum over lines", partsCostFromLines([
 
 console.log("\nprice-book type-ahead");
 check("matches by words, any order", filterCatalog(catalog, "tun std").map((c) => c.id), []);
-check("matches by substring", filterCatalog(catalog, "tuning").map((c) => c.id), ["t"]);
-check("prefix matches first", filterCatalog(catalog, "p").map((c) => c.id), ["p", "pk"]);
-check("inactive and package members are not listed", filterCatalog(catalog, "").map((c) => c.id).sort(), ["p", "pk", "s", "t"]);
+check("matches by substring", filterCatalog(catalog, "tuning").map((c) => c.id), ["m1", "t"]);
+check("prefix matches first, then the rest by name", filterCatalog(catalog, "p").map((c) => c.id), ["p", "bp", "pk", "m1"]);
+check("every active entry is listed (inactive ones are not); members are ordinary items now", filterCatalog(catalog, "", 20).map((c) => c.id).sort(), ["bp", "m1", "m2", "p", "pk", "s", "t"]);
 check("case-insensitive", filterCatalog(catalog, "HAMMER").map((c) => c.id), ["s"]);
 
 console.log("\npackages and quick add");
 check("single item expands to itself with price + kind", expandCatalogEntry(catalog[0]!, catalog).map((l) => [l.description, l.unitPriceCents, l.kind, l.catalogItemId]), [["Standard tuning", 250_000, "service", "t"]]);
-check("package expands to its members", expandCatalogEntry(catalog[3]!, catalog).map((l) => l.description), ["Tuning (package)", "Action regulation"]);
-check("package with no members adds itself as a service", expandCatalogEntry(entry({ id: "x", name: "Empty pkg", kind: "package", unitPriceCents: 1 }), []).map((l) => l.kind), ["service"]);
-check("quick-add chips: flagged, active, not package members", quickAddEntries(catalog).map((c) => c.id), ["t", "pk"]);
+check("a package is ONE line at the package price, with its includes list as details", expandCatalogEntry(catalog[4]!, catalog).map((l) => [l.description, l.unitPriceCents, l.kind, l.details]), [["Basic piano service package", 300_000, "service", "Includes: Standard tuning · Action cleaning · Pedal adjustment"]]);
+check("an old-style package (members, no list) still prints its members as the includes", expandCatalogEntry(catalog[3]!, catalog).map((l) => [l.unitPriceCents, l.details]), [[0, "Includes: Tuning (package) · Action regulation"]]);
+check("a package with nothing to list adds just its name and price", expandCatalogEntry(entry({ id: "x", name: "Empty pkg", kind: "package", unitPriceCents: 1 }), []).map((l) => [l.kind, l.details]), [["service", null]]);
+check("a plain item brings its description along as details", expandCatalogEntry(entry({ id: "d", name: "Pedal repair", description: "  Brass pedal rod and felt  " }), []).map((l) => l.details), ["Brass pedal rod and felt"]);
+check("quick-add chips: flagged and active", quickAddEntries(catalog).map((c) => c.id), ["t", "pk"]);
 
-check("a member whose package was removed is offered on its own again", filterCatalog(catalog.filter((c) => c.id !== "pk"), "action").map((c) => c.id), ["m2"]);
+console.log("\ndetails + includes");
+check("includes: one per line, bullets and dots tolerated, blanks and duplicates dropped", parseIncludes("Tuning\n- Cleaning\n• Regulation\n\nTUNING; Voicing · Pedals"), ["Tuning", "Cleaning", "Regulation", "Voicing", "Pedals"]);
+check("includes: empty / null", [parseIncludes(""), parseIncludes(null)], [[], []]);
+check("includes line", [includesLine(["A", "B"]), includesLine([])], ["Includes: A · B", null]);
+check("package list wins over legacy members", packageIncludes(catalog[4]!, catalog), ["Standard tuning", "Action cleaning", "Pedal adjustment"]);
+check("details are trimmed, capped and never empty strings", [cleanDetails("  hi  "), cleanDetails("   "), cleanDetails(undefined), cleanDetails("x".repeat(900))?.length], ["hi", null, null, 500]);
 
 console.log("\nsave to price book prompt");
 check("free text not in book -> offer", shouldOfferPriceBook({ description: "Pedal repair", catalogItemId: null }, catalog), true);

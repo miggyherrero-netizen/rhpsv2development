@@ -16,6 +16,8 @@ export type EditorLine = {
   costCents: number;
   catalogItemId: string | null;
   minutes: number | null;
+  /** Small print under the item name (printed on the quote and invoice). */
+  details?: string | null;
   /** Server sort position (kept so Undo can put a removed line back where it was). */
   position?: number;
 };
@@ -30,6 +32,8 @@ export type CatalogEntry = {
   active: boolean;
   isQuickAdd: boolean;
   packageId: string | null;
+  /** Details printed under the name. For a package: what is included, one item per line. */
+  description?: string | null;
 };
 
 /** What a new line looks like before it is saved (no id yet). */
@@ -63,15 +67,50 @@ export function lineCostCents(l: { kind: string; qty: number; unitPriceCents: nu
 export const partsCostFromLines = (lines: { kind: string; qty: number; unitPriceCents: number; costCents?: number | null }[]): number =>
   lines.reduce((sum, l) => sum + lineCostCents(l), 0);
 
+/* ------------------------------------------------------------ details + packages */
+
+export const DETAILS_MAX = 500;
+
+/** Details text: trimmed, capped, blank -> null. */
+export function cleanDetails(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim().slice(0, DETAILS_MAX) : "";
+  return s || null;
+}
+
+/** "What is included": one item per line (a "·" or ";" also splits), trimmed, no blanks, no duplicates. */
+export function parseIncludes(text: string | null | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of (text ?? "").split(/\r?\n|[·;]/)) {
+    const item = raw.replace(/^\s*[-•*]\s*/, "").trim();
+    const key = item.toLowerCase();
+    if (!item || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+/** The line printed under a package's name. */
+export const includesLine = (items: string[]): string | null => (items.length ? `Includes: ${items.join(" · ")}` : null);
+
+/** Active members of a legacy package (price-book rows pointing at it), in price-book order. */
+export const packageMembers = (catalog: CatalogEntry[], packageId: string): CatalogEntry[] =>
+  catalog.filter((c) => c.active && c.packageId === packageId);
+
+/** What a package includes: its own list, or — for packages set up the old way — the names of its member rows. */
+export function packageIncludes(entry: CatalogEntry, catalog: CatalogEntry[]): string[] {
+  const own = parseIncludes(entry.description);
+  return own.length ? own : packageMembers(catalog, entry.id).map((m) => m.name);
+}
+
 /* ------------------------------------------------------------ price book */
 
 /** Type-ahead: active entries whose name contains every typed word, prefix matches first. */
 export function filterCatalog(catalog: CatalogEntry[], query: string, limit = 8): CatalogEntry[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  // Package members are only offered through their package (so it never lists its own parts twice) —
-  // but a member whose package is gone, switched off or no longer a package is offered on its own again.
-  const liveParents = new Set(catalog.filter((c) => c.active && c.kind === "package").map((c) => c.id));
-  const pool = catalog.filter((c) => c.active && (!c.packageId || !liveParents.has(c.packageId)));
+  const pool = catalog.filter((c) => c.active);
   if (!words.length) return pool.slice(0, limit);
   const scored: { c: CatalogEntry; score: number }[] = [];
   for (const c of pool) {
@@ -82,7 +121,7 @@ export function filterCatalog(catalog: CatalogEntry[], query: string, limit = 8)
   return scored.sort((a, b) => a.score - b.score || a.c.name.localeCompare(b.c.name)).slice(0, limit).map((s) => s.c);
 }
 
-const toNewLine = (c: CatalogEntry): NewLine => ({
+const toNewLine = (c: CatalogEntry, catalog: CatalogEntry[]): NewLine => ({
   kind: c.kind === "package" ? "service" : c.kind,
   description: c.name,
   qty: 1,
@@ -91,26 +130,17 @@ const toNewLine = (c: CatalogEntry): NewLine => ({
   costCents: 0,
   catalogItemId: c.id,
   minutes: c.estimatedMinutes || null,
+  details: c.kind === "package" ? includesLine(packageIncludes(c, catalog)) : cleanDetails(c.description),
 });
 
-/** Active members of a package (price-book rows pointing at it), in price-book order. */
-export const packageMembers = (catalog: CatalogEntry[], packageId: string): CatalogEntry[] =>
-  catalog.filter((c) => c.active && c.packageId === packageId);
-
 /**
- * The lines one price-book pick adds: a package with members adds each member; anything else adds itself.
- * (A package row with no members and a price adds itself, so an unfinished package is never a dead click.)
+ * The line one price-book pick adds. Always ONE line: a package is a single price with its "Includes: …" list as the
+ * details under the name (the list carries no prices of its own).
  */
-export function expandCatalogEntry(entry: CatalogEntry, catalog: CatalogEntry[]): NewLine[] {
-  const members = packageMembers(catalog, entry.id);
-  return members.length > 0 ? members.map(toNewLine) : [toNewLine(entry)];
-}
+export const expandCatalogEntry = (entry: CatalogEntry, catalog: CatalogEntry[]): NewLine[] => [toNewLine(entry, catalog)];
 
 /** The entries shown as quick-add chips. */
-export const quickAddEntries = (catalog: CatalogEntry[]): CatalogEntry[] => {
-  const liveParents = new Set(catalog.filter((c) => c.active && c.kind === "package").map((c) => c.id));
-  return catalog.filter((c) => c.active && c.isQuickAdd && (!c.packageId || !liveParents.has(c.packageId)));
-};
+export const quickAddEntries = (catalog: CatalogEntry[]): CatalogEntry[] => catalog.filter((c) => c.active && c.isQuickAdd);
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 

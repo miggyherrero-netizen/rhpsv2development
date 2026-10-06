@@ -56,7 +56,7 @@ export default function InvoiceDetailClient({
   // The editor owns the lines while it is open; totals follow what it shows, saved or still saving.
   const editorLines = useMemo<EditorLine[]>(() => items.map((i) => ({
     id: i.id, kind: "service", description: i.description, qty: i.qty, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
-    costCents: 0, catalogItemId: null, minutes: null, position: i.position,
+    costCents: 0, catalogItemId: null, minutes: null, details: i.details, position: i.position,
   })), []); // eslint-disable-line react-hooks/exhaustive-deps -- seeded once; the editor keeps its own state afterwards
   const [liveLines, setLiveLines] = useState<EditorLine[] | null>(null);
   const lineAdapter = useMemo<LineAdapter>(() => ({
@@ -67,10 +67,10 @@ export default function InvoiceDetailClient({
     update: (id, patch) => updateInvoiceItem(id, patch),
     remove: (id) => deleteInvoiceItem(id),
     saveToPriceBook: async (l) => {
-      const res = await createCatalogItem({ name: l.description, kind: "service", unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: 60 });
+      const res = await createCatalogItem({ name: l.description, description: l.details ?? null, kind: "service", unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: 60 });
       if (!res.ok) return res;
       const now = new Date();
-      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: "service", unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: 60, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
+      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: "service", unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: 60, description: l.details ?? null, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
     },
   }), [invoice.id]);
   const shownItems = liveLines ?? items;

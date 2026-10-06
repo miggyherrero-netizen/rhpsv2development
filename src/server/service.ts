@@ -26,7 +26,7 @@ import { titleCaseName } from "@/lib/service-reports";
 import {
   canViewFinance, confirmMatches, nextJobStep, stepEffect, type StepKey,
 } from "@/lib/service-flow";
-import { partsCostFromLines } from "@/lib/service-lines";
+import { cleanDetails, partsCostFromLines } from "@/lib/service-lines";
 import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
 import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
@@ -868,6 +868,8 @@ export type JobItemInput = {
   taxable?: boolean; minutes?: number | null; catalogItemId?: string | null;
   /** Per-unit cost in pesos (optional, for margin). */
   cost?: number;
+  /** Small print under the item name on the quote and invoice. */
+  details?: string | null;
   /** Where the line sits; used by Undo to put a removed line back. */
   position?: number;
 };
@@ -884,6 +886,7 @@ function jobItemValues(jobId: string, input: JobItemInput, position: number) {
     taxable: boolOr(input.taxable, true),
     minutes: input.minutes ? Math.max(0, intOr(input.minutes, 0)) : null,
     costCents: Math.max(0, moneyToCents(input.cost)),
+    details: cleanDetails(input.details),
     catalogItemId: str(input.catalogItemId) || null,
     position,
   };
@@ -935,6 +938,7 @@ export async function updateJobItem(id: string, patch: Partial<JobItemInput>): P
       taxable: patch.taxable !== undefined ? boolOr(patch.taxable, true) : undefined,
       minutes: patch.minutes !== undefined ? (patch.minutes ? Math.max(0, intOr(patch.minutes, 0)) : null) : undefined,
       costCents: patch.cost !== undefined ? Math.max(0, moneyToCents(patch.cost)) : undefined,
+      details: patch.details !== undefined ? cleanDetails(patch.details) : undefined,
       updatedAt: new Date(),
     })
     .where(eq(serviceJobItems.id, id));
@@ -1148,7 +1152,7 @@ async function recalcInvoice(invoiceId: string): Promise<void> {
 }
 
 async function createInvoiceRows(input: {
-  customerId: string; jobId?: string | null; items: { description: string; qty: number; unitPriceCents: number; taxable: boolean; jobItemId?: string | null }[];
+  customerId: string; jobId?: string | null; items: { description: string; details?: string | null; qty: number; unitPriceCents: number; taxable: boolean; jobItemId?: string | null }[];
   terms?: string | null; notes?: string | null; dueDate?: Date | null; discountCents?: number;
 }): Promise<Result<{ id: string }>> {
   const user = await requireUser();
@@ -1185,6 +1189,7 @@ async function createInvoiceRows(input: {
       invoiceId: invoice!.id,
       jobItemId: item.jobItemId ?? null,
       description: item.description,
+      details: cleanDetails(item.details),
       qty: Math.max(1, Math.round(item.qty)),
       unitPriceCents: Math.round(item.unitPriceCents),
       taxable: item.taxable,
@@ -1221,9 +1226,10 @@ export async function createInvoiceFromJob(jobId: string, opts: { discountCents?
   if (existing) return ok({ id: existing.id });
   const items = await db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
   const lines: {
-    description: string; qty: number; unitPriceCents: number; taxable: boolean; jobItemId: string | null;
+    description: string; details?: string | null; qty: number; unitPriceCents: number; taxable: boolean; jobItemId: string | null;
   }[] = items.map((i) => ({
     description: i.description,
+    details: i.details,
     qty: i.qty,
     unitPriceCents: i.unitPriceCents,
     taxable: i.taxable,
@@ -1252,7 +1258,7 @@ export async function createInvoiceFromJob(jobId: string, opts: { discountCents?
 
 export async function createInvoice(input: {
   customerId: string; jobId?: string | null;
-  items: { description: string; qty?: number; unitPrice?: number; taxable?: boolean }[];
+  items: { description: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean }[];
   dueDate?: string | null; notes?: string | null; terms?: string | null; discount?: number;
 }): Promise<Result<{ id: string }>> {
   await requireUser();
@@ -1262,6 +1268,7 @@ export async function createInvoice(input: {
     .filter((i) => str(i.description))
     .map((i) => ({
       description: str(i.description, 300)!,
+      details: cleanDetails(i.details),
       qty: Math.max(1, intOr(i.qty, 1)),
       unitPriceCents: moneyToCents(i.unitPrice),
       taxable: boolOr(i.taxable, true),
@@ -1306,7 +1313,7 @@ export async function updateInvoice(
   return ok();
 }
 
-export type InvoiceItemInput = { description: string; qty?: number; unitPrice?: number; taxable?: boolean; position?: number };
+export type InvoiceItemInput = { description: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean; position?: number };
 
 /** Adds one or more invoice lines in one transaction. Returns the new ids, in order. */
 export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInput[]): Promise<Result<{ ids: string[]; positions: number[] }>> {
@@ -1329,6 +1336,7 @@ export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInpu
       const [row] = await tx.insert(serviceInvoiceItems).values({
         invoiceId,
         description: str(input.description, 300) ?? "",
+        details: cleanDetails(input.details),
         qty: Math.min(9_999, Math.max(1, intOr(input.qty, 1))),
         unitPriceCents: moneyToCents(input.unitPrice),
         taxable: boolOr(input.taxable, true),
@@ -1350,7 +1358,7 @@ export async function addInvoiceItem(invoiceId: string, input: InvoiceItemInput)
 
 export async function updateInvoiceItem(
   id: string,
-  patch: { description?: string; qty?: number; unitPrice?: number; taxable?: boolean },
+  patch: { description?: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean },
 ): Promise<Result> {
   await requireUser();
   const [item] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
@@ -1359,6 +1367,7 @@ export async function updateInvoiceItem(
     .update(serviceInvoiceItems)
     .set({
       description: patch.description !== undefined ? str(patch.description, 300) || item.description : undefined,
+      details: patch.details !== undefined ? cleanDetails(patch.details) : undefined,
       qty: patch.qty !== undefined ? Math.max(1, intOr(patch.qty, 1)) : undefined,
       unitPriceCents: patch.unitPrice !== undefined ? moneyToCents(patch.unitPrice) : undefined,
       taxable: patch.taxable !== undefined ? boolOr(patch.taxable, true) : undefined,

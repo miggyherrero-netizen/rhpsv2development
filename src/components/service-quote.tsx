@@ -67,7 +67,7 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
                   <tbody>
                     {lines.map((item, i) => (
                       <tr key={item.id ?? `l${i}`}>
-                        <td><span className={styles.itemName}>{item.description}</span>{vatOn && !item.taxable ? <span className={styles.exempt}>VAT exempt</span> : null}</td>
+                        <td><span className={styles.itemName}>{item.description}</span>{item.details ? <span className={styles.itemDetails}>{item.details}</span> : null}{vatOn && !item.taxable ? <span className={styles.exempt}>VAT exempt</span> : null}</td>
                         <td className={styles.number}>{item.qty}</td>
                         <td className={styles.number}>{documentMoney(item.unitPriceCents)}</td>
                         <td className={styles.number}>{documentMoney(item.qty * item.unitPriceCents)}</td>

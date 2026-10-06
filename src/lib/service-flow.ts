@@ -198,7 +198,7 @@ export function quoteStatus(jobStatus: string, events: { type: string }[]): Quot
 
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = { draft: "Draft", sent: "Sent", accepted: "Accepted", converted: "Converted to invoice" };
 
-type QuoteItem = { id?: string; kind?: string; description: string; qty: number; unitPriceCents: number; taxable: boolean };
+type QuoteItem = { id?: string; kind?: string; description: string; details?: string | null; qty: number; unitPriceCents: number; taxable: boolean };
 
 /**
  * Lines shown on a quote — exactly what "Create invoice" will bill: the job's items, plus the call-out fee

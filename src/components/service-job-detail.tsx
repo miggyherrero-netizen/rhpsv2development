@@ -68,7 +68,7 @@ export default function JobDetailClient({
   // The editor owns the lines while the page is open; totals follow what it shows, saved or still saving.
   const editorLines = useMemo<EditorLine[]>(() => detail.items.map((i) => ({
     id: i.id, kind: i.kind, description: i.description, qty: i.qty, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
-    costCents: i.costCents, catalogItemId: i.catalogItemId, minutes: i.minutes, position: i.position,
+    costCents: i.costCents, catalogItemId: i.catalogItemId, minutes: i.minutes, details: i.details, position: i.position,
   })), []); // eslint-disable-line react-hooks/exhaustive-deps -- seeded once; the editor keeps its own state afterwards
   const [liveLines, setLiveLines] = useState<EditorLine[]>(editorLines);
   const lineAdapter = useMemo<LineAdapter>(() => ({
@@ -79,10 +79,10 @@ export default function JobDetailClient({
     update: (id, patch) => updateJobItem(id, patch),
     remove: (id) => deleteJobItem(id),
     saveToPriceBook: async (l) => {
-      const res = await createCatalogItem({ name: l.description, kind: l.kind, unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60 });
+      const res = await createCatalogItem({ name: l.description, description: l.details ?? null, kind: l.kind, unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60 });
       if (!res.ok) return res;
       const now = new Date();
-      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: l.kind, unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
+      return { ok: true, entry: { id: res.data!.id, name: l.description, kind: l.kind, unitPriceCents: l.unitPriceCents, taxable: l.taxable, estimatedMinutes: l.minutes ?? 60, description: l.details ?? null, active: true, isQuickAdd: false, packageId: null, createdAt: now, updatedAt: now } as CatalogEntry };
     },
   }), [detail.job.id]);
   const totals = useMemo(
