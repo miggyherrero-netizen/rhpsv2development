@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { advanceJob, createInvoiceFromJob } from "@/server/service";
 import type { QuoteStatus } from "@/lib/service-flow";
 
-const BTN = "rounded-lg border border-[#bed1d2] bg-white px-3 py-2.5 text-[12px] text-[#214953] hover:bg-[#e7f2f0] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216c72]";
-const PRIMARY = "rounded-lg border border-[#216c72] bg-[#216c72] px-3.5 py-2.5 text-[12px] text-white hover:bg-[#1b585d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216c72]";
+const BTN = "inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-[#9db8ba] bg-white px-4 text-sm font-medium text-[#174f54] transition-colors hover:bg-[#e7f2f0] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1f6f6f]";
+const PRIMARY = "inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-[#1f6f6f] bg-[#1f6f6f] px-4 text-sm font-medium text-white transition-colors hover:bg-[#174f54] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1f6f6f]";
 
 export default function QuoteActions({ jobId, status, hasLines, invoiceId }: { jobId: string; status: QuoteStatus; hasLines: boolean; invoiceId: string | null }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function QuoteActions({ jobId, status, hasLines, invoiceId }: { j
       {status === "sent" && <button type="button" disabled={pending} className={PRIMARY} onClick={() => run(() => advanceJob(jobId, "accept_quote"))}>Mark accepted</button>}
       {status === "accepted" && !invoiceId && <button type="button" disabled={pending} className={PRIMARY} onClick={() => run(() => createInvoiceFromJob(jobId), (id) => id && router.push(`/service/invoices/${id}`))}>Convert to invoice</button>}
       {invoiceId && <button type="button" className={BTN} onClick={() => router.push(`/service/invoices/${invoiceId}`)}>View invoice</button>}
-      {error ? <span role="alert" className="text-[12px] text-[#a95353]">{error}</span> : null}
+      {error ? <span role="alert" className="text-sm text-[#a23f3f]">{error}</span> : null}
     </>
   );
 }
