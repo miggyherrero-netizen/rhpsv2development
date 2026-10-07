@@ -34,7 +34,7 @@ export default function ShowroomCostClient({ piano }: { piano: Piano }) {
       </Link>
 
       <div className="card-dark p-6">
-        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-mist mb-1">
+        <p className="flex items-center gap-1.5 text-xs uppercase tracking-[0.22em] text-mist mb-1">
           <Coins size={12} /> Private · cost &amp; margin
         </p>
         <h1 className="font-serif text-2xl text-white">{piano.brand} {piano.model}</h1>
@@ -50,13 +50,13 @@ export default function ShowroomCostClient({ piano }: { piano: Piano }) {
 
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3.5">
-              <p className="text-[9.5px] uppercase tracking-[0.16em] text-mist">Margin</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-mist">Margin</p>
               <p className={`tnum text-lg font-medium mt-1 ${margin != null && margin < 0 ? "text-rose-300" : "text-white"}`}>
                 {margin != null ? peso(margin) : "—"}
               </p>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3.5">
-              <p className="text-[9.5px] uppercase tracking-[0.16em] text-mist">Margin %</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-mist">Margin %</p>
               <p className={`tnum text-lg font-medium mt-1 ${marginPct != null && marginPct < 0 ? "text-rose-300" : "text-white"}`}>
                 {marginPct != null ? `${marginPct.toFixed(1)}%` : "—"}
               </p>
@@ -64,7 +64,7 @@ export default function ShowroomCostClient({ piano }: { piano: Piano }) {
           </div>
 
           <button onClick={save} disabled={busy}
-            className="w-full bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+            className="w-full bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
             {busy && <Spinner className="text-black" />} {saved ? "Saved" : "Save cost"}
           </button>
         </div>

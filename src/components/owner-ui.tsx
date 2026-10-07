@@ -139,8 +139,8 @@ export function ItemModal({
         <div className="flex rounded-xl p-1 gap-1" style={{ background: "var(--color-ow-surface-2)" }}>
           {([["task", "Task"], ["event", "Appointment"], ["focus", "Focus block"], ["reminder", "Reminder"]] as const).map(([k, label]) => (
             <button key={k} onClick={() => setForm({ ...form, type: k })}
-              className={`flex-1 text-[12px] rounded-lg py-2 transition ${
-                form.type === k ? "font-medium text-[var(--color-ow-accent)]" : "text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]"
+              className={`flex-1 text-[13px] rounded-lg min-h-11 transition ${
+                form.type === k ? "font-medium text-[var(--color-ow-accent-text)]" : "text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]"
               }`}
               style={form.type === k ? { background: "var(--color-ow-accent-soft)" } : undefined}
             >
@@ -154,16 +154,16 @@ export function ItemModal({
             placeholder={isTask ? "e.g. Order hammer felt" : "e.g. Piano tuning — Santos"} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3.5">
           <Field label={isTask ? "Due date" : "Date"}>
             <input type="date" className={inp} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </Field>
           {!isTask && (
             <Field label="All day">
               <button type="button" onClick={() => setForm({ ...form, isAllDay: !form.isAllDay })}
-                className="w-full text-[12.5px] rounded-[10px] border py-[9px] transition"
+                className="w-full text-[14px] rounded-[10px] border min-h-11 transition hover:bg-white/[0.05]"
                 style={form.isAllDay
-                  ? { background: "var(--color-ow-accent-soft)", borderColor: "var(--color-ow-accent)", color: "var(--color-ow-accent)" }
+                  ? { background: "var(--color-ow-accent-soft)", borderColor: "var(--color-ow-accent)", color: "var(--color-ow-accent-text)" }
                   : { borderColor: "var(--color-ow-border)", color: "var(--color-ow-text-dim)" }}
               >
                 {form.isAllDay ? "All day ✓" : "Timed"}
@@ -189,7 +189,7 @@ export function ItemModal({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3.5">
           <Field label="Category">
             <select className={inp} value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
               <option value="">None</option>
@@ -220,7 +220,7 @@ export function ItemModal({
         </Field>
 
         <button onClick={save} disabled={busy || !form.title.trim() || !form.date}
-          className="btn-ow-primary w-full text-[13px] rounded-xl py-3 flex items-center justify-center gap-2">
+          className="btn-ow-primary w-full text-[14px] rounded-[10px] flex items-center justify-center gap-2">
           {busy && <Spinner />} {edit ? "Save changes" : "Add"}
         </button>
       </div>
@@ -232,13 +232,13 @@ export function ItemModal({
 
 export function PriorityDot({ priority }: { priority: string }) {
   const p = PRIORITY_STYLE_OW[priority] ?? PRIORITY_STYLE_OW.normal;
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${p.dot}`} title={p.label} />;
+  return <span role="img" aria-label={`${p.label} priority`} className={`inline-block w-2 h-2 rounded-full shrink-0 ${p.dot}`} title={p.label} />;
 }
 
 export function CategoryChip({ category }: { category: OwnerCategory | undefined }) {
   if (!category) return null;
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10.5px] text-[var(--color-ow-text-dim)]">
+    <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--color-ow-text-dim)]">
       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: category.color }} />
       {category.name}
     </span>
@@ -250,28 +250,32 @@ export function TaskCheck({ done, onToggle }: { done: boolean; onToggle: () => v
     <button
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       aria-label={done ? "Mark not done" : "Mark done"}
-      className="w-[18px] h-[18px] rounded-full border-2 shrink-0 transition-all flex items-center justify-center"
-      style={done
-        ? { background: "var(--color-ow-accent)", borderColor: "var(--color-ow-accent)" }
-        : { borderColor: "var(--color-ow-border-strong)" }}
+      className="ow-icon-btn group/check -ml-2.5 -my-1.5"
     >
-      {done && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.2 5.5L8 1" stroke="#06211d" strokeWidth="1.6" strokeLinecap="round" /></svg>}
+      <span
+        className="w-[22px] h-[22px] rounded-full border-2 transition-all flex items-center justify-center group-hover/check:border-[var(--color-ow-accent-text)]"
+        style={done
+          ? { background: "var(--color-ow-accent)", borderColor: "var(--color-ow-accent)" }
+          : { borderColor: "#6b7ca0" }}
+      >
+        {done && <svg width="11" height="9" viewBox="0 0 9 7" fill="none" aria-hidden="true"><path d="M1 3.5L3.2 5.5L8 1" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" /></svg>}
+      </span>
     </button>
   );
 }
 
 export function KindGlyph({ kind }: { kind: string }) {
   const map: Record<string, { bg: string; fg: string }> = {
-    event: { bg: "rgba(107,147,201,0.16)", fg: "var(--color-ow-blue)" },
-    focus: { bg: "rgba(155,138,209,0.16)", fg: "var(--color-ow-violet)" },
-    reminder: { bg: "var(--color-ow-accent-soft)", fg: "var(--color-ow-accent)" },
+    event: { bg: "rgba(124,176,255,0.16)", fg: "var(--color-ow-blue)" },
+    focus: { bg: "rgba(167,139,250,0.16)", fg: "var(--color-ow-violet)" },
+    reminder: { bg: "rgba(45,212,191,0.16)", fg: "var(--color-ow-teal)" },
     "task-block": { bg: "var(--color-ow-surface-2)", fg: "var(--color-ow-text-dim)" },
     "task-due": { bg: "var(--color-ow-rose-soft)", fg: "var(--color-ow-rose)" },
   };
   const letter: Record<string, string> = { event: "A", focus: "F", reminder: "R", "task-block": "T", "task-due": "D" };
   const c = map[kind] ?? { bg: "var(--color-ow-surface-2)", fg: "var(--color-ow-text-dim)" };
   return (
-    <span className="w-[18px] h-[18px] rounded-md text-[9px] font-semibold flex items-center justify-center shrink-0"
+    <span className="w-[22px] h-[22px] rounded-md text-[12px] font-semibold flex items-center justify-center shrink-0"
       style={{ background: c.bg, color: c.fg }}>
       {letter[kind] ?? "·"}
     </span>

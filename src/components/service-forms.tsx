@@ -69,8 +69,8 @@ export function CustomerPicker({
           </div>
           <ErrorLine>{err}</ErrorLine>
           <div className="flex gap-2">
-            <GhostButton onClick={() => { setAdding(false); setErr(null); }} className="!min-h-10">Cancel</GhostButton>
-            <PrimaryButton pending={busy} disabled={!name.trim()} onClick={create} className="!min-h-10">Create customer</PrimaryButton>
+            <GhostButton onClick={() => { setAdding(false); setErr(null); }} className="!min-h-11">Cancel</GhostButton>
+            <PrimaryButton pending={busy} disabled={!name.trim()} onClick={create} className="!min-h-11">Create customer</PrimaryButton>
           </div>
         </div>
       )}
@@ -218,8 +218,8 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
           {[{ key: "service", label: "Home service" }, { key: "sale", label: "Piano sale" }].map((o) => (
             <button
               key={o.key} type="button" role="radio" aria-checked={jobType === o.key} onClick={() => setJobType(o.key)}
-              className="px-4 min-h-10 rounded-lg text-[13px]"
-              style={jobType === o.key ? { background: "var(--color-svc-accent)", color: "#051021", fontWeight: 500 } : { color: "var(--color-svc-text-dim)" }}
+              className="px-4 min-h-11 rounded-lg text-[14px]"
+              style={jobType === o.key ? { background: "var(--color-svc-primary)", color: "#fff", fontWeight: 600 } : { color: "var(--color-svc-text-dim)" }}
             >
               {o.label}
             </button>
@@ -290,7 +290,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
 
       {isSale && (
         <fieldset className="rounded-xl p-3.5 space-y-3" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
-          <legend className="px-1.5 text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>The sale</legend>
+          <legend className="px-1.5 text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>The sale</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Sale price"><PesoInput value={salePrice} onChange={(v) => { setSalePrice(v); setPriceTouched(true); }} placeholder="e.g. 180,000" /></Field>
             <Field label="Deposit received" hint="Balance = price − deposit, collected at delivery"><PesoInput value={deposit} onChange={setDeposit} placeholder="e.g. 20,000" /></Field>
@@ -359,8 +359,8 @@ function InlineBox({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">{children}</div>
       <ErrorLine>{err}</ErrorLine>
       <div className="flex gap-2">
-        <GhostButton onClick={onCancel} className="inline-flex items-center gap-1 !min-h-10"><X size={13} /> Cancel</GhostButton>
-        <PrimaryButton pending={busy} disabled={!canSave} onClick={onSave} className="!min-h-10"><Plus size={13} /> {saveLabel}</PrimaryButton>
+        <GhostButton onClick={onCancel} className="inline-flex items-center gap-1 !min-h-11"><X size={13} /> Cancel</GhostButton>
+        <PrimaryButton pending={busy} disabled={!canSave} onClick={onSave} className="!min-h-11"><Plus size={13} /> {saveLabel}</PrimaryButton>
       </div>
     </div>
   );
@@ -473,14 +473,14 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
       )}
 
       <div>
-        <p className="text-[11px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>Receipt photo (optional)</p>
+        <p className="text-[12px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>Receipt photo (optional)</p>
         {/* capture="environment" opens the rear camera on phones; desktops fall back to a file picker */}
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pickReceipt(e.target.files?.[0])} />
         {receipt ? (
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={receipt} alt="Receipt preview" className="h-20 w-20 rounded-lg object-cover border" style={{ borderColor: "var(--color-svc-border)" }} />
-            <GhostButton onClick={() => setReceipt(null)} className="inline-flex items-center gap-1.5 !min-h-10"><X size={13} /> Remove</GhostButton>
+            <GhostButton onClick={() => setReceipt(null)} className="inline-flex items-center gap-1.5 !min-h-11"><X size={13} /> Remove</GhostButton>
           </div>
         ) : (
           <GhostButton onClick={() => fileRef.current?.click()} disabled={reading} className="inline-flex items-center gap-2 !min-h-11">
@@ -536,7 +536,7 @@ function TimeEditBody({ onClose, pending, log, onSubmit }: { onClose: () => void
   return (
     <div className="space-y-3.5">
       {log.fromStatus && (
-        <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
           This entry came from the status buttons. Once you change it, it is yours — later status taps won&apos;t move it.
         </p>
       )}

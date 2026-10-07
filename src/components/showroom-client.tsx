@@ -88,7 +88,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
             <ArchiveRestore size={15} /> Sold pianos ({sold.length})
           </button>
           <button onClick={() => setModal({ data: BLANK })}
-            className="flex items-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition">
+            className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition">
             <Plus size={15} /> Add Piano
           </button>
         </div>
@@ -103,9 +103,9 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
         <div className="card-dark overflow-x-auto thin-scroll">
           <table className="w-full text-[12.5px] min-w-[860px]">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
+              <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Piano", "Type", "Condition", "Price", "Status", "Cost & margin", ""].map((h) => (
-                  <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                  <th key={h} className="px-4 py-3 font-medium">{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -122,21 +122,21 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                     <td className="px-4 py-3">
                       <div className="relative inline-flex items-center">
                         <span className={`absolute left-3 w-1.5 h-1.5 rounded-full ${STATUS_DOT[p.status] ?? STATUS_DOT.available}`} />
-                        <select value={p.status} onChange={(e) => changeStatus(p.id, e.target.value)}
-                          className="text-[11px] rounded-full pl-6 pr-2.5 py-1 border border-white/10 bg-white/[0.06] text-chrome">
+                        <select aria-label={`Status for ${p.brand} ${p.model}`} value={p.status} onChange={(e) => changeStatus(p.id, e.target.value)}
+                          className="text-xs rounded-full pl-6 pr-2.5 py-1 border border-white/10 bg-white/[0.06] text-chrome">
                           {Object.entries(PIANO_STATUS).map(([k, v]) => <option key={k} value={k} className="text-black">{v.label}</option>)}
                         </select>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/showroom/${p.id}/cost`}
-                        className="inline-flex items-center gap-1.5 text-[11px] text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">
+                        className="inline-flex items-center gap-1.5 text-xs text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">
                         <Coins size={13} /> View
                       </Link>
                     </td>
                     <td className="px-4 py-3">
                       <button onClick={() => setModal({ id: p.id, data: { ...p, price: p.priceCents != null ? (p.priceCents / 100).toString() : "" } as PianoInput & { price: string } })}
-                        className="text-[11px] text-chrome hover:text-white underline underline-offset-4 decoration-white/20 transition">Edit</button>
+                        className="text-xs text-chrome hover:text-white underline underline-offset-4 decoration-white/20 transition">Edit</button>
                     </td>
                   </tr>
                 );
@@ -189,14 +189,14 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                     <Upload size={15} /> Upload a photo
                   </button>
                 )}
-                {uploadError && <p className="text-rose-400 text-[11px] mt-1.5">{uploadError}</p>}
+                {uploadError && <p className="text-rose-400 text-xs mt-1.5">{uploadError}</p>}
               </Field>
             </div>
             <div className="sm:col-span-2"><Field label="Description (public)"><textarea className={`${inp} min-h-20`} value={modal.data.description ?? ""} onChange={(e) => setModal({ ...modal, data: { ...modal.data, description: e.target.value } })} /></Field></div>
             <div className="sm:col-span-2"><Field label="Technician notes (internal)"><textarea className={`${inp} min-h-16`} value={modal.data.technicianNotes ?? ""} onChange={(e) => setModal({ ...modal, data: { ...modal.data, technicianNotes: e.target.value } })} /></Field></div>
             <div className="sm:col-span-2 flex gap-2 mt-1">
               <button onClick={save} disabled={busy || !modal.data.brand.trim() || !modal.data.model.trim()}
-                className="flex-1 bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+                className="flex-1 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {busy && <Spinner className="text-black" />} {modal.id ? "Save changes" : "Add piano"}
               </button>
               {modal.id && (
@@ -221,12 +221,12 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                 <div key={p.id} className="flex items-center justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
                   <div>
                     <p className="text-white text-[13px]">{p.brand} {p.model}{p.year ? ` · ${p.year}` : ""}</p>
-                    <p className="text-mist text-[11px] mt-0.5">{p.priceCents != null ? peso(p.priceCents) : "—"}</p>
+                    <p className="text-mist text-xs mt-0.5">{p.priceCents != null ? peso(p.priceCents) : "—"}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link href={`/admin/showroom/${p.id}/cost`} className="text-[11px] text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">Cost</Link>
+                    <Link href={`/admin/showroom/${p.id}/cost`} className="text-xs text-mist hover:text-white underline underline-offset-4 decoration-white/20 transition">Cost</Link>
                     <button onClick={() => changeStatus(p.id, "available")}
-                      className="text-[11px] text-emerald-300 hover:text-emerald-200 underline underline-offset-4 decoration-emerald-300/30 transition">Relist</button>
+                      className="text-xs text-emerald-300 hover:text-emerald-200 underline underline-offset-4 decoration-emerald-300/30 transition">Relist</button>
                   </div>
                 </div>
               ))}

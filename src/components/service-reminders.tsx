@@ -73,7 +73,7 @@ export function RemindMeModal({
               return (
                 <button
                   key={p.key} type="button" aria-pressed={active} onClick={() => setDay(value)}
-                  className={`rounded-xl px-3.5 min-h-11 text-[13px] border ${FOCUS}`}
+                  className={`rounded-xl px-3.5 min-h-11 text-[14px] border ${FOCUS}`}
                   style={{
                     borderColor: active ? "var(--color-svc-accent)" : "var(--color-svc-border)",
                     background: active ? "rgba(79,140,255,0.14)" : "transparent",
@@ -89,7 +89,7 @@ export function RemindMeModal({
         <Field label="Date">
           <TextInput type="date" value={day} min={toDayInput(now)} onChange={(e) => setDay(e.target.value)} />
         </Field>
-        {parseDayInput(day) ? <p className="text-[12.5px] -mt-2" style={DIM}>{fmtDate(parseDayInput(day)!)}</p> : null}
+        {parseDayInput(day) ? <p className="text-[13px] -mt-2" style={DIM}>{fmtDate(parseDayInput(day)!)}</p> : null}
         <Field label="What is it about?" hint="Optional. For example: ask about the Yamaha quote.">
           <TextArea rows={3} maxLength={NOTE_MAX} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ask about the quote, confirm the schedule…" />
         </Field>
@@ -144,7 +144,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
             </Link>
           ) : null}
           <p
-            className={`break-words ${showClient ? "text-[13.5px] mt-0.5" : "text-[15px] font-medium"}`}
+            className={`break-words ${showClient ? "text-[14px] mt-0.5" : "text-[15px] font-medium"}`}
             style={note ? { color: showClient ? "var(--color-svc-text-dim)" : "var(--color-svc-text)" } : FAINT}
           >
             {note ?? "No note"}
@@ -153,7 +153,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
             <a
               href={tel}
               aria-label={`Call ${r.customerName} at ${r.customerPhone}`}
-              className={`mt-1.5 inline-flex items-center gap-1.5 min-h-8 text-[12.5px] hover:underline rounded-sm ${FOCUS}`}
+              className={`mt-1.5 inline-flex items-center gap-1.5 min-h-11 text-[13px] hover:underline rounded-sm ${FOCUS}`}
               style={{ color: TONE_TEXT.azure }}
             >
               <Phone size={12} aria-hidden="true" /> <span className="svc-num">{r.customerPhone}</span>
@@ -163,7 +163,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
 
         {/* When */}
         <p className="flex flex-wrap items-center gap-2 @min-[40rem]:justify-end">
-          <span className="svc-num text-[13px]" style={DIM}>{fmtDate(r.dueAt)}</span>
+          <span className="svc-num text-[14px]" style={DIM}>{fmtDate(r.dueAt)}</span>
           {label ? <Chip tone={state === "overdue" ? "danger" : state === "today" ? "warn" : "slate"}>{label}</Chip> : null}
         </p>
 
@@ -172,7 +172,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
           <button
             type="button" disabled={pending} onClick={() => run(() => completeReminder(r.id))}
             aria-label={`Mark done: reminder for ${r.customerName}`}
-            className={`flex-1 @min-[40rem]:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl px-4 min-h-11 text-[13px] font-medium disabled:opacity-60 ${FOCUS}`}
+            className={`flex-1 @min-[40rem]:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl px-4 min-h-11 text-[14px] font-medium disabled:opacity-60 ${FOCUS}`}
             style={{ background: "var(--color-svc-accent-soft)", color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}
           >
             <Check size={15} aria-hidden="true" /> Done
@@ -180,7 +180,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
           <Select
             aria-label={`Snooze reminder for ${r.customerName}`} value="" disabled={pending}
             onChange={(e) => { const d = Number(e.target.value); if (d) run(() => snoozeReminder(r.id, d)); }}
-            className="!w-auto !min-h-11 !text-[13px] !bg-transparent"
+            className="!w-auto !min-h-11 !text-[14px] !bg-transparent"
           >
             <option value="">Snooze</option>
             {SNOOZE_CHOICES.map((c) => <option key={c.days} value={c.days}>{c.label}</option>)}

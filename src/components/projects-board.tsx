@@ -122,7 +122,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
           <p className="text-mist text-[12.5px] mt-1">The pipeline — where every piano stands today.</p>
         </div>
         <button onClick={() => setModal({ data: BLANK })}
-          className="flex items-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition">
+          className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition">
           <Plus size={15} /> New Project
         </button>
       </div>
@@ -132,7 +132,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search client, piano, serial…" className="input-dark pl-9" />
         </div>
-        <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="input-dark w-auto">
+        <select aria-label="Filter by stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="input-dark w-auto">
           <option value="all">All stages</option>
           {PROJECT_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
@@ -143,7 +143,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
         <div className="ml-auto flex bg-white/[0.05] border border-white/10 rounded-xl p-1">
           {([["kanban", LayoutGrid], ["list", Rows3]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-3.5 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition ${view === v ? "bg-white text-black font-medium" : "text-mist hover:text-white"}`}>
+              className={`px-3.5 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition ${view === v ? "bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium" : "text-mist hover:text-white"}`}>
               <Icon size={13} /> {v === "kanban" ? "Kanban" : "List"}
             </button>
           ))}
@@ -166,8 +166,8 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
                 onDrop={(e) => { e.preventDefault(); setDragOver(null); const id = e.dataTransfer.getData("text/plain"); if (id) moveProject(id, stage.key); }}
               >
                 <div className="flex items-center justify-between px-1.5 mb-2.5">
-                  <p className="text-[10.5px] uppercase tracking-[0.18em] text-mist">{stage.label}</p>
-                  <span className="text-[10.5px] text-mist/60 tnum">{cards.length}</span>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mist">{stage.label}</p>
+                  <span className="text-xs text-mist tnum">{cards.length}</span>
                 </div>
                 <div className="space-y-2.5 min-h-[120px] rounded-xl">
                   {cards.map((p) => (
@@ -183,11 +183,11 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
                         <img src={p.imageUrl} alt="" className="w-full h-24 object-cover rounded-lg mb-3 opacity-90" />
                       )}
                       <p className="text-[13px] text-white font-medium leading-snug">{p.pianoBrand} {p.pianoModel}</p>
-                      <p className="text-[11px] text-mist mt-0.5">{p.clientName} · {p.serviceType}</p>
+                      <p className="text-xs text-mist mt-0.5">{p.clientName} · {p.serviceType}</p>
                       <div className="h-1 bg-white/10 rounded-full mt-3 overflow-hidden">
                         <div className="h-full bg-chrome/80 rounded-full" style={{ width: `${p.progress}%` }} />
                       </div>
-                      <div className="flex items-center justify-between mt-2.5 text-[10.5px] text-mist/70">
+                      <div className="flex items-center justify-between mt-2.5 text-xs text-mist">
                         <span>{p.dueDate ? `due ${fmtDate(new Date(p.dueDate))}` : "no due date"}</span>
                         {p.workerName && <span className="text-chrome/80">{p.workerName.split(" ")[0]}</span>}
                       </div>
@@ -206,7 +206,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
         <div className="card-dark overflow-x-auto anim-fade-in thin-scroll">
           <table className="w-full text-[12.5px] min-w-[860px]">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
+              <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Client", "Piano", "Service", "Stage", "Due", "Lead tech", "Progress", "Tasks", "Last client update"].map((h) => (
                   <th key={h} className="px-4 py-3 font-medium">{h}</th>
                 ))}
@@ -216,9 +216,9 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
               {filtered.map((p) => (
                 <tr key={p.id} onClick={() => setDetailId(p.id)} className="border-b border-white/[0.04] hover:bg-white/[0.035] cursor-pointer transition-colors">
                   <td className="px-4 py-3.5 text-white font-medium">{p.clientName}</td>
-                  <td className="px-4 py-3.5 text-chrome">{p.pianoBrand} {p.pianoModel}{p.pianoYear ? <span className="text-mist/60"> ·{p.pianoYear}</span> : null}</td>
+                  <td className="px-4 py-3.5 text-chrome">{p.pianoBrand} {p.pianoModel}{p.pianoYear ? <span className="text-mist"> ·{p.pianoYear}</span> : null}</td>
                   <td className="px-4 py-3.5 text-mist">{p.serviceType}</td>
-                  <td className="px-4 py-3.5"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-[10.5px]">{STAGE_LABEL[p.status]}</span></td>
+                  <td className="px-4 py-3.5"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-xs">{STAGE_LABEL[p.status]}</span></td>
                   <td className="px-4 py-3.5 text-mist tnum">{p.dueDate ? fmtDate(new Date(p.dueDate)) : "—"}</td>
                   <td className="px-4 py-3.5 text-chrome">{p.workerName ?? "—"}</td>
                   <td className="px-4 py-3.5 w-32">
@@ -248,7 +248,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
               ) : <div className="h-full w-full bg-panel" />}
               <div className="absolute inset-0 bg-gradient-to-t from-[#0d1116] via-transparent to-transparent" />
               <div className="absolute bottom-4 left-6 right-6">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-white/60">{STAGE_LABEL[detail.project.status]} · {detail.project.serviceType}</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-white/60">{STAGE_LABEL[detail.project.status]} · {detail.project.serviceType}</p>
                 <h2 className="font-serif text-3xl text-white mt-1">{detail.project.pianoBrand} {detail.project.pianoModel}</h2>
               </div>
             </div>
@@ -264,17 +264,17 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
                   ["Due", detail.project.dueDate ? fmtDate(new Date(detail.project.dueDate)) : "—"],
                   ["Lead technician", detail.worker?.name ?? "—"],
                 ].map(([k, v]) => (
-                  <div key={k} className="card-dark p-3"><p className="text-[9.5px] uppercase tracking-[0.18em] text-mist/70 mb-1">{k}</p><p className="text-chrome">{v}</p></div>
+                  <div key={k} className="card-dark p-3"><p className="text-xs uppercase tracking-[0.18em] text-mist mb-1">{k}</p><p className="text-chrome">{v}</p></div>
                 ))}
               </div>
 
               {/* stage selector */}
               <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2">Move through pipeline</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2">Move through pipeline</p>
                 <div className="flex flex-wrap gap-1.5">
                   {PROJECT_STAGES.map((s) => (
                     <button key={s.key} onClick={async () => { await setProjectStatus(detail.project.id, s.key); const d = await fetchProjectDetail(detail.project.id); setDetail(d); }}
-                      className={`text-[11px] rounded-full px-3 py-1.5 border transition ${detail.project.status === s.key ? "bg-white text-black border-white font-medium" : "border-white/15 text-mist hover:text-white"}`}>
+                      className={`text-xs rounded-full px-3 py-1.5 border transition ${detail.project.status === s.key ? "bg-[#22C55E] text-[#04210F] border-[#22C55E] font-medium" : "border-white/15 text-mist hover:text-white"}`}>
                       {s.label}
                     </button>
                   ))}
@@ -283,24 +283,24 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
 
               {/* portal link */}
               <div className="card-dark p-4">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2 flex items-center gap-1.5"><Link2 size={12} /> Private client portal</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2 flex items-center gap-1.5"><Link2 size={12} /> Private client portal</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-[11px] text-chrome/80 truncate flex-1 tnum">/portal/{detail.project.portalUuid}</p>
+                  <p className="text-xs text-chrome/80 truncate flex-1 tnum">/portal/{detail.project.portalUuid}</p>
                   <button onClick={async () => { await navigator.clipboard.writeText(`${location.origin}/portal/${detail.project.portalUuid}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
                     className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">{copied ? <Check size={13} className="text-emerald-300" /> : <Copy size={13} />}</button>
                 </div>
-                <a href={`/portal/${detail.project.portalUuid}`} target="_blank" className="text-[11px] text-sky-300 hover:underline mt-2 inline-block">Preview as client ↗</a>
+                <a href={`/portal/${detail.project.portalUuid}`} target="_blank" className="text-xs text-sky-300 hover:underline mt-2 inline-block">Preview as client ↗</a>
               </div>
 
               {/* tasks */}
               <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2.5">Tasks · {detail.tasks.filter((t) => t.status !== "done").length} open</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2.5">Tasks · {detail.tasks.filter((t) => t.status !== "done").length} open</p>
                 <ul className="space-y-2">
                   {detail.tasks.slice(0, 10).map((t) => (
                     <li key={t.id} className="card-dark px-3.5 py-2.5 flex items-center gap-3 text-[12px]">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === "done" ? "bg-emerald-400" : t.status === "in_progress" ? "bg-white" : "bg-slate-500"}`} />
-                      <span className={`flex-1 ${t.status === "done" ? "line-through text-mist/60" : "text-chrome"}`}>{t.title}</span>
-                      <span className="text-mist/60 text-[10.5px]">{t.claimedName ?? (t.assigneeNames.length > 1 ? `${t.assigneeNames[0].split(" ")[0]} +${t.assigneeNames.length - 1}` : t.assigneeNames[0] ?? "")}</span>
+                      <span className={`flex-1 ${t.status === "done" ? "line-through text-mist" : "text-chrome"}`}>{t.title}</span>
+                      <span className="text-mist text-xs">{t.claimedName ?? (t.assigneeNames.length > 1 ? `${t.assigneeNames[0].split(" ")[0]} +${t.assigneeNames.length - 1}` : t.assigneeNames[0] ?? "")}</span>
                     </li>
                   ))}
                 </ul>
@@ -309,11 +309,11 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
               {/* story + labor */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="card-dark p-4">
-                  <p className="text-[9.5px] uppercase tracking-[0.18em] text-mist/70 mb-1">Story entries</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mist mb-1">Story entries</p>
                   <p className="text-chrome text-[13px]">{detail.updates.length} · {detail.updates.filter((u) => u.isVisibleToClient).length} visible</p>
                 </div>
                 <div className="card-dark p-4">
-                  <p className="text-[9.5px] uppercase tracking-[0.18em] text-mist/70 mb-1">Labor logged</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mist mb-1">Labor logged</p>
                   <p className="text-chrome text-[13px] tnum">
                     {(() => {
                       const cents = detail.labor.reduce((s, l) => {
@@ -328,14 +328,14 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
 
               {detail.project.notes && (
                 <div className="card-dark p-4">
-                  <p className="text-[9.5px] uppercase tracking-[0.18em] text-mist/70 mb-1.5">Workshop notes</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mist mb-1.5">Workshop notes</p>
                   <p className="text-[12.5px] text-chrome/85 leading-relaxed">{detail.project.notes}</p>
                 </div>
               )}
 
               <div className="flex gap-2">
                 <button onClick={() => { setDetailId(null); setModal({ id: detail.project.id, data: { clientName: detail.project.clientName, clientEmail: detail.project.clientEmail ?? "", clientPhone: detail.project.clientPhone ?? "", clientAddress: detail.project.clientAddress ?? "", pianoBrand: detail.project.pianoBrand, pianoModel: detail.project.pianoModel, pianoYear: detail.project.pianoYear, serialNumber: detail.project.serialNumber ?? "", serviceType: detail.project.serviceType, dueDate: detail.project.dueDate ? toDateInput(new Date(detail.project.dueDate)) : "", assignedWorkerId: detail.project.assignedWorkerId, imageUrl: detail.project.imageUrl ?? "", notes: detail.project.notes ?? "" } }); }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl py-2.5 hover:bg-chrome transition">
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl py-2.5 hover:brightness-110 transition">
                   <Pencil size={13} /> Edit project
                 </button>
                 <button onClick={async () => { if (confirm("Delete this project, its tasks and story entries?")) { await deleteProject(detail.project.id); setDetailId(null); } }}
@@ -372,7 +372,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
             <div className="sm:col-span-2"><Field label="Workshop notes"><textarea className={`${inp} min-h-[80px]`} value={modal.data.notes ?? ""} onChange={(e) => setModal({ ...modal, data: { ...modal.data, notes: e.target.value } })} /></Field></div>
             <div className="sm:col-span-2 flex gap-2 mt-1">
               <button onClick={save} disabled={busy || !modal.data.clientName || !modal.data.pianoBrand || !modal.data.pianoModel}
-                className="flex-1 bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+                className="flex-1 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {busy && <Spinner className="text-black" />} {modal.id ? "Save changes" : "Create project"}
               </button>
             </div>

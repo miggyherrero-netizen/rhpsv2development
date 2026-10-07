@@ -176,7 +176,7 @@ export default function JobDetailClient({
           <h1 className="font-serif text-3xl mt-1.5" style={{ color: "var(--color-svc-text)" }}>
             {job.title}
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {job.customerName}
             {job.scheduledStart ? ` · ${fmtDate(new Date(job.scheduledStart))} at ${fmtTime(new Date(job.scheduledStart))}` : " · unscheduled"}
             {job.technicianName ? ` · ${job.technicianName}` : ""}
@@ -191,7 +191,7 @@ export default function JobDetailClient({
             ) : (
               <Chip tone="success">{isSale ? "Sold — nothing left to do" : "Paid — nothing left to do"}</Chip>
             )}
-            <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10">
+            <GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-11">
               <Pencil size={13} /> Edit
             </GhostButton>
             <MoreMenu items={moreItems} />
@@ -233,7 +233,7 @@ export default function JobDetailClient({
                       <MapPin size={11} /> Directions
                     </a>
                     {detail.location.accessNotes ? (
-                      <p className="text-[11.5px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+                      <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
                         {detail.location.accessNotes}
                       </p>
                     ) : null}
@@ -252,7 +252,7 @@ export default function JobDetailClient({
                       aria-label="Link a piano to this job"
                       defaultValue=""
                       disabled={pending}
-                      className="!w-auto !min-h-10"
+                      className="!w-auto !min-h-11"
                       onChange={(e) => e.target.value && run(() => updateJob(job.id, { pianoId: e.target.value }))}
                     >
                       <option value="" disabled>Link piano…</option>
@@ -299,9 +299,9 @@ export default function JobDetailClient({
           {isSale && detail.sale && (
             <SectionCard
               title="Piano sale"
-              action={<GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-10"><Pencil size={13} /> Edit sale</GhostButton>}
+              action={<GhostButton onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit sale</GhostButton>}
             >
-              <div className="px-5 py-4 space-y-2.5 text-[13px]">
+              <div className="px-5 py-4 space-y-2.5 text-[14px]">
                 <Row label="Piano"><span style={{ color: "var(--color-svc-text)" }}>{detail.sale.pianoLabel ?? "Not chosen yet"}</span></Row>
                 <Row label="Sale price"><Money cents={job.salePriceCents} /></Row>
                 <Row label="Deposit received"><Money cents={job.depositCents} /></Row>
@@ -347,7 +347,7 @@ export default function JobDetailClient({
               />
             </div>
             <div
-              className="px-5 py-3 space-y-1.5 text-[12.5px]"
+              className="px-5 py-3 space-y-1.5 text-[13px]"
               style={{ borderTop: "1px solid var(--color-svc-border)" }}
             >
               <Row label="Subtotal"><Money cents={totals.subtotalCents} /></Row>
@@ -368,18 +368,18 @@ export default function JobDetailClient({
                 <GhostButton
                   disabled={pending || !!job.runningLog}
                   onClick={() => run(() => startTimer(job.id, "travel", job.technicianId))}
-                  className="!text-[11.5px] inline-flex items-center gap-1.5"
+                  className="!text-[12px] inline-flex items-center gap-1.5"
                 >
                   <Navigation size={12} /> Travel
                 </GhostButton>
                 <GhostButton
                   disabled={pending || !!job.runningLog}
                   onClick={() => run(() => startTimer(job.id, "work", job.technicianId))}
-                  className="!text-[11.5px] inline-flex items-center gap-1.5"
+                  className="!text-[12px] inline-flex items-center gap-1.5"
                 >
                   <Play size={12} /> On site
                 </GhostButton>
-                <GhostButton onClick={() => setTimeOpen(true)} className="!text-[11.5px] inline-flex items-center gap-1.5">
+                <GhostButton onClick={() => setTimeOpen(true)} className="!text-[12px] inline-flex items-center gap-1.5">
                   <Clock3 size={12} /> Manual
                 </GhostButton>
               </div>
@@ -390,7 +390,7 @@ export default function JobDetailClient({
                 className="flex items-center justify-between gap-3 px-5 py-3"
                 style={{ background: "var(--color-svc-warn-soft)" }}
               >
-                <span className="text-[12.5px]" style={{ color: "var(--color-svc-warn)" }}>
+                <span className="text-[13px]" style={{ color: "var(--color-svc-warn)" }}>
                   {TIME_KIND_LABEL[job.runningLog.kind] ?? job.runningLog.kind} running since{" "}
                   {fmtTime(new Date(job.runningLog.startedAt))}
                 </span>
@@ -417,16 +417,16 @@ export default function JobDetailClient({
                     <Chip tone={log.kind === "work" ? "azure" : log.kind === "travel" ? "violet" : "slate"}>
                       {TIME_KIND_LABEL[log.kind] ?? log.kind}
                     </Chip>
-                    <span className="text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</span>
-                    <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+                    <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</span>
+                    <span className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
                       {fmtDate(new Date(log.startedAt))} {fmtTime(new Date(log.startedAt))}
                       {log.endedAt ? ` – ${fmtTime(new Date(log.endedAt))}` : " · running"}
                     </span>
-                    <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                    <span className="text-[13px]" style={{ color: "var(--color-svc-text-faint)" }}>
                       {log.technicianName ?? "Unassigned"}
                     </span>
                     <div className="flex-1" />
-                    <span className="text-[13px] tnum" style={{ color: "var(--color-svc-text)" }}>
+                    <span className="text-[14px] tnum" style={{ color: "var(--color-svc-text)" }}>
                       {log.endedAt ? fmtMinutes(log.minutes) : fmtMinutes(elapsedMinutes(log.startedAt))}
                     </span>
                     <button
@@ -472,13 +472,13 @@ export default function JobDetailClient({
                 {detail.expenses.map((e) => (
                   <div key={e.id} className="flex items-center gap-3 px-5 py-2.5 group">
                     <Chip tone="slate">{EXPENSE_CATEGORY_LABEL[e.category] ?? e.category}</Chip>
-                    <span className="text-[12.5px] flex-1 truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+                    <span className="text-[13px] flex-1 truncate" style={{ color: "var(--color-svc-text-dim)" }}>
                       {e.description}
                     </span>
-                    <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                    <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                       {fmtDate(new Date(e.spentAt))}
                     </span>
-                    <Money cents={e.amountCents} className="text-[13px]" />
+                    <Money cents={e.amountCents} className="text-[14px]" />
                     <button
                       onClick={() => run(() => deleteExpense(e.id))}
                       className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
@@ -512,14 +512,14 @@ export default function JobDetailClient({
                   className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition hover:bg-white/[0.03]"
                   style={{ background: "var(--color-svc-surface-2)" }}
                 >
-                  <span className="text-[12.5px]" style={{ color: "var(--color-svc-text)" }}>
+                  <span className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                     Invoice #{inv.invoiceNumber}
-                    <span className="ml-1.5 text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                    <span className="ml-1.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                       {inv.status}
                     </span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Money cents={inv.totalCents} className="text-[12.5px]" />
+                    <Money cents={inv.totalCents} className="text-[13px]" />
                     <ExternalLink size={12} style={{ color: "var(--color-svc-text-faint)" }} />
                   </span>
                 </Link>
@@ -536,7 +536,7 @@ export default function JobDetailClient({
                 </PrimaryButton>
               )}
               {detail.items.length === 0 && (
-                <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                   Add at least one quote line before invoicing.
                 </p>
               )}
@@ -596,10 +596,10 @@ export default function JobDetailClient({
                       size={6}
                     />
                     <div className="min-w-0">
-                      <p className="text-[12.5px]" style={{ color: "var(--color-svc-text)" }}>
+                      <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                         {ev.message ?? ev.type}
                       </p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+                      <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                         {fmtDate(new Date(ev.at))} · {fmtTime(new Date(ev.at))}
                         {ev.actorName ? ` · ${ev.actorName}` : ""}
                       </p>
@@ -680,11 +680,11 @@ export default function JobDetailClient({
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-[0.1em] mb-1" style={{ color: "var(--color-svc-text-faint)" }}>
+      <p className="text-[12px] uppercase tracking-[0.1em] mb-1" style={{ color: "var(--color-svc-text-faint)" }}>
         {label}
       </p>
       {/* a div, not a p: some values contain their own paragraphs (access notes) */}
-      <div className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+      <div className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>
         {children}
       </div>
     </div>

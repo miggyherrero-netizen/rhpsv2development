@@ -15,24 +15,26 @@ const CHOICES = [
 export default async function StartPage() {
   const user = await requireUser();
   return (
-    <main className="min-h-screen bg-coal text-chrome px-4 py-12">
+    <main id="main" className="adm-shell min-h-screen bg-coal text-chrome px-4 py-12 sm:py-20">
       <div className="mx-auto max-w-3xl">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-subtle">Herrero Pianos</p>
-        <h1 className="font-serif text-3xl text-white mt-2">Hi {user.name.split(" ")[0]}, where to?</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-[#22C55E]">Herrero Pianos</p>
+        <h1 className="font-serif text-3xl sm:text-4xl text-white mt-2">Hi {user.name.split(" ")[0]}, where to?</h1>
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {CHOICES.map(({ href, title, text, icon: Icon }) => (
             <Link key={href} href={href}
-              className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-              <Icon size={22} strokeWidth={1.6} className="text-white" aria-hidden="true" />
-              <p className="mt-3 text-lg text-white">{title}</p>
-              <p className="mt-1 text-[13px] text-mist">{text}</p>
+              className="group rounded-[14px] border border-slate-700 bg-panel p-6 min-h-32 transition duration-200 hover:border-[#22C55E]/60 hover:bg-deepslate/60 cursor-pointer">
+              <span className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-deepslate text-[#22C55E] transition-colors group-hover:bg-[#22C55E]/15">
+                <Icon size={22} strokeWidth={1.7} aria-hidden="true" />
+              </span>
+              <p className="mt-4 text-lg font-semibold text-white">{title}</p>
+              <p className="mt-1 text-sm text-mist">{text}</p>
             </Link>
           ))}
         </div>
-        <p className="mt-6 text-[13px] text-subtle">
-          <Link href="/workshop" className="hover:text-white inline-flex items-center gap-1.5"><Hammer size={13} aria-hidden="true" /> Workshop kiosk</Link>
+        <p className="mt-6 text-sm text-subtle">
+          <Link href="/workshop" className="hover:text-white inline-flex items-center gap-1.5 min-h-11"><Hammer size={16} aria-hidden="true" /> Workshop kiosk</Link>
           <span className="mx-2">·</span>
-          <Link href="/" className="hover:text-white">Public website</Link>
+          <Link href="/" className="hover:text-white inline-flex items-center min-h-11">Public website</Link>
         </p>
       </div>
     </main>

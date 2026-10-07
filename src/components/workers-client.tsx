@@ -69,7 +69,7 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
           <p className="text-mist text-[12.5px] mt-1">The hands of the atelier — rates, PINs, and time history.</p>
         </div>
         <button onClick={() => setModal(true)}
-          className="flex items-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition">
+          className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition">
           <Plus size={15} /> Add Worker
         </button>
       </div>
@@ -85,12 +85,12 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-[14.5px] font-medium flex items-center gap-2">
                     {w.name}
-                    {live && <span className="text-[9px] uppercase tracking-[0.16em] text-emerald-300 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">on the clock</span>}
+                    {live && <span className="text-xs uppercase tracking-[0.16em] text-emerald-300 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">on the clock</span>}
                   </p>
-                  <p className="text-[11px] text-mist mt-1">{w.title}</p>
+                  <p className="text-xs text-mist mt-1">{w.title}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-white/[0.07] text-[11.5px]">
+              <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-white/[0.07] text-xs">
                 <span className="text-chrome tnum">{peso(w.hourlyRateCents)}/hr</span>
                 <span className={w.active ? "text-emerald-300/90" : "text-mist"}>{w.active ? "Active" : "Inactive"}</span>
               </div>
@@ -108,7 +108,7 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
           <Field label="4-digit kiosk PIN"><input className={inp} inputMode="numeric" maxLength={4} value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "") })} placeholder="••••" /></Field>
           {err && <p className="text-rose-400 text-xs">{err}</p>}
           <button onClick={add} disabled={busy || !form.name || form.pin.length !== 4}
-            className="w-full bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+            className="w-full bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
             {busy && <Spinner className="text-black" />} Add to the atelier
           </button>
         </div>
@@ -130,15 +130,15 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
 
             {detail.current && (
               <div className="card-dark p-4 border-l-2 border-l-emerald-400/60">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-300 mb-1">Working on now</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-emerald-300 mb-1">Working on now</p>
                 <p className="text-chrome text-[13px]">{detail.current.title}</p>
-                <p className="text-mist text-[11px] mt-0.5">{detail.current.pianoName ?? "Shop"}</p>
+                <p className="text-mist text-xs mt-0.5">{detail.current.pianoName ?? "Shop"}</p>
               </div>
             )}
 
             {/* edit profile */}
             <div className="card-dark p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-mist flex items-center gap-1.5"><Pencil size={11} /> Profile & rate</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-mist flex items-center gap-1.5"><Pencil size={11} /> Profile & rate</p>
               <div className="grid grid-cols-2 gap-2.5">
                 <input className={inp} defaultValue={detail.worker.name} id="w-name" />
                 <input className={inp} defaultValue={detail.worker.title} id="w-title" />
@@ -152,14 +152,14 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
                     await updateWorker(detail.worker.id, { name, title, hourlyRateCents: Math.round(Number(editRate) * 100) });
                     const d = await fetchWorkerDetail(detail.worker.id); setDetail(d);
                   }}
-                  className="shrink-0 bg-white text-black text-[12px] font-medium rounded-xl px-4 hover:bg-chrome transition">Save</button>
+                  className="shrink-0 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12px] font-medium rounded-xl px-4 hover:brightness-110 transition">Save</button>
               </div>
-              <p className="text-[10px] text-mist/60">Rate changes only affect future clock-ins — history keeps its snapshot.</p>
+              <p className="text-xs text-mist">Rate changes only affect future clock-ins — history keeps its snapshot.</p>
             </div>
 
             {/* pin + status */}
             <div className="card-dark p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-mist flex items-center gap-1.5"><KeyRound size={11} /> Kiosk PIN</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-mist flex items-center gap-1.5"><KeyRound size={11} /> Kiosk PIN</p>
               <div className="flex gap-2.5">
                 <input className={inp} inputMode="numeric" maxLength={4} value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} placeholder="New 4-digit PIN" />
                 <button onClick={async () => { if (newPin.length === 4) { await resetWorkerPin(detail.worker.id, newPin); setNewPin(""); } }}
@@ -173,13 +173,13 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
 
             {/* completed tasks */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2.5">Completed tasks · {detail.completed.length}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2.5">Completed tasks · {detail.completed.length}</p>
               {detail.completed.length === 0 ? <EmptyState title="No completions yet" /> : (
                 <ul className="space-y-1.5">
                   {detail.completed.slice(0, 8).map((t) => (
                     <li key={t.id} className="text-[12px] flex justify-between gap-3 text-chrome/85">
                       <span className="truncate">{t.title}</span>
-                      <span className="text-mist/60 shrink-0">{t.completedAt ? timeAgo(new Date(t.completedAt)) : ""}</span>
+                      <span className="text-mist shrink-0">{t.completedAt ? timeAgo(new Date(t.completedAt)) : ""}</span>
                     </li>
                   ))}
                 </ul>
@@ -188,20 +188,20 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
 
             {/* time history */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2.5 flex items-center gap-1.5"><Clock3 size={11} /> Time history</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2.5 flex items-center gap-1.5"><Clock3 size={11} /> Time history</p>
               <ul className="space-y-1.5">
                 {detail.entries.slice(0, 12).map(({ entry, task }) => {
                   const end = entry.clockOut?.getTime() ?? nowMs;
                   const earned = ((end - entry.clockIn.getTime()) / 3_600_000) * entry.rateAtClockInCents;
                   return (
-                    <li key={entry.id} className="card-dark px-3.5 py-2.5 text-[11.5px] flex items-center justify-between gap-3">
+                    <li key={entry.id} className="card-dark px-3.5 py-2.5 text-xs flex items-center justify-between gap-3">
                       <div>
                         <p className="text-chrome">{fmtDate(new Date(entry.clockIn))} · {fmtTime(new Date(entry.clockIn))}</p>
-                        <p className="text-mist/60 text-[10px] mt-0.5">{task ? task.title : "General"} {entry.clockOut ? "" : "· still clocked in"}</p>
+                        <p className="text-mist text-xs mt-0.5">{task ? task.title : "General"} {entry.clockOut ? "" : "· still clocked in"}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-white tnum">{fmtDuration(end - entry.clockIn.getTime())}</p>
-                        <p className="text-emerald-300/90 tnum text-[10.5px]">{peso(earned)}</p>
+                        <p className="text-emerald-300/90 tnum text-xs">{peso(earned)}</p>
                       </div>
                     </li>
                   );
@@ -209,7 +209,7 @@ export default function WorkersClient({ workers, liveWorkerIds }: { workers: Wor
               </ul>
             </div>
             <div className="card-dark p-4 space-y-3">
-              <p className="text-[11px] text-mist">Permanently deletes this worker account and its attendance, break, and payment records.</p>
+              <p className="text-xs text-mist">Permanently deletes this worker account and its attendance, break, and payment records.</p>
               {deleteError && <p role="alert" className="text-rose-400 text-xs">{deleteError}</p>}
               <button onClick={removeWorker} disabled={deleting}
                 className="flex items-center gap-2 rounded-xl border border-rose-400/30 px-4 py-2.5 text-[12px] text-rose-400 hover:bg-rose-400/10 transition disabled:opacity-50">

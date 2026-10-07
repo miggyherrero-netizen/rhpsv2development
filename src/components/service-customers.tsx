@@ -83,13 +83,13 @@ export default function CustomersClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Customers
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {totals.clients} clients{totals.batches > 0 ? ` · ${totals.batches} trip${totals.batches === 1 ? "" : "s"} / batch${totals.batches === 1 ? "" : "es"}` : ""} · {totals.pianos} instruments · {recalls.length} due for service
           </p>
         </div>
@@ -118,10 +118,10 @@ export default function CustomersClient({
               <div key={r.pianoId} className="px-5 py-3.5" style={{ background: "var(--color-svc-surface)", boxShadow: "0 0 0 0.5px var(--color-svc-border)" }}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] truncate" style={{ color: "var(--color-svc-text)" }}>
+                    <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>
                       {r.customerName}
                     </p>
-                    <p className="text-[11.5px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>
+                    <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-faint)" }}>
                       {r.pianoLabel} · {r.area ?? r.addressLine ?? "—"}
                     </p>
                   </div>
@@ -130,12 +130,12 @@ export default function CustomersClient({
                   </Chip>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-2">
-                  <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                  <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                     Due {fmtDate(new Date(r.nextServiceDueAt))}
                   </span>
                   <Link
                     href={`/service/jobs?new=1`}
-                    className="text-[11.5px] hover:underline"
+                    className="inline-flex items-center min-h-11 px-3 -mr-3 text-[13px] hover:underline"
                     style={{ color: TONE_TEXT.azure }}
                   >
                     Book visit
@@ -246,7 +246,7 @@ function CustomerRow({ c, sum, now, first }: ListRow & { now: Date; first: boole
 
   const nextDue = sum.nextDueAt ? (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="svc-num text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(sum.nextDueAt)}</span>
+      <span className="svc-num text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(sum.nextDueAt)}</span>
       {dueText && sum.dueState !== "later" ? <Chip tone={dueTone}>{dueText}</Chip> : null}
     </span>
   ) : <Dash />;
@@ -265,28 +265,28 @@ function CustomerRow({ c, sum, now, first }: ListRow & { now: Date; first: boole
           </p>
           {followUp ? <div className="mt-1">{followUp}</div> : null}
         </div>
-        <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{sum.area ?? <Dash />}</p>
+        <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{sum.area ?? <Dash />}</p>
         <div className="min-w-0">{tel ? <CallLink tel={tel} phone={c.phone!} name={c.name} /> : <Dash />}</div>
-        <p className="svc-num text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{last ?? <Dash />}</p>
-        <div className="text-[13px]">{nextDue}</div>
-        <p className="text-right svc-num text-[13px]">{owes ? <Money cents={c.outstandingCents} className="!text-[13px]" /> : <Dash />}</p>
+        <p className="svc-num text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{last ?? <Dash />}</p>
+        <div className="text-[14px]">{nextDue}</div>
+        <p className="text-right svc-num text-[14px]">{owes ? <Money cents={c.outstandingCents} className="!text-[14px]" /> : <Dash />}</p>
       </div>
 
       {/* Narrow: name, then area · last service, then what needs attention */}
       <div className="@min-[56rem]:hidden flex items-start gap-3 px-4 py-3">
         <div className="min-w-0 flex-1 space-y-1">
           <NameLink c={c} />
-          <p className="text-[12.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
             {[sum.area, last ? `Last service ${last}` : null].filter(Boolean).join(" · ") || sub}
           </p>
           {(sum.nextDueAt || owes || c.openJobCount > 0 || followUp) ? (
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[12.5px]">
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[13px]">
               {sum.nextDueAt ? (
                 <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
                   Next due {fmtDate(sum.nextDueAt)}{dueText && sum.dueState !== "later" ? <Chip tone={dueTone}>{dueText}</Chip> : null}
                 </span>
               ) : null}
-              {owes ? <span className="inline-flex items-center gap-1" style={{ color: TONE_TEXT.warn }}>Owes <Money cents={c.outstandingCents} className="!text-[12.5px]" /></span> : null}
+              {owes ? <span className="inline-flex items-center gap-1" style={{ color: TONE_TEXT.warn }}>Owes <Money cents={c.outstandingCents} className="!text-[13px]" /></span> : null}
               {c.openJobCount > 0 ? <span style={{ color: TONE_TEXT.azure }}>{c.openJobCount} open job{c.openJobCount === 1 ? "" : "s"}</span> : null}
               {followUp}
             </p>
@@ -325,7 +325,7 @@ function CallLink({ tel, phone, name }: { tel: string; phone: string; name: stri
     <a
       href={tel}
       aria-label={`Call ${name} at ${phone}`}
-      className={`relative z-10 inline-flex items-center gap-1.5 min-h-9 text-[13px] hover:underline ${FOCUS}`}
+      className={`relative z-10 inline-flex items-center gap-1.5 min-h-11 text-[14px] hover:underline ${FOCUS}`}
       style={{ color: TONE_TEXT.azure }}
     >
       <Phone size={12} /> <span className="svc-num truncate">{phone}</span>
@@ -508,7 +508,7 @@ export function CustomerSheet({
             </div>
           ) : (
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1 text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+              <div className="space-y-1 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
                 {customer.company ? <p>{customer.company}</p> : null}
                 {customer.phone ? <p>{customer.phone}</p> : null}
                 {customer.email ? <p>{customer.email}</p> : null}
@@ -541,7 +541,7 @@ export function CustomerSheet({
             <h4 className="text-[12px] uppercase tracking-[0.16em]" style={{ color: "var(--color-svc-text-faint)" }}>
               Locations
             </h4>
-            <GhostButton onClick={() => setLocOpen(true)} className="!text-[11.5px] inline-flex items-center gap-1">
+            <GhostButton onClick={() => setLocOpen(true)} className="!text-[12px] inline-flex items-center gap-1">
               <Plus size={12} /> Add
             </GhostButton>
           </div>
@@ -556,10 +556,10 @@ export function CustomerSheet({
                   style={{ background: "var(--color-svc-surface-2)" }}
                 >
                   <div className="min-w-0">
-                    <p className="text-[12.5px]" style={{ color: "var(--color-svc-text)" }}>
+                    <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                       {l.label} · {l.addressLine}, {l.city}
                     </p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+                    <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                       {l.area ? `${l.area} · ` : ""}{l.travelMinutes}m travel · {l.travelFeeCents / 100} fee
                       {l.accessNotes ? ` · ${l.accessNotes}` : ""}
                     </p>
@@ -584,7 +584,7 @@ export function CustomerSheet({
             <h4 className="text-[12px] uppercase tracking-[0.16em]" style={{ color: "var(--color-svc-text-faint)" }}>
               Instruments
             </h4>
-            <GhostButton onClick={() => setPianoOpen(true)} className="!text-[11.5px] inline-flex items-center gap-1">
+            <GhostButton onClick={() => setPianoOpen(true)} className="!text-[12px] inline-flex items-center gap-1">
               <Plus size={12} /> Add
             </GhostButton>
           </div>
@@ -600,12 +600,12 @@ export function CustomerSheet({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[12.5px]" style={{ color: "var(--color-svc-text)" }}>
+                      <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                         {[p.brand, p.model].filter(Boolean).join(" ") || p.type}
                         <span style={{ color: "var(--color-svc-text-faint)" }}> · {p.type}</span>
                         {p.year ? <span style={{ color: "var(--color-svc-text-faint)" }}> · {p.year}</span> : null}
                       </p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+                      <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                         {p.locationLabel ? `${p.locationLabel} · ` : ""}
                         every {p.tuningIntervalMonths} months ·
                         {p.nextServiceDueAt ? ` next due ${fmtDate(new Date(p.nextServiceDueAt))}` : " no due date set"}
@@ -621,7 +621,7 @@ export function CustomerSheet({
                           const months = Number(e.target.value);
                           if (months > 0 && months !== p.tuningIntervalMonths) onUpdatePiano(p.id, { tuningIntervalMonths: months });
                         }}
-                        className="input-svc !w-16 !py-1 !px-2 text-[11.5px]"
+                        className="input-svc !w-16 !py-1 !px-2 text-[12px]"
                         title="Tuning interval (months)"
                       />
                       <button

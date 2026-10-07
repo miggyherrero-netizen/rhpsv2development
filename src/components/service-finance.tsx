@@ -35,9 +35,9 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Finance</h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             Invoicing, collections, costs, and job profitability
           </p>
         </div>
@@ -47,7 +47,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
       {drafts.count > 0 && (
         <Link
           href="/service/invoices?filter=draft"
-          className="inline-flex items-center gap-2 rounded-xl px-3.5 min-h-10 text-[12.5px] card-svc card-svc-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+          className="inline-flex items-center gap-2 rounded-xl px-3.5 min-h-11 text-[13px] card-svc card-svc-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
           style={{ color: "var(--color-svc-text-dim)" }}
         >
           <FileClock size={14} />
@@ -57,7 +57,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
       )}
 
       <section aria-labelledby="fin-range" className="space-y-2.5">
-        <h2 id="fin-range" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
+        <h2 id="fin-range" className="text-[14px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
           {range.label}
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -76,7 +76,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
 
       <section aria-labelledby="fin-split" className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="fin-split" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
+          <h2 id="fin-split" className="text-[14px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
             Profit by business line · {range.label.toLowerCase()}
           </h2>
           {split.unreviewedCount > 0 && (
@@ -99,14 +99,14 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
             sub="rent, marketing, running the business"
           />
         </div>
-        <p className="text-[12.5px] svc-num" style={FAINT}>
+        <p className="text-[13px] svc-num" style={FAINT}>
           After overhead: <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.netCents)}</b>
           {split.stockOnHandCents > 0 ? <> · <b className="font-medium" style={{ color: "var(--color-svc-text-dim)" }}>{peso(split.stockOnHandCents)}</b> tied up in unsold piano stock (not counted until sold)</> : null}
         </p>
       </section>
 
       <section aria-labelledby="fin-wait" className="space-y-2.5">
-        <h2 id="fin-wait" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>Waitlist &amp; recalls</h2>
+        <h2 id="fin-wait" className="text-[14px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>Waitlist &amp; recalls</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard label="Recall revenue" value={<Money cents={waitlist.recallRevenueCents} />} tone="success" sub={`${waitlist.recallJobs} recall visit${waitlist.recallJobs === 1 ? "" : "s"} invoiced · ${range.label.toLowerCase()}`} />
           <StatCard label="Waiting now" value={waitlist.waiting} sub={waitlist.avgDaysWaiting === null ? "nobody waiting" : `avg ${waitlist.avgDaysWaiting} days`} />
@@ -117,27 +117,27 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
 
       {report.pianoSales.length > 0 && (
         <SectionCard title={`Piano sales · profit per piano · ${range.label.toLowerCase()}`}>
-          <div className="overflow-x-auto thin-scroll">
-            <table className="w-full text-left">
+          <div className="svc-table-wrap thin-scroll">
+            <table className="svc-table w-full text-left">
               <thead>
                 <tr style={{ color: "var(--color-svc-text-faint)" }}>
                   {["Piano", "Buyer", "Sold", "Price", "Cost", "Profit"].map((h) => (
-                    <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                    <th key={h} className="px-5 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="svc-divide">
                 {report.pianoSales.map((r) => (
                   <tr key={r.jobId}>
-                    <td className="px-5 py-2.5 text-[13px]">
+                    <td className="px-5 py-2.5 text-[14px]">
                       <Link href={`/service/jobs/${r.jobId}`} className="inline-flex items-center min-h-11 hover:underline" style={{ color: "var(--color-svc-text)" }}>{r.pianoLabel ?? r.title}</Link>
                     </td>
-                    <td className="px-5 py-2.5 text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>{r.customerName}</td>
-                    <td className="px-5 py-2.5 text-[12.5px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(new Date(r.soldAt))}</td>
-                    <td className="px-5 py-2.5"><Money cents={r.priceCents} className="text-[13px]" /></td>
-                    <td className="px-5 py-2.5"><Money cents={r.costCents} className="text-[13px]" /></td>
+                    <td className="px-5 py-2.5 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{r.customerName}</td>
+                    <td className="px-5 py-2.5 text-[13px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(new Date(r.soldAt))}</td>
+                    <td className="px-5 py-2.5"><Money cents={r.priceCents} className="text-[14px]" /></td>
+                    <td className="px-5 py-2.5"><Money cents={r.costCents} className="text-[14px]" /></td>
                     <td className="px-5 py-2.5 whitespace-nowrap">
-                      <span className="svc-num text-[13px]" style={{ color: r.profitCents >= 0 ? "var(--color-svc-success)" : "var(--color-svc-danger)" }}>
+                      <span className="svc-num text-[14px]" style={{ color: r.profitCents >= 0 ? "var(--color-svc-success)" : "var(--color-svc-danger)" }}>
                         {peso(r.profitCents)} · {r.marginPct}%
                       </span>
                     </td>
@@ -150,7 +150,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
       )}
 
       <section aria-labelledby="fin-now" className="space-y-2.5">
-        <h2 id="fin-now" className="text-[13px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
+        <h2 id="fin-now" className="text-[14px] font-medium" style={{ color: "var(--color-svc-text-dim)" }}>
           Owed to you · as of today
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -167,13 +167,13 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
             <p className="text-[12px] mb-3" style={FAINT}>Chart shows the latest 24 months; the totals above cover all time.</p>
           )}
           {months.length === 0 ? (
-            <p className="text-[12.5px]" style={FAINT}>Nothing to plot yet.</p>
+            <p className="text-[13px]" style={FAINT}>Nothing to plot yet.</p>
           ) : (
             <div className="flex gap-2" role="group" aria-label={`Cashflow by ${granularity}, ${range.label}. Use Tab to hear each ${granularity}.`}>
               {/* y-axis */}
               <div className="relative w-12 shrink-0 h-56 mt-3 mb-6" aria-hidden="true">
                 {scale.ticks.map((t) => (
-                  <span key={t} className="svc-num absolute right-0 -translate-y-1/2 text-[11px]" style={{ bottom: `${(t / scale.max) * 100}%`, ...FAINT }}>
+                  <span key={t} className="svc-num absolute right-0 -translate-y-1/2 text-[12px]" style={{ bottom: `${(t / scale.max) * 100}%`, ...FAINT }}>
                     {compactPeso(t)}
                   </span>
                 ))}
@@ -194,7 +194,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
                             <div key={s.key} className="flex-1 max-w-4 rounded-t-sm"
                               style={{ height: `${Math.max(m[s.key] > 0 ? 1.5 : 0, (m[s.key] / scale.max) * 100)}%`, background: s.color }} />
                           ))}
-                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block group-focus-visible:block whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11.5px] card-svc svc-num"
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block group-focus-visible:block whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] card-svc svc-num"
                             style={{ color: "var(--color-svc-text)" }}>
                             <b className="font-medium">{m.label}</b><br />
                             {SERIES.map((s) => <span key={s.key} className="block" style={{ color: s.color }}>{s.label}: {peso(m[s.key])}</span>)}
@@ -206,7 +206,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
                 </div>
                 <div className="flex gap-1 sm:gap-2 mt-2" aria-hidden="true">
                   {months.map((m, i) => (
-                    <p key={m.key} className="flex-1 text-center text-[11px] whitespace-nowrap overflow-visible" style={FAINT}>
+                    <p key={m.key} className="flex-1 text-center text-[12px] whitespace-nowrap overflow-visible" style={FAINT}>
                       {i % labelEvery === 0 ? (granularity === "day" ? m.label.replace(/^[A-Za-z]+ /, "") : m.label) : ""}
                     </p>
                   ))}
@@ -222,7 +222,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
           <div className="px-5 py-4 space-y-4">
             {aging.buckets.map((b) => (
               <div key={b.key}>
-                <div className="flex items-center justify-between text-[12.5px] mb-1.5">
+                <div className="flex items-center justify-between text-[13px] mb-1.5">
                   <span style={{ color: "var(--color-svc-text-dim)" }}>{b.label}</span>
                   <span className="svc-num" style={{ color: "var(--color-svc-text)" }}>{peso(b.amountCents)}</span>
                 </div>
@@ -230,7 +230,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
                   pct={(b.amountCents / maxBucket) * 100}
                   color={TONE_BAR[b.key === "current" ? "azure" : b.key === "90_plus" ? "danger" : "warn"]}
                 />
-                <p className="text-[11.5px] mt-1" style={FAINT}>
+                <p className="text-[12px] mt-1" style={FAINT}>
                   {b.count} invoice{b.count === 1 ? "" : "s"}
                 </p>
               </div>
@@ -241,11 +241,11 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
         <SectionCard title="Expenses by category" action={<span className="text-[12px]" style={FAINT}>{range.label.toLowerCase()}</span>}>
           <div className="px-5 py-4 space-y-3">
             {expenseByCategory.length === 0 ? (
-              <p className="text-[12.5px]" style={FAINT}>No expenses recorded in this range.</p>
+              <p className="text-[13px]" style={FAINT}>No expenses recorded in this range.</p>
             ) : (
               expenseByCategory.map((c) => (
                 <div key={c.category}>
-                  <div className="flex items-center justify-between text-[12.5px] mb-1.5">
+                  <div className="flex items-center justify-between text-[13px] mb-1.5">
                     <span style={{ color: "var(--color-svc-text-dim)" }}>
                       {EXPENSE_CATEGORY_LABEL[c.category] ?? c.category}
                     </span>
@@ -263,14 +263,14 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
         <SectionCard title="Top customers" action={<span className="text-[12px]" style={FAINT}>{range.label.toLowerCase()}</span>}>
           <div className="svc-divide">
             {topCustomers.length === 0 ? (
-              <p className="px-5 py-6 text-[12.5px]" style={FAINT}>No billing in this range.</p>
+              <p className="px-5 py-6 text-[13px]" style={FAINT}>No billing in this range.</p>
             ) : (
               topCustomers.map((c) => (
                 <div key={c.customerId} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <span className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>{c.name}</span>
+                  <span className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{c.name}</span>
                   <span className="text-right">
-                    <Money cents={c.billedCents} className="text-[13px]" />
-                    <p className="text-[11.5px]" style={FAINT}>{peso(c.paidCents)} paid</p>
+                    <Money cents={c.billedCents} className="text-[14px]" />
+                    <p className="text-[12px]" style={FAINT}>{peso(c.paidCents)} paid</p>
                   </span>
                 </div>
               ))
@@ -281,16 +281,16 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
         {options.showJobMargins ? (
           <SectionCard title="Job margins" action={<span className="text-[12px]" style={FAINT}>completed in {range.label.toLowerCase()}</span>}>
             {jobMargins.length === 0 ? (
-              <p className="px-5 py-6 text-[12.5px]" style={FAINT}>
+              <p className="px-5 py-6 text-[13px]" style={FAINT}>
                 Complete and invoice a job in this range to see its margin.
               </p>
             ) : (
-              <div className="overflow-x-auto thin-scroll">
-                <table className="w-full text-left">
+              <div className="svc-table-wrap thin-scroll">
+                <table className="svc-table w-full text-left">
                   <thead>
                     <tr style={FAINT}>
                       {["Job", revenueHeading, "Cost", "Profit", "Margin"].map((h) => (
-                        <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                        <th key={h} className="px-5 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -298,15 +298,15 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
                     {jobMargins.map((j) => (
                       <tr key={j.jobId}>
                         <td className="px-5 py-2.5 max-w-[180px]">
-                          <Link href={`/service/jobs/${j.jobId}`} className="inline-flex items-center min-h-11 text-[12.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                          <Link href={`/service/jobs/${j.jobId}`} className="inline-flex items-center min-h-11 text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
                             {j.title}
                           </Link>
-                          <p className="text-[11.5px] truncate" style={FAINT}>{j.customerName}</p>
+                          <p className="text-[12px] truncate" style={FAINT}>{j.customerName}</p>
                         </td>
-                        <td className="px-5 py-2.5"><Money cents={j.revenueCents} className="text-[12.5px]" /></td>
-                        <td className="px-5 py-2.5"><Money cents={j.costCents} className="text-[12.5px]" /></td>
+                        <td className="px-5 py-2.5"><Money cents={j.revenueCents} className="text-[13px]" /></td>
+                        <td className="px-5 py-2.5"><Money cents={j.costCents} className="text-[13px]" /></td>
                         <td className="px-5 py-2.5">
-                          <Money cents={j.profitCents} signed className="text-[12.5px]" />
+                          <Money cents={j.profitCents} signed className="text-[13px]" />
                         </td>
                         <td className="px-5 py-2.5">
                           <Chip tone={j.marginPct >= 40 ? "success" : j.marginPct >= 15 ? "warn" : "danger"}>
@@ -337,7 +337,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
 
 function Legend() {
   return (
-    <div className="flex items-center gap-3 text-[11.5px]" style={FAINT}>
+    <div className="flex items-center gap-3 text-[12px]" style={FAINT}>
       {SERIES.map((s) => (
         <span key={s.key} className="inline-flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full inline-block" style={{ background: s.color }} /> {s.label}

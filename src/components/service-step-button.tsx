@@ -26,18 +26,18 @@ export default function StepButton({
   const step = nextJobStep(job.status, { hasLineItems: job.itemCount > 0, hasInvoice: !!invoiceId, hasSchedule: !!job.scheduledStart, isSale: job.jobType === "sale" });
   if (!step) return null;
   const fail = (m: string) => { setLocalError(m); onError?.(m); };
-  const cls = `!min-h-11 !px-3.5 text-[12.5px] ${className}`;
+  const cls = `!min-h-11 !px-3.5 text-[13px] ${className}`;
 
   if (step.key === "schedule" || step.key === "send_quote" || step.key === "accept_quote") {
     return (
-      <Link href={`/service/jobs/${job.id}`} className={`btn-svc-ghost rounded-xl inline-flex items-center gap-1.5 px-3.5 min-h-11 text-[12.5px] ${className}`}>
+      <Link href={`/service/jobs/${job.id}`} className={`btn-svc-ghost rounded-xl inline-flex items-center gap-1.5 px-3.5 min-h-11 text-[13px] ${className}`}>
         {step.label} <ArrowRight size={13} aria-hidden="true" />
       </Link>
     );
   }
   if (step.key === "view_invoice") {
     return invoiceId ? (
-      <Link href={`/service/invoices/${invoiceId}`} className={`btn-svc-ghost rounded-xl inline-flex items-center gap-1.5 px-3.5 min-h-11 text-[12.5px] ${className}`}>
+      <Link href={`/service/invoices/${invoiceId}`} className={`btn-svc-ghost rounded-xl inline-flex items-center gap-1.5 px-3.5 min-h-11 text-[13px] ${className}`}>
         {step.label} <ArrowRight size={13} aria-hidden="true" />
       </Link>
     ) : null;
@@ -62,7 +62,7 @@ export default function StepButton({
       >
         {step.label} <ArrowRight size={13} aria-hidden="true" />
       </PrimaryButton>
-      {localError && !onError ? <span role="alert" className="text-[11.5px]" style={{ color: "var(--color-svc-danger)" }}>{localError}</span> : null}
+      {localError && !onError ? <span role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>{localError}</span> : null}
     </span>
   );
 }

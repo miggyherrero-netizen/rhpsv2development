@@ -27,7 +27,7 @@ export default function OwnerUpcomingClient({ bundle: rawBundle }: { bundle: Own
     <div className="p-4 sm:p-7 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="font-serif text-2xl sm:text-3xl text-[var(--color-ow-text)]">Upcoming</h1>
-        <p className="text-[var(--color-ow-text-dim)] text-[12.5px] mt-1">The next two weeks, in order.</p>
+        <p className="text-[var(--color-ow-text-dim)] text-[13px] mt-1">The next two weeks, in order.</p>
       </div>
 
       {groups.length === 0 ? (
@@ -36,17 +36,17 @@ export default function OwnerUpcomingClient({ bundle: rawBundle }: { bundle: Own
         <div className="space-y-7">
           {groups.map(({ day, items }) => (
             <section key={day.toISOString()}>
-              <p className="text-[10.5px] uppercase tracking-[0.2em] text-[var(--color-ow-text-faint)] mb-2.5">
+              <p className="text-[12px] uppercase tracking-[0.2em] text-[var(--color-ow-text-faint)] mb-2.5">
                 {fmtDate(day)}{sameDay(day, addDays(new Date(), 1)) ? " · Tomorrow" : ""}
               </p>
               <ul className="card-ow ow-divide">
                 {items.map((i) => (
                   <li key={i.key} className="flex items-center gap-3.5 px-4 py-3">
-                    <span className="w-[74px] shrink-0 text-[11.5px] text-[var(--color-ow-text-dim)] tnum">{i.allDay ? "All day" : fmtTime(i.start, tf)}</span>
+                    <span className="w-[74px] shrink-0 text-[12px] text-[var(--color-ow-text-dim)] tnum">{i.allDay ? "All day" : fmtTime(i.start, tf)}</span>
                     <KindGlyph kind={i.kind} />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] truncate text-[var(--color-ow-text)]">{i.title}</p>
-                      <p className="text-[10.5px] text-[var(--color-ow-text-dim)] mt-0.5 flex items-center gap-2">
+                      <p className="text-[12px] text-[var(--color-ow-text-dim)] mt-0.5 flex items-center gap-2">
                         <CategoryChip category={catMap.get(i.categoryId ?? "")} />
                         {i.location && <span>· {i.location}</span>}
                         {i.person && <span>· {i.person}</span>}

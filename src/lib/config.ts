@@ -61,10 +61,10 @@ export const REMINDER_OPTIONS = [
   { value: 1440, label: "1 day before" },
 ];
 
-/** Muted, non-yellow/brown palette — safe to tint calendar blocks and category chips on the dark Personal Workspace theme. */
+/** My Desk category palette — every hue reads on the dark navy surfaces and tints calendar blocks. */
 export const CATEGORY_COLORS = [
-  "#64748b", "#6b93c9", "#4fb8ab", "#10b981", "#0f766e",
-  "#9b8ad1", "#c97fa8", "#e08a95", "#5b8fa8", "#3f6b8a",
+  "#94a3b8", "#7cb0ff", "#2dd4bf", "#34d399", "#22d3ee",
+  "#a78bfa", "#f0abfc", "#fb7185", "#fbbf24", "#60a5fa",
 ];
 
 export const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

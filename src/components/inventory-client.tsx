@@ -50,7 +50,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
           <p className="text-mist text-[12.5px] mt-1">Parts, materials, and what they cost the shop.</p>
         </div>
         <button onClick={() => setModal({ data: BLANK })}
-          className="flex items-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition">
+          className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition">
           <Plus size={15} /> Add Item
         </button>
       </div>
@@ -65,7 +65,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
           <div key={s.label} className={`card-dark p-3.5 ${s.warn ? "border-amber-400/20" : ""}`}>
             <s.icon size={15} className={s.warn ? "text-amber-300" : "text-mist"} />
             <p className={`tnum text-lg font-medium mt-2 ${s.warn ? "text-amber-300" : "text-white"}`}>{s.value}</p>
-            <p className="text-[9.5px] uppercase tracking-[0.16em] text-mist mt-0.5">{s.label}</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-mist mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
@@ -75,7 +75,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item, SKU, supplier, shelf…" className="input-dark pl-9" />
         </div>
-        <select value={cat} onChange={(e) => setCat(e.target.value)} className="input-dark w-auto">
+        <select aria-label="Filter by category" value={cat} onChange={(e) => setCat(e.target.value)} className="input-dark w-auto">
           <option value="all">All categories</option>
           {categories.map((c) => <option key={c}>{c}</option>)}
         </select>
@@ -89,9 +89,9 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
         <div className="card-dark overflow-x-auto thin-scroll">
           <table className="w-full text-[12.5px] min-w-[920px]">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
+              <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Item", "Category", "SKU", "Supplier", "On hand", "Unit cost", "Value", "Reorder at", "Location", ""].map((h) => (
-                  <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                  <th key={h} className="px-4 py-3 font-medium">{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -102,9 +102,9 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
                   <tr key={i.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                     <td className="px-4 py-3 text-white max-w-[260px]">
                       {i.name}
-                      {i.notes && <span className="block text-[10.5px] text-mist/60 mt-0.5">{i.notes}</span>}
+                      {i.notes && <span className="block text-xs text-mist mt-0.5">{i.notes}</span>}
                     </td>
-                    <td className="px-4 py-3"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-[10.5px]">{i.category}</span></td>
+                    <td className="px-4 py-3"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-xs">{i.category}</span></td>
                     <td className="px-4 py-3 text-mist tnum">{i.sku ?? "—"}</td>
                     <td className="px-4 py-3 text-mist">{i.supplier ?? "—"}</td>
                     <td className="px-4 py-3">
@@ -113,7 +113,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
                         <span className={`tnum w-10 text-center font-medium ${low ? "text-amber-300" : "text-white"}`}>{i.qtyOnHand}</span>
                         <button onClick={() => adjustInventoryQty(i.id, 1)} className="p-1 rounded-md bg-white/[0.06] hover:bg-white/[0.14] text-mist transition" aria-label="Add one"><Plus size={12} /></button>
                       </div>
-                      {low && <span className="text-[9.5px] uppercase tracking-wide text-amber-300/90">reorder</span>}
+                      {low && <span className="text-xs uppercase tracking-wide text-amber-300/90">reorder</span>}
                     </td>
                     <td className="px-4 py-3 text-mist tnum">{peso(i.unitCostCents)}</td>
                     <td className="px-4 py-3 text-chrome tnum">{peso(i.qtyOnHand * i.unitCostCents)}</td>
@@ -121,7 +121,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
                     <td className="px-4 py-3 text-mist">{i.location ?? "—"}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => setModal({ id: i.id, data: { ...i, price: (i.unitCostCents / 100).toString() } as InventoryInput & { price: string } })}
-                        className="text-[11px] text-chrome hover:text-white underline underline-offset-4 decoration-white/20 transition">Edit</button>
+                        className="text-xs text-chrome hover:text-white underline underline-offset-4 decoration-white/20 transition">Edit</button>
                     </td>
                   </tr>
                 );
@@ -148,7 +148,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
             <Field label="Notes"><input className={inp} value={modal.data.notes ?? ""} onChange={(e) => setModal({ ...modal, data: { ...modal.data, notes: e.target.value } })} /></Field>
             <div className="sm:col-span-2 flex gap-2 mt-1">
               <button onClick={save} disabled={busy || !modal.data.name.trim()}
-                className="flex-1 bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+                className="flex-1 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {busy && <Spinner className="text-black" />} {modal.id ? "Save changes" : "Add item"}
               </button>
               {modal.id && (

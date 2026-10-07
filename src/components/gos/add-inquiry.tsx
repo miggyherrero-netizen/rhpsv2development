@@ -82,10 +82,10 @@ export default function AddInquiry() {
     <>
       <button ref={opener} type="button" className="gos-btn-black" onClick={() => setOpen(true)}>+ Add inquiry</button>
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 lg:items-stretch lg:justify-end"
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#14201b]/50 lg:items-stretch lg:justify-end"
           onMouseDown={(e) => { if (e.target === e.currentTarget) tryClose(); }}>
           <div ref={panel} role="dialog" aria-modal="true" aria-label="Add inquiry" onKeyDown={onKeyDown}
-            className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 lg:max-h-none lg:w-[480px] lg:rounded-none">
+            className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[20px] bg-white p-5 shadow-2xl lg:max-h-none lg:w-[480px] lg:rounded-none">
             <h2 className="text-xl font-bold">Add inquiry</h2>
             <div className="mt-3 space-y-4">
               <label className="block">
@@ -101,7 +101,7 @@ export default function AddInquiry() {
                   <input className="gos-input mt-1" inputMode="tel" maxLength={30} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </label>
               ) : (
-                <button type="button" className="gos-tap text-[var(--gos-gold-text)] underline" onClick={() => setShowPhone(true)}>+ Add phone</button>
+                <button type="button" className="gos-tap gos-link" onClick={() => setShowPhone(true)}>+ Add phone</button>
               )}
               <label className="block">
                 <span className="font-bold">Area (optional)</span>
@@ -144,7 +144,7 @@ export default function AddInquiry() {
                   <p>You already have <b>{dup.name}</b>{dup.area ? ` (${dup.area})` : ""}. Same person?</p>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" className="gos-btn-black" onClick={() => { const id = dup.id; close(); router.push(`/os/customers/${id}`); }}>Yes, open her record</button>
-                    <button type="button" className="gos-tap rounded-full border px-4" onClick={() => void save(true)}>No, add new</button>
+                    <button type="button" className="gos-btn-ghost" onClick={() => void save(true)}>No, add new</button>
                   </div>
                 </div>
               )}
@@ -154,13 +154,13 @@ export default function AddInquiry() {
                   <p className="font-bold">Discard this inquiry?</p>
                   <div className="flex gap-2">
                     <button type="button" autoFocus className="gos-btn-black" onClick={() => setConfirmDiscard(false)}>Keep editing</button>
-                    <button type="button" className="gos-tap rounded-full border px-4" onClick={close}>Discard</button>
+                    <button type="button" className="gos-btn-ghost" onClick={close}>Discard</button>
                   </div>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="sticky bottom-0 -mx-5 -mb-5 flex gap-2 border-t border-[var(--gos-line)] bg-white p-4">
                 <button type="button" className="gos-btn-black" disabled={busy} onClick={() => void save(false)}>{busy ? "Saving…" : "Save"}</button>
-                <button type="button" className="gos-tap rounded-full border px-4" onClick={tryClose}>Cancel</button>
+                <button type="button" className="gos-btn-ghost" onClick={tryClose}>Cancel</button>
               </div>
             </div>
           </div>

@@ -28,56 +28,58 @@ export default function LoginClient() {
   }
 
   return (
-    <div className="min-h-screen bg-coal text-chrome flex">
-      <div className="hidden lg:block relative w-[46%] overflow-hidden">
+    <div className="adm-shell min-h-screen bg-coal text-chrome flex">
+      <aside aria-label="The Herrero Atelier" className="hidden lg:block relative w-[46%] overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/img/hero.jpg" alt="Herrero Pianos atelier" className="absolute inset-0 h-full w-full object-cover opacity-80" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/25 to-coal" />
         <div className="absolute bottom-10 left-10 right-10">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-white/50 mb-3">The Herrero Atelier</p>
-          <p className="font-serif text-2xl text-white/90 leading-snug max-w-md">
+          <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-3">The Herrero Atelier</p>
+          <p className="font-serif text-2xl text-white leading-snug max-w-md">
             “Every instrument that leaves this room carries our signature.”
           </p>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="w-full max-w-sm anim-fade-up">
-          <Link href="/" className="block text-center mb-10">
-            <p className="font-serif text-3xl text-white tracking-wide">HERRERO</p>
-            <p className="text-[10px] uppercase tracking-[0.42em] text-mist mt-1.5">Pianos · Command Center</p>
+      <main id="main" className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm anim-fade-up card-dark p-7 sm:p-8 shadow-2xl shadow-black/40">
+          <Link href="/" className="block text-center mb-8">
+            <h1 className="font-serif text-3xl text-white tracking-[0.14em]">HERRERO</h1>
+            <p className="text-xs uppercase tracking-[0.3em] text-mist mt-2">Pianos · Command Center</p>
           </Link>
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-5">
             <div>
-              <label className="block text-[11px] uppercase tracking-[0.16em] text-mist mb-1.5">Email</label>
+              <label htmlFor="login-email" className="block text-xs font-medium uppercase tracking-[0.08em] text-mist mb-1.5">Email</label>
               <input
+                id="login-email"
                 type="email" required autoComplete="email" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-dark" placeholder="you@herrero.ph"
               />
             </div>
             <div>
-              <label className="block text-[11px] uppercase tracking-[0.16em] text-mist mb-1.5">Password</label>
+              <label htmlFor="login-password" className="block text-xs font-medium uppercase tracking-[0.08em] text-mist mb-1.5">Password</label>
               <input
+                id="login-password"
                 type="password" required autoComplete="current-password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-dark" placeholder="••••••••"
               />
             </div>
-            {error && <p className="text-rose-400 text-xs anim-shake">{error}</p>}
+            {error && <p role="alert" className="text-red-400 text-sm anim-shake">{error}</p>}
             <button
               type="submit" disabled={busy}
-              className="w-full mt-2 bg-white text-black font-medium text-sm rounded-xl py-3 hover:bg-chrome transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="btn-brass w-full mt-2 min-h-12 font-semibold text-base rounded-[10px] disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {busy && <Spinner className="text-black" />}
+              {busy && <Spinner className="text-[#04210F]" />}
               Enter the atelier
             </button>
           </form>
-          <p className="text-center text-[11px] text-mist/70 mt-8">
-            Staff working today? <Link href="/workshop" className="text-chrome underline underline-offset-4">Open the workshop kiosk</Link>
+          <p className="text-center text-sm text-mist mt-8">
+            Staff working today? <Link href="/workshop" className="inline-flex items-center min-h-11 text-chrome underline underline-offset-4 hover:text-white">Open the workshop kiosk</Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

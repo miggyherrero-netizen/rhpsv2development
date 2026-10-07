@@ -36,7 +36,7 @@ export const TONE_SOFT: Record<Tone, string> = {
 };
 
 export const TONE_BAR: Record<Tone, string> = {
-  slate: "#64748b",
+  slate: "#64748b", /* neutral bar fill (3:1 on surface) */
   azure: "var(--color-svc-accent)",
   violet: "var(--color-svc-violet)",
   success: "var(--color-svc-success)",
@@ -78,7 +78,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-medium tracking-wide ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-medium tracking-wide ${className}`}
       style={{ background: TONE_SOFT[tone], color: TONE_TEXT[tone], border: `1px solid ${TONE_SOFT[tone]}` }}
     >
       {children}
@@ -127,7 +127,7 @@ export function StatCard({
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <p className="text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>
           {label}
         </p>
         {icon ? <span style={{ color: tone ? TONE_TEXT[tone] : "var(--color-svc-text-faint)" }}>{icon}</span> : null}
@@ -176,7 +176,7 @@ export function SectionCard({
           className="flex items-center justify-between gap-4 px-5 py-3.5"
           style={{ borderBottom: "1px solid var(--color-svc-border)" }}
         >
-          <h2 className="text-[13px] font-medium" style={{ color: "var(--color-svc-text)" }}>
+          <h2 className="text-[14px] font-medium" style={{ color: "var(--color-svc-text)" }}>
             {title}
           </h2>
           {action}
@@ -206,7 +206,7 @@ export function EmptyState({
       >
         {icon ?? <Inbox size={19} strokeWidth={1.7} />}
       </div>
-      <p className="text-[13.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+      <p className="text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>
         {title}
       </p>
       {hint ? (
@@ -250,7 +250,7 @@ export function SvcModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={onClose} />
       <div
-        className={`relative w-full ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"} max-h-[92vh] overflow-y-auto thin-scroll anim-sheet card-svc sm:rounded-2xl rounded-t-2xl p-6`}
+        className={`relative w-full ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"} max-h-[92vh] overflow-y-auto thin-scroll anim-sheet card-svc sm:rounded-[14px] rounded-b-none sm:rounded-b-[14px] rounded-t-[14px] p-5 sm:p-6`}
       >
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
@@ -265,11 +265,11 @@ export function SvcModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg transition hover:bg-white/[0.06]"
+            className="inline-flex items-center justify-center min-w-11 min-h-11 -mr-2 -mt-2 rounded-lg transition-colors hover:bg-white/[0.06]"
             style={{ color: "var(--color-svc-text-faint)" }}
             aria-label="Close"
           >
-            <X size={17} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
         {children}
@@ -302,17 +302,17 @@ export function ConfirmDialog({
           {title}
         </p>
         {message ? (
-          <p className="text-[12.5px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
             {message}
           </p>
         ) : null}
         <div className="flex gap-2 mt-5">
-          <button onClick={onCancel} className="btn-svc-ghost flex-1 text-[13px] rounded-xl py-2.5">
+          <button onClick={onCancel} className="btn-svc-ghost flex-1 text-[14px] rounded-xl">
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 text-[13px] rounded-xl py-2.5 font-medium"
+            className="flex-1 text-[14px] rounded-xl min-h-11 font-medium transition-colors hover:brightness-110"
             style={{ background: TONE_SOFT.danger, color: TONE_TEXT.danger }}
           >
             {confirmLabel}
@@ -357,8 +357,8 @@ function ConfirmTypeInner({
         className="relative card-svc max-w-sm w-full p-6 anim-sheet"
       >
         <p id={`${id}-t`} className="font-serif text-lg" style={{ color: "var(--color-svc-text)" }}>{title}</p>
-        {message ? <p className="text-[12.5px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{message}</p> : null}
-        <label htmlFor={`${id}-i`} className="block text-[12.5px] mt-4" style={{ color: "var(--color-svc-text-dim)" }}>
+        {message ? <p className="text-[13px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{message}</p> : null}
+        <label htmlFor={`${id}-i`} className="block text-[13px] mt-4" style={{ color: "var(--color-svc-text-dim)" }}>
           Type <b className="font-mono font-medium" style={{ color: "var(--color-svc-text)" }}>{code}</b> to confirm
         </label>
         <input
@@ -368,10 +368,10 @@ function ConfirmTypeInner({
         />
         {error ? <p role="alert" className="text-[12px] mt-2" style={{ color: TONE_TEXT.danger }}>{error}</p> : null}
         <div className="flex gap-2 mt-5">
-          <button type="button" onClick={onCancel} className="btn-svc-ghost flex-1 text-[13px] rounded-xl min-h-11">Cancel</button>
+          <button type="button" onClick={onCancel} className="btn-svc-ghost flex-1 text-[14px] rounded-xl min-h-11">Cancel</button>
           <button
             type="submit" disabled={!ready || pending}
-            className="flex-1 text-[13px] rounded-xl min-h-11 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 text-[14px] rounded-xl min-h-11 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: TONE_SOFT.danger, color: TONE_TEXT.danger }}
           >
             {pending ? "Deleting…" : confirmLabel}
@@ -407,12 +407,12 @@ export function MoreMenu({ items, label = "More" }: { items: MoreItem[]; label?:
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
   }, [open]);
-  const row = "flex w-full items-center gap-2.5 px-3.5 min-h-11 text-left text-[13px] hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[-2px] focus-visible:outline-[var(--color-svc-accent)]";
+  const row = "flex w-full items-center gap-2.5 px-3.5 min-h-11 text-left text-[14px] hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[-2px] focus-visible:outline-[var(--color-svc-accent)]";
   return (
     <div ref={ref} className="relative" onBlur={(e) => { if (!ref.current?.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
       <button
         ref={trigger} type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}
-        className="btn-svc-ghost rounded-xl px-3.5 min-h-10 text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+        className="btn-svc-ghost rounded-[10px] px-3.5 min-h-11 text-[13px] inline-flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
       >
         <Ellipsis size={15} /> {label}
       </button>
@@ -483,14 +483,14 @@ export function Field({
   return (
     <label className={`block ${className}`}>
       <span
-        className="block text-[11px] uppercase tracking-[0.1em] mb-1.5"
+        className="block text-[12px] uppercase tracking-[0.1em] mb-1.5"
         style={{ color: "var(--color-svc-text-dim)" }}
       >
         {label}
       </span>
       {children}
       {hint ? (
-        <span className="block text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+        <span className="block text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
           {hint}
         </span>
       ) : null}
@@ -524,11 +524,11 @@ export function ToggleRow({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <label id={labelId} htmlFor={id} className="block text-[13px] cursor-pointer" style={{ color: "var(--color-svc-text)" }}>
+        <label id={labelId} htmlFor={id} className="block text-[14px] cursor-pointer" style={{ color: "var(--color-svc-text)" }}>
           {label}
         </label>
         {hint ? (
-          <p id={hintId} className="text-[11.5px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p id={hintId} className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
             {hint}
           </p>
         ) : null}
@@ -550,15 +550,15 @@ export function ToggleRow({
           aria-hidden
           className="pointer-events-none w-9 h-5 rounded-full transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-svc-accent)]"
           style={{
-            background: on ? "var(--color-svc-accent)" : "var(--color-svc-surface-2)",
-            border: `1px solid ${on ? "var(--color-svc-accent)" : "var(--color-svc-border-strong)"}`,
+            background: on ? "var(--color-svc-primary)" : "var(--color-svc-surface-2)",
+            border: `1px solid ${on ? "var(--color-svc-accent)" : "var(--color-svc-text-faint)"}`,
           }}
         />
         <span
           aria-hidden
           className="pointer-events-none absolute top-[3px] left-[3px] w-3.5 h-3.5 rounded-full transition-transform"
           style={{
-            background: on ? "#051021" : "var(--color-svc-text-dim)",
+            background: on ? "#fff" : "var(--color-svc-text-dim)",
             transform: on ? "translateX(16px)" : "translateX(0)",
           }}
         />
@@ -578,7 +578,7 @@ export function UnitInput({
   const dim = { color: props.disabled ? "var(--color-svc-text-faint)" : "var(--color-svc-text-dim)" };
   return (
     <span className="relative block">
-      {prefix ? <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={dim}>{prefix}</span> : null}
+      {prefix ? <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px]" style={dim}>{prefix}</span> : null}
       <input
         {...props}
         className={`input-svc svc-num ${className}`}
@@ -607,7 +607,7 @@ export function PrimaryButton({
     <button
       {...rest}
       disabled={rest.disabled || pending}
-      className={`btn-svc-primary rounded-xl px-4 py-2.5 text-[13px] inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed ${className}`}
+      className={`btn-svc-primary rounded-[10px] px-4 py-2.5 text-[14px] inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed ${className}`}
     >
       {pending ? <Loader2 size={14} className="animate-spin" /> : null}
       {children}
@@ -621,7 +621,7 @@ export function GhostButton({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button {...rest} className={`btn-svc-ghost rounded-xl px-3.5 py-2 text-[12.5px] ${className}`}>
+    <button {...rest} className={`btn-svc-ghost rounded-[10px] px-3.5 py-2 text-[13px] inline-flex items-center justify-center gap-1.5 ${className}`}>
       {children}
     </button>
   );
@@ -667,7 +667,7 @@ export function FilterPills<T extends string>({
           type="button"
           aria-pressed={value === o.key}
           onClick={() => onChange(o.key)}
-          className="px-3.5 min-h-10 rounded-full text-[12.5px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+          className="px-4 min-h-11 rounded-full text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
           style={{
             background: value === o.key ? "var(--color-svc-accent-soft)" : "var(--color-svc-surface-2)",
             color: value === o.key ? TONE_TEXT.azure : "var(--color-svc-text-dim)",

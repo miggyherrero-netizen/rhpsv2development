@@ -117,24 +117,24 @@ export default function InvoiceDetailClient({
             <h1 className="font-serif text-2xl" style={{ color: "var(--color-svc-text)" }}>{code}</h1>
             <Chip tone={tone}>{INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}</Chip>
           </div>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {customer.name}
             {invoice.jobTitle ? ` · ${invoice.jobTitle}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/service/invoices/${invoice.id}/document`} className="btn-svc-ghost rounded-xl px-3.5 min-h-10 text-[12.5px] inline-flex items-center gap-1.5">
+          <Link href={`/service/invoices/${invoice.id}/document`} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 text-[13px] inline-flex items-center gap-1.5">
             <Printer size={13} /> Print / PDF / Share
           </Link>
           {!isDraft && invoice.status !== "void" && (
             unlocked ? (
-              <PrimaryButton onClick={() => setUnlocked(false)} className="!min-h-10 !text-white"><Check size={14} /> Done editing</PrimaryButton>
+              <PrimaryButton onClick={() => setUnlocked(false)} className="!min-h-11 !text-white"><Check size={14} /> Done editing</PrimaryButton>
             ) : (
-              <GhostButton onClick={() => setUnlocked(true)} className="inline-flex items-center gap-1.5 !min-h-10"><Pencil size={13} /> Edit lines</GhostButton>
+              <GhostButton onClick={() => setUnlocked(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit lines</GhostButton>
             )
           )}
           {isDraft && (
-            <PrimaryButton pending={pending} onClick={() => run(() => setInvoiceStatus(invoice.id, "sent"))} className="!min-h-10">
+            <PrimaryButton pending={pending} onClick={() => run(() => setInvoiceStatus(invoice.id, "sent"))} className="!min-h-11">
               <Send size={13} /> Mark sent
             </PrimaryButton>
           )}
@@ -156,7 +156,7 @@ export default function InvoiceDetailClient({
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+            <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
               Invoice
             </p>
             <p className="font-mono text-[15px] mt-1" style={{ color: "var(--color-svc-text)" }}>{code}</p>
@@ -172,18 +172,18 @@ export default function InvoiceDetailClient({
         </div>
 
         <div className="mt-7 pt-5" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
-          <p className="text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.16em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Billed to
           </p>
           <p className="text-[14px] mt-1" style={{ color: "var(--color-svc-text)" }}>{customer.name}</p>
           {customer.company ? (
-            <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.company}</p>
+            <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.company}</p>
           ) : null}
           {customer.phone ? (
-            <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.phone}</p>
+            <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.phone}</p>
           ) : null}
           {detail.job ? (
-            <p className="text-[11.5px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+            <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
               Job: {detail.job.title}
             </p>
           ) : null}
@@ -213,22 +213,22 @@ export default function InvoiceDetailClient({
               <thead>
                 <tr style={{ color: "var(--color-svc-text-faint)" }}>
                   {["Description", "Qty", "Unit price", "Amount"].map((h) => (
-                    <th key={h} className="py-2 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                    <th key={h} className="py-2 text-[12px] uppercase tracking-[0.08em] font-normal">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} style={{ borderTop: "1px solid var(--color-svc-border)" }}>
-                    <td className="py-2.5 pr-4 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+                    <td className="py-2.5 pr-4 text-[14px]" style={{ color: "var(--color-svc-text)" }}>
                       {item.description}
                       {hasVat && !item.taxable ? (
-                        <span className="ml-2 text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>VAT exempt</span>
+                        <span className="ml-2 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>VAT exempt</span>
                       ) : null}
                     </td>
-                    <td className="py-2.5 pr-4 text-[13px] svc-num">{item.qty}</td>
-                    <td className="py-2.5 pr-4"><Money cents={item.unitPriceCents} className="text-[13px]" /></td>
-                    <td className="py-2.5 pr-4"><Money cents={item.qty * item.unitPriceCents} className="text-[13px]" /></td>
+                    <td className="py-2.5 pr-4 text-[14px] svc-num">{item.qty}</td>
+                    <td className="py-2.5 pr-4"><Money cents={item.unitPriceCents} className="text-[14px]" /></td>
+                    <td className="py-2.5 pr-4"><Money cents={item.qty * item.unitPriceCents} className="text-[14px]" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -238,7 +238,7 @@ export default function InvoiceDetailClient({
 
         {/* Totals */}
         <div className="mt-4 flex justify-end">
-          <div className="w-full sm:w-72 space-y-1.5 text-[13px]">
+          <div className="w-full sm:w-72 space-y-1.5 text-[14px]">
             <Line label="Subtotal"><Money cents={totals.subtotalCents} /></Line>
             {invoice.discountCents > 0 && (
               <Line label="Discount"><Money cents={-invoice.discountCents} /></Line>
@@ -266,7 +266,7 @@ export default function InvoiceDetailClient({
           <p className="mt-6 text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>{invoice.notes}</p>
         ) : null}
         {invoice.terms ? (
-          <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>{invoice.terms}</p>
+          <p className="mt-1 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>{invoice.terms}</p>
         ) : null}
       </div>
 
@@ -274,7 +274,7 @@ export default function InvoiceDetailClient({
       <SectionCard
         title="Payments"
         action={
-          <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
             {payments.length} recorded
           </span>
         }
@@ -287,15 +287,15 @@ export default function InvoiceDetailClient({
               {payments.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 py-2.5 group">
                   <Chip tone="success">{PAYMENT_METHOD_LABEL[p.method] ?? p.method}</Chip>
-                  <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+                  <span className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
                     {fmtDate(new Date(p.receivedAt))}
                   </span>
                   {p.reference ? (
-                    <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>{p.reference}</span>
+                    <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>{p.reference}</span>
                   ) : null}
                   <div className="flex-1" />
-                  <Money cents={p.amountCents} className="text-[13px]" />
-                  <Link href={`/service/invoices/${invoice.id}/receipts/${p.id}`} className="text-[11.5px] hover:underline" style={{ color: "var(--color-svc-accent)" }}>
+                  <Money cents={p.amountCents} className="text-[14px]" />
+                  <Link href={`/service/invoices/${invoice.id}/receipts/${p.id}`} className="text-[12px] hover:underline" style={{ color: "var(--color-svc-accent)" }}>
                     Receipt / PDF / Share
                   </Link>
                   <button
@@ -317,7 +317,7 @@ export default function InvoiceDetailClient({
               style={{ borderTop: "1px solid var(--color-svc-border)" }}
             >
               {isDraft && (
-                <p className="sm:col-span-4 text-[12.5px] rounded-lg px-3 py-2" style={{ background: "var(--color-svc-warn-soft)", color: "var(--color-svc-warn)" }}>
+                <p className="sm:col-span-4 text-[13px] rounded-lg px-3 py-2" style={{ background: "var(--color-svc-warn-soft)", color: "var(--color-svc-warn)" }}>
                   This invoice is still a draft. Recording a payment will <b className="font-medium">mark it as sent</b> first.
                 </p>
               )}
@@ -339,11 +339,11 @@ export default function InvoiceDetailClient({
                 <TextInput value={reference} onChange={(e) => setReference(e.target.value)} />
               </Field>
               <div className="flex gap-2">
-                <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-10">Full</GhostButton>
+                <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-11">Full</GhostButton>
                 <PrimaryButton
                   pending={pending}
                   disabled={!parsePesoInput(amount)}
-                  className="!min-h-10"
+                  className="!min-h-11"
                   onClick={() => {
                     run(() => recordPayment({
                       invoiceId: invoice.id,

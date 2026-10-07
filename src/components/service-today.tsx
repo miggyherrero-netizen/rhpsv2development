@@ -31,17 +31,17 @@ import {
 
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
-const ROW_BTN = "btn-svc-ghost rounded-lg px-3 min-h-11 inline-flex items-center gap-1.5 text-[12.5px] shrink-0";
+const ROW_BTN = "btn-svc-ghost rounded-lg px-3 min-h-11 inline-flex items-center gap-1.5 text-[13px] shrink-0";
 
 function Elapsed({ startedAt, now }: { startedAt: Date; now: Date | null }) {
   if (!now) {
-    return <span className="tnum text-[13px]" style={{ color: "var(--color-svc-text-faint)" }}>—</span>;
+    return <span className="tnum text-[14px]" style={{ color: "var(--color-svc-text-faint)" }}>—</span>;
   }
   const mins = Math.max(0, Math.round((now.getTime() - new Date(startedAt).getTime()) / 60_000));
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return (
-    <span className="tnum text-[13px]" style={{ color: "var(--color-svc-warn)" }}>
+    <span className="tnum text-[14px]" style={{ color: "var(--color-svc-warn)" }}>
       {h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`}
     </span>
   );
@@ -118,12 +118,12 @@ export default function TodayClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Today</h1>
-          <p className="text-[12.5px] mt-1" style={DIM}>{fmtDateLong(board.date)}</p>
+          <p className="text-[13px] mt-1" style={DIM}>{fmtDateLong(board.date)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/service/schedule" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Schedule</Link>
+          <Link href="/service/schedule" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[13px]">Schedule</Link>
           <PrimaryButton onClick={() => setQuickOpen(true)} className="!min-h-11"><Plus size={15} /> New job</PrimaryButton>
         </div>
       </header>
@@ -146,10 +146,10 @@ export default function TodayClient({
               <li key={log.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                 <span className="w-2 h-2 rounded-full anim-pulse-soft" style={{ background: "var(--color-svc-warn)" }} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13.5px] truncate" style={{ color: "var(--color-svc-text)" }}>
+                  <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>
                     {log.jobTitle}<span style={FAINT}> · {log.customerName}</span>
                   </p>
-                  <p className="text-[11.5px] mt-0.5" style={FAINT}>{log.kind} timer running since {fmtTime(new Date(log.startedAt))}</p>
+                  <p className="text-[12px] mt-0.5" style={FAINT}>{log.kind} timer running since {fmtTime(new Date(log.startedAt))}</p>
                 </div>
                 <Elapsed startedAt={new Date(log.startedAt)} now={clock} />
                 <GhostButton disabled={pending} onClick={() => run(() => stopTimer(log.id))} className="!min-h-11 inline-flex items-center gap-1.5"><Square size={12} /> Stop</GhostButton>
@@ -164,8 +164,8 @@ export default function TodayClient({
                 <li key={job.id} className="px-5 py-4" style={isNow ? { background: "rgba(77,141,240,0.05)" } : undefined}>
                   <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
                     <div className="w-16 shrink-0 pt-0.5">
-                      <p className="text-[13.5px] tnum" style={{ color: "var(--color-svc-text)" }}>{start ? fmtTime(start) : "Any time"}</p>
-                      <p className="text-[11px] tnum" style={FAINT}>{fmtMinutes(job.estimatedMinutes)}</p>
+                      <p className="text-[14px] tnum" style={{ color: "var(--color-svc-text)" }}>{start ? fmtTime(start) : "Any time"}</p>
+                      <p className="text-[12px] tnum" style={FAINT}>{fmtMinutes(job.estimatedMinutes)}</p>
                     </div>
                     <div className="min-w-0 flex-1 basis-56">
                       <div className="flex flex-wrap items-center gap-2">
@@ -175,19 +175,19 @@ export default function TodayClient({
                         <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>{JOB_STATUS_LABEL[job.status] ?? job.status}</Chip>
                         {isNow && <Chip tone="azure">now</Chip>}
                       </div>
-                      <p className="text-[12.5px] mt-1" style={DIM}>
+                      <p className="text-[13px] mt-1" style={DIM}>
                         {job.customerName}{job.area ? ` · ${job.area}` : ""}
                         {job.technicianName ? (<> · <span className="inline-flex items-center gap-1.5 align-middle"><Dot color={job.technicianColor ?? "#64748b"} /> {job.technicianName}</span></>) : " · unassigned"}
                       </p>
                       <div className="flex flex-wrap items-center gap-x-4 mt-0.5 text-[12px]" style={FAINT}>
                         <span>{SERVICE_TYPE_LABEL[job.serviceType] ?? job.serviceType}</span>
                         {job.addressLine && (
-                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.addressLine)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 min-h-8 hover:underline">
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.addressLine)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 min-h-11 hover:underline">
                             <MapPin size={12} aria-hidden="true" /> {job.addressLine}
                           </a>
                         )}
                         {job.customerPhone && (
-                          <a href={telHref(job.customerPhone) ?? undefined} className="inline-flex items-center gap-1 min-h-8 hover:underline">
+                          <a href={telHref(job.customerPhone) ?? undefined} className="inline-flex items-center gap-1 min-h-11 hover:underline">
                             <Phone size={12} aria-hidden="true" /> {job.customerPhone}
                           </a>
                         )}
@@ -195,7 +195,7 @@ export default function TodayClient({
                       {job.runningLog && (
                         <p className="text-[12px] mt-1.5 inline-flex items-center gap-2" style={{ color: "var(--color-svc-warn)" }}>
                           {job.runningLog.kind} timer · <Elapsed startedAt={new Date(job.runningLog.startedAt)} now={clock} />
-                          <button type="button" disabled={pending} onClick={() => run(() => stopTimer(job.runningLog!.id))} className="underline min-h-8">Stop timer</button>
+                          <button type="button" disabled={pending} onClick={() => run(() => stopTimer(job.runningLog!.id))} className="underline min-h-11">Stop timer</button>
                         </p>
                       )}
                     </div>
@@ -229,19 +229,19 @@ export default function TodayClient({
         >
           {board.draftInvoices.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={FAINT}>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={FAINT}>
                 <FileClock size={12} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Drafts to send · {board.draftInvoices.length}
               </p>
               <ul className="svc-divide">
                 {board.draftInvoices.map((inv) => (
                   <li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link href={`/service/invoices/${inv.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{inv.customerName}</Link>
+                      <Link href={`/service/invoices/${inv.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{inv.customerName}</Link>
                       <p className="text-[12px] mt-0.5" style={DIM}>{inv.code}{inv.jobTitle ? ` · ${inv.jobTitle}` : ""}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Money cents={inv.totalCents} className="text-[13px]" />
-                      <PrimaryButton pending={pending} className="!min-h-11 !px-3.5 text-[12.5px]" onClick={() => run(() => setInvoiceStatus(inv.id, "sent"))}>
+                      <Money cents={inv.totalCents} className="text-[14px]" />
+                      <PrimaryButton pending={pending} className="!min-h-11 !px-3.5 text-[13px]" onClick={() => run(() => setInvoiceStatus(inv.id, "sent"))}>
                         <Send size={13} aria-hidden="true" /> Send
                       </PrimaryButton>
                     </div>
@@ -252,18 +252,18 @@ export default function TodayClient({
           )}
           {board.deliveryBalances.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length ? 8 : 0 }}>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length ? 8 : 0 }}>
                 Balance due on delivery · {board.deliveryBalances.length}
               </p>
               <ul className="svc-divide">
                 {board.deliveryBalances.map((d) => (
                   <li key={d.jobId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link href={`/service/jobs/${d.jobId}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{d.title}</Link>
+                      <Link href={`/service/jobs/${d.jobId}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{d.title}</Link>
                       <p className="text-[12px] mt-0.5" style={DIM}>{d.customerName} · delivery {fmtDate(new Date(d.deliveryAt))}, {fmtTime(new Date(d.deliveryAt))}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Money cents={d.balanceCents} className="text-[13px] mr-1" />
+                      <Money cents={d.balanceCents} className="text-[14px] mr-1" />
                       {d.customerPhone && <a href={telHref(d.customerPhone) ?? undefined} className={ROW_BTN} aria-label={`Call ${d.customerName}`}><Phone size={13} aria-hidden="true" /> Call</a>}
                       <Link href={`/service/jobs/${d.jobId}`} className={ROW_BTN}>Open sale</Link>
                     </div>
@@ -274,20 +274,20 @@ export default function TodayClient({
           )}
           {board.unpaid.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length + board.deliveryBalances.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length + board.deliveryBalances.length ? 8 : 0 }}>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={{ ...FAINT, borderTop: board.draftInvoices.length + board.deliveryBalances.length ? "1px solid var(--color-svc-border)" : undefined, marginTop: board.draftInvoices.length + board.deliveryBalances.length ? 8 : 0 }}>
                 Unpaid · {board.unpaid.length}
               </p>
               <ul className="svc-divide">
                 {board.unpaid.map((inv) => (
                   <li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link href={`/service/invoices/${inv.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{inv.customerName}</Link>
+                      <Link href={`/service/invoices/${inv.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{inv.customerName}</Link>
                       <p className="text-[12px] mt-0.5" style={{ color: inv.daysOverdue > 0 ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
                         {inv.code} · {inv.daysOverdue > 0 ? `${inv.daysOverdue}d overdue` : inv.dueDate ? `due ${fmtDate(new Date(inv.dueDate))}` : "no due date"}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Money cents={inv.balanceCents} className="text-[13px] mr-1" />
+                      <Money cents={inv.balanceCents} className="text-[14px] mr-1" />
                       <button type="button" onClick={() => { void copyReminder(inv); }} className={ROW_BTN} aria-label={`Copy Messenger reminder for ${inv.customerName}`}>
                         {copied === inv.id ? <><Check size={13} aria-hidden="true" /> Copied</> : <><Copy size={13} aria-hidden="true" /> Copy reminder</>}
                       </button>
@@ -318,12 +318,12 @@ export default function TodayClient({
             <ul className="svc-divide">
               {tripPrompts.map((t) => (
                 <li key={t.tripId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                  <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+                  <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>
                     <b className="font-medium">{t.name}</b> is done.{" "}
                     {t.stillWaiting > 0 ? `${t.stillWaiting} other client${t.stillWaiting === 1 ? "" : "s"} in ${t.cityName ?? "that area"} still waiting — message them?` : "Nobody else is waiting there."}
                   </p>
                   <div className="flex gap-2">
-                    {t.stillWaiting > 0 && t.cityCode ? <Link href={`/service/waitlist/plan?city=${t.cityCode}`} onClick={() => { void closeTrip(t.tripId); }} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Message them</Link> : null}
+                    {t.stillWaiting > 0 && t.cityCode ? <Link href={`/service/waitlist/plan?city=${t.cityCode}`} onClick={() => { void closeTrip(t.tripId); }} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[13px]">Message them</Link> : null}
                     <GhostButton className="!min-h-11" disabled={pending} onClick={() => run(() => closeTrip(t.tripId))}>Not now</GhostButton>
                   </div>
                 </li>
@@ -334,10 +334,10 @@ export default function TodayClient({
             {waitlistFollowUps.map((w) => (
               <li key={w.id} className="px-5 py-3 space-y-2.5">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-[13.5px] font-medium" style={{ color: "var(--color-svc-text)" }}>
+                  <p className="text-[14px] font-medium" style={{ color: "var(--color-svc-text)" }}>
                     {w.customerName} <span className="text-[12px] font-normal" style={DIM}>· {w.pianoLabel ?? "piano"} · {w.cityName ?? "Unsorted"}</span>
                   </p>
-                  <span className="text-[11.5px]" style={{ color: w.nextFollowUpAt.getTime() < board.date.getTime() ? "var(--color-svc-danger)" : "var(--color-svc-text-faint)" }}>
+                  <span className="text-[12px]" style={{ color: w.nextFollowUpAt.getTime() < board.date.getTime() ? "var(--color-svc-danger)" : "var(--color-svc-text-faint)" }}>
                     {WAIT_STATUS_LABEL[w.status]} · message {w.followUpCount + 1}
                   </span>
                 </div>
@@ -358,13 +358,13 @@ export default function TodayClient({
           <div className="svc-divide">
             {next7Days.map((g) => (
               <div key={g.dayStart.toISOString()} className="px-5 py-3">
-                <p className="text-[11px] uppercase tracking-[0.1em] mb-1" style={FAINT}>{fmtDate(g.dayStart)}</p>
+                <p className="text-[12px] uppercase tracking-[0.1em] mb-1" style={FAINT}>{fmtDate(g.dayStart)}</p>
                 <ul>
                   {g.items.map((j) => (
                     <li key={j.id}>
                       <Link href={`/service/jobs/${j.id}`} className="flex items-baseline gap-3 min-h-11 py-1.5 hover:bg-white/[0.03] rounded-lg">
-                        <span className="w-16 shrink-0 text-[12.5px] tnum" style={DIM}>{j.scheduledStart ? fmtTime(new Date(j.scheduledStart)) : "—"}</span>
-                        <span className="text-[13px] truncate" style={{ color: "var(--color-svc-text)" }}>{jobHeading(j.title, j.serviceType).heading}</span>
+                        <span className="w-16 shrink-0 text-[13px] tnum" style={DIM}>{j.scheduledStart ? fmtTime(new Date(j.scheduledStart)) : "—"}</span>
+                        <span className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>{jobHeading(j.title, j.serviceType).heading}</span>
                         <span className="text-[12px] truncate" style={FAINT}>{j.customerName}{j.area ? ` · ${j.area}` : ""}</span>
                       </Link>
                     </li>
@@ -381,12 +381,12 @@ export default function TodayClient({
         <SectionCard title={<span className="inline-flex items-center gap-2"><AlertTriangle size={14} style={{ color: "var(--color-svc-warn)" }} aria-hidden="true" /> Follow-ups</span>}>
           {board.staleQuotes.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={FAINT}>Quotes with no answer · {board.staleQuotes.length}</p>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={FAINT}>Quotes with no answer · {board.staleQuotes.length}</p>
               <ul className="svc-divide">
                 {board.staleQuotes.map((q) => (
                   <li key={q.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link href={`/service/jobs/${q.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{q.title}</Link>
+                      <Link href={`/service/jobs/${q.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{q.title}</Link>
                       <p className="text-[12px] mt-0.5" style={DIM}>{q.customerName} · sent {q.days} days ago · {peso(q.quotedCents)}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -400,12 +400,12 @@ export default function TodayClient({
           )}
           {board.recalls.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={FAINT}><CalendarClock size={12} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Recalls due · {board.recalls.length}</p>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={FAINT}><CalendarClock size={12} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Recalls due · {board.recalls.length}</p>
               <ul className="svc-divide">
                 {board.recalls.slice(0, 6).map((r) => (
                   <li key={r.pianoId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text)" }}>{r.customerName}</p>
+                      <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>{r.customerName}</p>
                       <p className="text-[12px] mt-0.5 truncate" style={DIM}>{r.pianoLabel} · {r.area ?? "—"}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -421,12 +421,12 @@ export default function TodayClient({
           )}
           {board.unfinished.length > 0 && (
             <div>
-              <p className="px-5 pt-3 text-[11px] uppercase tracking-[0.1em]" style={FAINT}><ClipboardCheck size={12} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Jobs to close out · {board.unfinished.length}</p>
+              <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={FAINT}><ClipboardCheck size={12} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Jobs to close out · {board.unfinished.length}</p>
               <ul className="svc-divide">
                 {board.unfinished.slice(0, 6).map((j) => (
                   <li key={j.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link href={`/service/jobs/${j.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{jobHeading(j.title, j.serviceType).heading}</Link>
+                      <Link href={`/service/jobs/${j.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>{jobHeading(j.title, j.serviceType).heading}</Link>
                       <p className="text-[12px] mt-0.5 truncate" style={DIM}>{j.customerName} · {fmtDate(new Date(j.scheduledStart!))}</p>
                     </div>
                     <Link href={`/service/jobs/${j.id}`} className={ROW_BTN}>Close out</Link>
@@ -441,7 +441,7 @@ export default function TodayClient({
       {/* 5 · THIS WEEK */}
       {weekHasData && (
         <section aria-label="This week" className="space-y-2.5">
-          <h2 className="text-[13px] font-medium" style={DIM}>This week</h2>
+          <h2 className="text-[14px] font-medium" style={DIM}>This week</h2>
           <div className="svc-tiles">
             <WeekTile label="Booked" split={week.booked} icon={<CalendarClock size={15} />} />
             <WeekTile label="Collected" split={week.collected} tone="success" icon={<Wallet size={15} />} />

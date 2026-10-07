@@ -33,13 +33,13 @@ export const toServerLine = (l: NewLine & { position?: number }) => ({
 
 const MUTED = { color: "var(--color-svc-text-faint)" } as const;
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
-const FIELD = "input-svc !py-1.5 !px-2 text-[13px]";
+const FIELD = "input-svc !py-1.5 !px-2 text-[14px]";
 
 /** Column templates are written out in full so Tailwind can see them. Stacked below the breakpoint. */
 const GRID = {
-  plain: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_142px_92px_44px] min-[960px]:items-center",
+  plain: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_196px_92px_44px] min-[960px]:items-center",
   noType: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_92px_44px] min-[960px]:items-center",
-  cost: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_142px_104px_92px_44px] min-[1100px]:items-center",
+  cost: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_196px_104px_92px_44px] min-[1100px]:items-center",
   costNoType: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_104px_92px_44px] min-[1100px]:items-center",
 } as const;
 
@@ -53,7 +53,7 @@ function Cell({ label, wide, children, show }: { label: string; wide?: boolean; 
   if (!show) return null;
   return (
     <div className={wide ? "col-span-2 min-[960px]:col-span-1" : ""}>
-      <span className="block min-[960px]:hidden text-[11px] mb-0.5" style={MUTED}>{label}</span>
+      <span className="block min-[960px]:hidden text-[12px] mb-0.5" style={MUTED}>{label}</span>
       {children}
     </div>
   );
@@ -169,13 +169,13 @@ export default function LineEditor({
         <span role="status" aria-live="polite" className="text-[12px]" style={status.s === "error" ? { color: "var(--color-svc-danger)" } : MUTED}>
           {statusText}
           {status.s === "error" ? (
-            <button type="button" onClick={() => { void saver.retry(); }} className="ml-2 underline min-h-8">Retry</button>
+            <button type="button" onClick={() => { void saver.retry(); }} className="ml-2 underline min-h-11">Retry</button>
           ) : null}
         </span>
         {costs ? (
           <button
             type="button" aria-pressed={showCost} onClick={() => setShowCost((v) => !v)}
-            className="text-[12px] hover:underline min-h-8" style={{ color: "var(--color-svc-accent)" }}
+            className="text-[12px] hover:underline min-h-11" style={{ color: "var(--color-svc-accent)" }}
           >
             {showCost ? "Hide costs" : "Show costs"}
           </button>
@@ -183,7 +183,7 @@ export default function LineEditor({
       </div>
 
       <div className="px-5">
-        <div className={`hidden ${showCost && costs ? "min-[1100px]:grid" : "min-[960px]:grid"} ${grid.replace(/^grid /, "")} text-[11px] uppercase tracking-[0.08em] pb-1.5`} style={MUTED} aria-hidden="true">
+        <div className={`hidden ${showCost && costs ? "min-[1100px]:grid" : "min-[960px]:grid"} ${grid.replace(/^grid /, "")} text-[12px] uppercase tracking-[0.08em] pb-1.5`} style={MUTED} aria-hidden="true">
           <span>Description</span><span>Qty</span><span>Unit price</span>
           {showType ? <span>Type</span> : null}
           {showCost && costs ? <span>Cost / unit</span> : null}
@@ -208,13 +208,13 @@ export default function LineEditor({
         </div>
       </div>
 
-      {addError ? <p role="alert" className="px-5 text-[12.5px]" style={{ color: "var(--color-svc-danger)" }}>{addError}</p> : null}
+      {addError ? <p role="alert" className="px-5 text-[13px]" style={{ color: "var(--color-svc-danger)" }}>{addError}</p> : null}
 
       {offer ? (
-        <div className="mx-5 rounded-lg px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)", color: "var(--color-svc-text)" }}>
+        <div className="mx-5 rounded-lg px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)", color: "var(--color-svc-text)" }}>
           <span>Save “{offer.description}” ({peso(offer.unitPriceCents)}) to the price book?</span>
           <button
-            type="button" className="underline min-h-8" style={{ color: "var(--color-svc-accent)" }}
+            type="button" className="underline min-h-11" style={{ color: "var(--color-svc-accent)" }}
             onClick={async () => {
               const res = await adapter.saveToPriceBook?.(offer);
               if (res?.ok) { setCatalog((c) => [...c, res.entry]); setOfferMsg("Saved to price book ✓"); setOffer(null); }
@@ -224,23 +224,23 @@ export default function LineEditor({
             Save to price book
           </button>
           <button
-            type="button" className="min-h-8" style={DIM}
+            type="button" className="min-h-11" style={DIM}
             onClick={() => { dismissed.current.add(offer.description.trim().toLowerCase()); setOffer(null); }}
           >
             No thanks
           </button>
         </div>
       ) : offerMsg ? (
-        <p role="status" className="px-5 text-[12.5px]" style={MUTED}>{offerMsg}</p>
+        <p role="status" className="px-5 text-[13px]" style={MUTED}>{offerMsg}</p>
       ) : null}
 
       {chips.length > 0 ? (
         <div className="px-5 pt-1" role="group" aria-label="Quick add from the price book">
-          <p className="text-[11px] uppercase tracking-[0.08em] mb-1.5" style={MUTED}>Quick add</p>
+          <p className="text-[12px] uppercase tracking-[0.08em] mb-1.5" style={MUTED}>Quick add</p>
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
               <button
-                key={c.id} type="button" className="chip-svc inline-flex items-center gap-1.5 px-3 min-h-9 rounded-full text-[12.5px]"
+                key={c.id} type="button" className="chip-svc inline-flex items-center gap-1.5 px-3 min-h-11 rounded-full text-[13px]"
                 onClick={() => { void addLines(expandCatalogEntry(c, catalog)); }}
               >
                 <Plus size={12} aria-hidden="true" />
@@ -254,9 +254,9 @@ export default function LineEditor({
 
       <div aria-live="polite" className="px-5 space-y-1.5">
         {toasts.map((t) => (
-          <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-[12.5px]" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border-strong)", color: "var(--color-svc-text)" }}>
+          <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-[13px]" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border-strong)", color: "var(--color-svc-text)" }}>
             <span className="truncate">Removed “{t.label}”</span>
-            <button type="button" onClick={() => { void undo(t); }} className="inline-flex items-center gap-1.5 min-h-9 px-2 font-medium" style={{ color: "var(--color-svc-accent)" }}>
+            <button type="button" onClick={() => { void undo(t); }} className="inline-flex items-center gap-1.5 min-h-11 px-2 font-medium" style={{ color: "var(--color-svc-accent)" }}>
               <Undo2 size={13} aria-hidden="true" /> Undo
             </button>
           </div>
@@ -275,7 +275,7 @@ function DetailsField({
 }) {
   if (!open) {
     return (
-      <button type="button" onClick={onOpen} className="mt-0.5 inline-flex items-center min-h-8 text-[12px] hover:underline" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}>
+      <button type="button" onClick={onOpen} className="mt-0.5 inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}>
         + Details
       </button>
     );
@@ -358,7 +358,7 @@ function LineRow({
             {ITEM_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
           </select>
           {vatEnabled ? (
-            <label className="inline-flex items-center gap-1.5 text-[11.5px] min-h-8 cursor-pointer" style={DIM}>
+            <label className="inline-flex items-center gap-1.5 text-[12px] min-h-11 cursor-pointer" style={DIM}>
               <input type="checkbox" checked={row.taxable} onChange={(e) => onEdit({ taxable: e.target.checked }, { taxable: e.target.checked })} onBlur={onBlur} aria-label={`VAT applies to line ${n}`} />
               VAT
             </label>
@@ -381,7 +381,7 @@ function LineRow({
         </span>
       </Cell>
       <div className="flex items-center justify-between gap-2 col-span-2 min-[960px]:contents">
-        <span className="min-[960px]:text-right svc-num text-[13px]"><span className="min-[960px]:hidden text-[11px] mr-2" style={MUTED}>Amount</span><Money cents={amount} /></span>
+        <span className="min-[960px]:text-right svc-num text-[14px]"><span className="min-[960px]:hidden text-[12px] mr-2" style={MUTED}>Amount</span><Money cents={amount} /></span>
         <button
           type="button" onClick={onRemove} aria-label={`Remove line ${n}: ${row.description}`}
           className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]" style={MUTED}
@@ -508,12 +508,12 @@ function BlankRow({
                 <li
                   key={c.id} id={`${listId}-${i}`} role="option" aria-selected={i === active}
                   onMouseDown={(e) => { e.preventDefault(); void choose(c); }}
-                  className="px-3 py-2 min-h-11 flex items-center justify-between gap-3 cursor-pointer text-[13px]"
+                  className="px-3 py-2 min-h-11 flex items-center justify-between gap-3 cursor-pointer text-[14px]"
                   style={{ background: i === active ? "var(--color-svc-accent-soft)" : undefined, color: "var(--color-svc-text)" }}
                 >
                   <span className="min-w-0">
                     <span className="block truncate">{c.name}</span>
-                    {c.kind === "package" ? <span className="block truncate text-[11.5px]" style={MUTED}>Package · {peso(c.unitPriceCents)}</span> : null}
+                    {c.kind === "package" ? <span className="block truncate text-[12px]" style={MUTED}>Package · {peso(c.unitPriceCents)}</span> : null}
                   </span>
                   <span className="shrink-0 text-[12px]" style={MUTED}>
                     {c.kind === "package" ? "" : peso(c.unitPriceCents)}
@@ -546,7 +546,7 @@ function BlankRow({
             {ITEM_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
           </select>
           {vatEnabled ? (
-            <label className="inline-flex items-center gap-1.5 text-[11.5px] min-h-8 cursor-pointer" style={DIM}>
+            <label className="inline-flex items-center gap-1.5 text-[12px] min-h-11 cursor-pointer" style={DIM}>
               <input type="checkbox" checked={taxable} onChange={(e) => setTaxable(e.target.checked)} aria-label={`VAT applies to new ${noun}`} />
               VAT
             </label>
@@ -563,8 +563,8 @@ function BlankRow({
         </span>
       </Cell>
       <div className="flex items-center justify-between gap-2 col-span-2 min-[960px]:contents">
-        <span className="min-[960px]:text-right svc-num text-[13px]" style={desc.trim() ? undefined : MUTED}>
-          <span className="min-[960px]:hidden text-[11px] mr-2" style={MUTED}>Amount</span>{desc.trim() ? <Money cents={amount} /> : "—"}
+        <span className="min-[960px]:text-right svc-num text-[14px]" style={desc.trim() ? undefined : MUTED}>
+          <span className="min-[960px]:hidden text-[12px] mr-2" style={MUTED}>Amount</span>{desc.trim() ? <Money cents={amount} /> : "—"}
         </span>
         <button
           type="button" aria-label={`Add ${noun}`} onClick={() => { void commit(true); }}

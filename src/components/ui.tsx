@@ -17,21 +17,22 @@ export function Modal({
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade-in" onClick={onClose} />
+    <div className="adm-shell !bg-transparent fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={onClose} />
       <div
-        className={`relative w-full ${wide ? "max-w-2xl" : "max-w-md"} max-h-[92vh] overflow-y-auto thin-scroll anim-sheet p-6 sm:p-7 sm:rounded-2xl rounded-t-2xl ${
-          dark ? "bg-panel text-chrome border border-white/10 shadow-2xl" : "bg-parchment text-ink border border-white/10 shadow-2xl"
+        role="dialog" aria-modal="true" aria-label={title}
+        className={`relative w-full ${wide ? "max-w-2xl" : "max-w-md"} max-h-[92vh] overflow-y-auto thin-scroll anim-sheet p-6 sm:p-7 sm:rounded-[14px] rounded-t-[14px] ${
+          dark ? "bg-panel text-chrome border border-slate-600/60 shadow-2xl" : "bg-parchment text-ink border border-slate-600/60 shadow-2xl"
         }`}
       >
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between gap-3 mb-5">
           <h3 className={`font-serif text-xl ${dark ? "text-white" : "text-ink"}`}>{title}</h3>
           <button
             onClick={onClose}
-            className={`p-1.5 rounded-lg transition ${dark ? "hover:bg-white/10 text-mist" : "hover:bg-white/10 text-mist"}`}
+            className="h-11 w-11 -mr-2 flex items-center justify-center rounded-[10px] transition cursor-pointer hover:bg-white/10 text-mist hover:text-white"
             aria-label="Close"
           >
-            <X size={17} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
         {children}
@@ -88,10 +89,11 @@ export function Drawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={onClose} />
       <div
+        role="dialog" aria-modal="true"
         className={`absolute right-0 top-0 h-full w-full sm:max-w-xl overflow-y-auto thin-scroll anim-drawer shadow-2xl ${
-          dark ? "bg-[#0d1116] text-chrome border-l border-white/10" : "bg-white text-ink border-l border-slate-200"
+          dark ? "adm-shell !bg-panel text-chrome border-l border-slate-600/60" : "bg-white text-ink border-l border-slate-200"
         }`}
       >
         {children}
@@ -103,7 +105,7 @@ export function Drawer({
 export function Field({ label, children, dark = true }: { label: string; children: ReactNode; dark?: boolean }) {
   return (
     <label className="block">
-      <span className={`block text-[11px] uppercase tracking-[0.14em] mb-1.5 ${dark ? "text-mist" : "text-smoke"}`}>
+      <span className={`block text-xs font-medium uppercase tracking-[0.08em] mb-1.5 ${dark ? "text-mist" : "text-smoke"}`}>
         {label}
       </span>
       {children}
@@ -112,7 +114,7 @@ export function Field({ label, children, dark = true }: { label: string; childre
 }
 
 export function Spinner({ className = "" }: { className?: string }) {
-  return <Loader2 size={16} className={`animate-spin ${className}`} />;
+  return <Loader2 size={16} aria-hidden="true" className={`animate-spin motion-reduce:animate-none ${className}`} />;
 }
 
 export function EmptyState({
@@ -122,13 +124,15 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center text-center py-14 px-6 rounded-2xl border border-dashed ${
-        dark ? "border-white/10 text-mist" : "border-slate-200 text-smoke"
+      className={`flex flex-col items-center justify-center text-center py-12 px-6 rounded-[14px] border border-dashed ${
+        dark ? "border-slate-600 text-mist" : "border-slate-300 text-smoke"
       }`}
     >
-      <Inbox size={26} className="mb-3 opacity-50" strokeWidth={1.5} />
-      <p className={`text-sm font-medium ${dark ? "text-chrome" : "text-ink"}`}>{title}</p>
-      {body && <p className="text-xs mt-1 max-w-xs opacity-70">{body}</p>}
+      <span className={`mb-3 flex h-12 w-12 items-center justify-center rounded-full ${dark ? "bg-deepslate" : "bg-slate-100"}`}>
+        <Inbox size={22} strokeWidth={1.5} aria-hidden="true" />
+      </span>
+      <p className={`text-base font-medium ${dark ? "text-chrome" : "text-ink"}`}>{title}</p>
+      {body && <p className="text-sm mt-1 max-w-xs">{body}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

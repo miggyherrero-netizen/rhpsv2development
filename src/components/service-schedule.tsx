@@ -75,13 +75,13 @@ export default function ScheduleClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1500px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Schedule
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {fmtDate(board.from)} – {fmtDate(addDays(board.from, 6))} · drag a visit to reschedule
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function ScheduleClient({
                       }}
                     >
                       <p
-                        className="text-[10.5px] uppercase tracking-[0.14em]"
+                        className="text-[12px] uppercase tracking-[0.14em]"
                         style={{ color: isToday ? TONE_TEXT.azure : "var(--color-svc-text-faint)" }}
                       >
                         {d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Manila" })}
@@ -146,7 +146,7 @@ export default function ScheduleClient({
                   {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
                     <div
                       key={i}
-                      className="absolute right-2 text-[11px] svc-num whitespace-nowrap -translate-y-1/2"
+                      className="absolute right-2 text-[12px] svc-num whitespace-nowrap -translate-y-1/2"
                       style={{ top: i * HOUR_PX, color: "var(--color-svc-text-faint)" }}
                     >
                       {i === 0 ? "" : fmtHourShort(DAY_START + i * 60)}
@@ -207,14 +207,14 @@ export default function ScheduleClient({
                                 style={{ background: TONE_BAR[tone] }}
                               />
                               <div className="min-w-0 pl-1.5">
-                                <p className="text-[11.5px] font-medium truncate" style={{ color: "var(--color-svc-text)" }}>
+                                <p className="text-[12px] font-medium truncate" style={{ color: "var(--color-svc-text)" }}>
                                   {fmtMinuteOfDay(startMin)} · {job.customerName}
                                 </p>
-                                <p className="text-[10.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
+                                <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>
                                   {job.title}
                                 </p>
                                 {job.technicianName && (
-                                  <p className="text-[10px] mt-0.5 inline-flex items-center gap-1 truncate">
+                                  <p className="text-[12px] mt-0.5 inline-flex items-center gap-1 truncate">
                                     <Dot color={job.technicianColor ?? "#64748b"} size={5} />
                                     <span style={{ color: "var(--color-svc-text-faint)" }}>{job.technicianName}</span>
                                   </p>
@@ -244,7 +244,7 @@ export default function ScheduleClient({
         <SectionCard
           title="Unscheduled"
           action={
-            <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+            <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
               {board.unscheduled.length}
             </span>
           }
@@ -260,21 +260,21 @@ export default function ScheduleClient({
               {board.unscheduled.map((job) => (
                 <div key={job.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/service/jobs/${job.id}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                    <Link href={`/service/jobs/${job.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
                       {job.title}
                     </Link>
                     <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>{job.status.replace(/_/g, " ")}</Chip>
                   </div>
-                  <p className="text-[11.5px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>
+                  <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>
                     {job.customerName} · {SERVICE_TYPE_LABEL[job.serviceType] ?? job.serviceType}
                   </p>
-                  <div className="flex gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {days.slice(0, 7).map((d, i) => (
                       <button
                         key={d.toISOString()}
                         disabled={pending}
                         onClick={() => move(job.id, i, 9 * 60)}
-                        className="px-2 py-1 rounded-lg text-[10.5px] transition hover:brightness-125"
+                        className="min-w-11 min-h-11 rounded-[10px] text-[13px] font-medium transition-colors hover:brightness-125 disabled:opacity-50"
                         style={{ background: "var(--color-svc-surface-2)", color: "var(--color-svc-text-dim)" }}
                         title={`Schedule on ${fmtDate(d)} at 9:00 AM`}
                       >
@@ -287,7 +287,7 @@ export default function ScheduleClient({
             </div>
           )}
           <div
-            className="px-4 py-3 text-[11.5px] flex items-center gap-2"
+            className="px-4 py-3 text-[12px] flex items-center gap-2"
             style={{ color: "var(--color-svc-text-faint)", borderTop: "1px solid var(--color-svc-border)" }}
           >
             <Inbox size={13} /> Click a weekday to drop it at 9:00 AM, then drag to fine-tune.

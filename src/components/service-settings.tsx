@@ -155,13 +155,13 @@ export default function SettingsClient({
   return (
     <div className={`px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6 ${dirty ? "pb-28" : ""}`}>
       <header>
-        <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+        <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
           Home Service
         </p>
         <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
           Settings
         </h1>
-        <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+        <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
           Numbering, tax, crew rates, and the price book used on every visit
         </p>
       </header>
@@ -216,7 +216,7 @@ export default function SettingsClient({
               </Field>
             </div>
           ) : (
-            <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+            <p className="text-[13px]" style={{ color: "var(--color-svc-text-faint)" }}>
               VAT is off — new invoices carry no tax. Turn it on to set the label and rate.
             </p>
           )}
@@ -311,7 +311,7 @@ export default function SettingsClient({
                       />
                     </>
                   ) : (
-                    <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>Closed</span>
+                    <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>Closed</span>
                   )}
                 </div>
               );
@@ -331,13 +331,13 @@ export default function SettingsClient({
           className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:left-60 z-30 border-t px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 anim-sheet"
           style={{ background: "var(--color-svc-surface)", borderColor: "var(--color-svc-border-strong)", boxShadow: "0 -10px 30px rgba(0,0,0,0.35)" }}
         >
-          <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+          <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>
             <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: "var(--color-svc-warn)" }} />
             You have unsaved changes{changedSections.length ? <span style={{ color: "var(--color-svc-text-dim)" }}> in {changedSections.join(", ")}</span> : null}
           </p>
           <div className="flex items-center gap-2">
-            <GhostButton onClick={discard} className="!min-h-10">Discard</GhostButton>
-            <PrimaryButton pending={pending} onClick={saveBusiness} className="!min-h-10">
+            <GhostButton onClick={discard} className="!min-h-11">Discard</GhostButton>
+            <PrimaryButton pending={pending} onClick={saveBusiness} className="!min-h-11">
               <Building2 size={14} /> Save changes
             </PrimaryButton>
           </div>
@@ -365,13 +365,13 @@ export default function SettingsClient({
               <div key={t.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <span className="w-3 h-3 rounded-full" style={{ background: t.color }} />
                 <div className="min-w-[160px] flex-1">
-                  <p className="text-[13.5px]" style={{ color: "var(--color-svc-text)" }}>{t.name}</p>
-                  <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                  <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{t.name}</p>
+                  <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                     {t.title}
                     {t.phone ? ` · ${t.phone}` : ""}
                   </p>
                 </div>
-                <label className="text-[11.5px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
+                <label className="text-[12px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
                   Cost
                   <UnitInput
                     type="number"
@@ -382,7 +382,7 @@ export default function SettingsClient({
                     className="input-svc !w-24 !py-1 !px-2 text-[12px]"
                   />
                 </label>
-                <label className="text-[11.5px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
+                <label className="text-[12px] inline-flex items-center gap-1.5" style={{ color: "var(--color-svc-text-dim)" }}>
                   Charge
                   <UnitInput
                     type="number"
@@ -395,7 +395,7 @@ export default function SettingsClient({
                 </label>
                 <button
                   onClick={() => run(() => updateTechnician(t.id, { active: !t.active }))}
-                  className="text-[11.5px]"
+                  className="text-[12px] min-h-11 px-1"
                 >
                   {t.active ? <Chip tone="success">active</Chip> : <Chip tone="slate">inactive</Chip>}
                 </button>
@@ -421,12 +421,12 @@ export default function SettingsClient({
         <SectionCard title="Sample data" action={<span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>only offered while the workspace is empty</span>}>
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>Load a realistic sample dataset</p>
+              <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>Load a realistic sample dataset</p>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                 Four customers, two technicians, a price book, jobs, time logs, and expenses.
               </p>
             </div>
-            <GhostButton disabled={pending} onClick={() => run(() => seedServiceDemo())} className="inline-flex items-center gap-1.5 !min-h-10">
+            <GhostButton disabled={pending} onClick={() => run(() => seedServiceDemo())} className="inline-flex items-center gap-1.5 !min-h-11">
               <Database size={14} /> Load sample data
             </GhostButton>
           </div>
@@ -453,7 +453,7 @@ export default function SettingsClient({
 function SubHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <p
-      className="text-[11px] uppercase tracking-[0.1em] flex items-center gap-1.5"
+      className="text-[12px] uppercase tracking-[0.1em] flex items-center gap-1.5"
       style={{ color: "var(--color-svc-text-dim)" }}
     >
       {icon} {children}

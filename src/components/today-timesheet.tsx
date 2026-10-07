@@ -16,7 +16,7 @@ function PaymentControl({
 
   if (balanceCents <= 0) {
     return (
-      <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-[10.5px] uppercase tracking-wide bg-emerald-400/15 text-emerald-300 border-emerald-400/25">
+      <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs uppercase tracking-wide bg-emerald-400/15 text-emerald-300 border-emerald-400/25">
         <CheckCircle2 size={12} /> Paid in full
       </span>
     );
@@ -24,11 +24,11 @@ function PaymentControl({
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-rose-300 text-[10.5px] tnum">{peso(balanceCents)} owed</span>
+      <span className="text-rose-300 text-xs tnum">{peso(balanceCents)} owed</span>
       <input
-        type="number" min={1} inputMode="decimal" value={amount}
+        type="number" min={1} inputMode="decimal" aria-label="Payment amount in pesos" value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        className="w-16 bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-[11px] text-white tnum focus:outline-none focus:border-white/30"
+        className="w-16 bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-xs text-white tnum focus:outline-none focus:border-white/30"
       />
       <button
         disabled={busy}
@@ -36,7 +36,7 @@ function PaymentControl({
           const cents = Math.round(parseFloat(amount) * 100);
           if (cents > 0) onPay(entryId, cents);
         }}
-        className="flex items-center gap-1 rounded-full px-2.5 py-1 border text-[10.5px] uppercase tracking-wide transition disabled:opacity-40 text-mist border-white/15 hover:text-white hover:bg-white/[0.06]"
+        className="flex items-center gap-1 rounded-full px-2.5 py-1 border text-xs uppercase tracking-wide transition disabled:opacity-40 text-mist border-white/15 hover:text-white hover:bg-white/[0.06]"
       >
         {busy ? <Spinner className="w-3 h-3" /> : <HandCoins size={12} />} Pay
       </button>
@@ -91,19 +91,19 @@ export default function TodayTimesheet({ initial }: { initial: TimesheetWorkerSu
               <Avatar name={s.name} url={s.avatarUrl} size={36} />
               <div className="flex-1">
                 <p className="text-white text-[14px] font-medium">{s.name}</p>
-                <p className="text-mist text-[11px] mt-0.5">{fmtDuration(s.totalMinutesToday * 60_000)} today</p>
+                <p className="text-mist text-xs mt-0.5">{fmtDuration(s.totalMinutesToday * 60_000)} today</p>
               </div>
               <div className="text-right">
                 <p className="text-emerald-300 font-medium text-[15px] tnum">{peso(s.totalEarnedCentsToday)}</p>
-                {s.totalBalanceCents > 0 && <p className="text-rose-300 text-[10.5px] tnum mt-0.5">{peso(s.totalBalanceCents)} owed total</p>}
+                {s.totalBalanceCents > 0 && <p className="text-rose-300 text-xs tnum mt-0.5">{peso(s.totalBalanceCents)} owed total</p>}
               </div>
             </div>
             <ul className="mt-3 space-y-2.5 pl-[48px]">
               {s.entries.map((e) => (
-                <li key={e.entryId} className="text-[11.5px]">
+                <li key={e.entryId} className="text-xs">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <span className="tnum text-mist">
-                      {!e.isToday && <span className="text-mist/60">{fmtDate(new Date(e.clockIn))} · </span>}
+                      {!e.isToday && <span className="text-mist">{fmtDate(new Date(e.clockIn))} · </span>}
                       {fmtTime(new Date(e.clockIn))} – {e.clockOut ? fmtTime(new Date(e.clockOut)) : "now"}
                     </span>
                     <div className="flex items-center gap-2.5 shrink-0">
@@ -114,14 +114,14 @@ export default function TodayTimesheet({ initial }: { initial: TimesheetWorkerSu
                           entryId={e.entryId} balanceCents={e.balanceCents} busy={busyId === e.entryId} onPay={pay}
                         />
                       ) : (
-                        <span className="text-mist/50 text-[10.5px] uppercase tracking-wide">Clock out first</span>
+                        <span className="text-mist text-xs uppercase tracking-wide">Clock out first</span>
                       )}
                     </div>
                   </div>
                   {e.breaks.length > 0 && (
                     <ul className="mt-1.5 space-y-1">
                       {e.breaks.map((b, i) => (
-                        <li key={i} className={`flex items-center gap-1.5 text-[10.5px] ${b.long ? "text-rose-300" : "text-amber-300/80"}`}>
+                        <li key={i} className={`flex items-center gap-1.5 text-xs ${b.long ? "text-rose-300" : "text-amber-300/80"}`}>
                           {b.long ? <AlertTriangle size={10.5} /> : <Coffee size={10.5} />}
                           <span className="tnum">
                             {fmtTime(new Date(b.startedAt))} – {b.endedAt ? fmtTime(new Date(b.endedAt)) : "not back yet"}
