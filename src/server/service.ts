@@ -33,6 +33,8 @@ import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } fro
 import { isBatchCustomer } from "@/lib/service-reports";
 import { completeEntriesForJob, ensureRecallEntry, releaseEntriesForJob } from "@/server/service-waitlist-core";
 import { getServiceSettings } from "@/server/service-data";
+import { recordFinanceHistory, type FinanceHistoryEntry } from "@/server/service-finance-history";
+import { describeChange, diffFields, dropSameDay, pesoExact, type FinanceChanges } from "@/lib/service-finance-history";
 import { invoiceCode, jobCode } from "@/lib/service";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -60,6 +62,44 @@ const RECEIPT_MAX_CHARS = 3_200_000;
 /** Every mutation revalidates the whole workspace so lists, boards, and totals agree. */
 function touch() {
   revalidatePath("/service", "layout");
+}
+
+/* ---- Finance history helpers (best-effort: they can never fail a money action) ---- */
+
+/** Runs a history write; any error (missing table, lookup failure) is logged and swallowed. */
+async function safeHistory(fn: () => Promise<void>): Promise<void> {
+  try { await fn(); } catch (e) { console.error("[finance-history] skipped:", e instanceof Error ? e.message : e); }
+}
+const actorOf = (user: { name?: string | null }) => user.name || "Owner";
+const invoiceRow = async (id: string) => (await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, id)).limit(1))[0] ?? null;
+type InvoiceHead = { invoiceNumber: number; issueDate: Date };
+async function invLabel(userId: string, inv: InvoiceHead): Promise<string> {
+  const settings = await getServiceSettings(userId);
+  return invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate);
+}
+/** Swaps customer / job / piano ids in a diff for readable names (falls back to the raw id). */
+async function nameRefs(changes: FinanceChanges): Promise<FinanceChanges> {
+  const name = async (key: string, id: unknown): Promise<unknown> => {
+    if (typeof id !== "string") return id;
+    if (key === "customerId") {
+      const [r] = await db.select({ n: serviceCustomers.name }).from(serviceCustomers).where(eq(serviceCustomers.id, id)).limit(1);
+      return r?.n ?? id;
+    }
+    if (key === "jobId") {
+      const [r] = await db.select({ n: serviceJobs.jobNumber, t: serviceJobs.title, d: serviceJobs.createdAt }).from(serviceJobs).where(eq(serviceJobs.id, id)).limit(1);
+      return r ? `${jobCode("WO", r.n, r.d)} ${r.t}` : id;
+    }
+    if (key === "pianoId") {
+      const [r] = await db.select({ b: pianos.brand, m: pianos.model }).from(pianos).where(eq(pianos.id, id)).limit(1);
+      return r ? `${r.b} ${r.m}` : id;
+    }
+    return id;
+  };
+  const out: FinanceChanges = {};
+  for (const [k, c] of Object.entries(changes)) {
+    out[k] = ["customerId", "jobId", "pianoId"].includes(k) ? { from: await name(k, c.from), to: await name(k, c.to) } : c;
+  }
+  return out;
 }
 
 /* ============================================================
@@ -1199,6 +1239,18 @@ async function createInvoiceRows(input: {
 
   await recalcInvoice(invoice!.id);
 
+  await safeHistory(async () => {
+    const fresh = await invoiceRow(invoice!.id);
+    if (!fresh) return;
+    const changes: FinanceChanges = { totalCents: { from: null, to: fresh.totalCents }, itemCount: { from: null, to: input.items.length } };
+    if (fresh.discountCents > 0) changes.discountCents = { from: null, to: fresh.discountCents };
+    const label = await invLabel(user.id, fresh);
+    await recordFinanceHistory({
+      entityType: "invoice", entityId: fresh.id, invoiceId: fresh.id, jobId: fresh.jobId, action: "create",
+      summary: `${describeChange("invoice", "create", label)} (total ${pesoExact(fresh.totalCents)})`, changes, actorName: actorOf(user),
+    });
+  });
+
   if (input.jobId) {
     // Only a finished job becomes "invoiced"; billing a lead/quote/scheduled job early leaves its status alone.
     await db
@@ -1292,9 +1344,10 @@ export async function updateInvoice(
     taxRateBps?: number; discount?: number; customerId?: string;
   },
 ): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const issue = patch.issueDate !== undefined ? optionalDate(patch.issueDate) : undefined;
   if (patch.issueDate !== undefined && !issue) return fail("Pick a valid issue date.");
+  const before = await invoiceRow(id).catch(() => null);
   await db
     .update(serviceInvoices)
     .set({
@@ -1309,6 +1362,17 @@ export async function updateInvoice(
     })
     .where(eq(serviceInvoices.id, id));
   await recalcInvoice(id);
+  await safeHistory(async () => {
+    const after = await invoiceRow(id);
+    if (!before || !after) return;
+    const changes = dropSameDay(diffFields(before, after, ["discountCents", "taxRateBps", "dueDate", "issueDate", "customerId", "notes", "terms", "totalCents"]), ["issueDate", "dueDate"]);
+    if (!Object.keys(changes).length) return;
+    const named = await nameRefs(changes);
+    await recordFinanceHistory({
+      entityType: "invoice", entityId: id, invoiceId: id, jobId: after.jobId, action: "update",
+      summary: describeChange("invoice", "update", await invLabel(user.id, after), named), changes: named, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
@@ -1317,13 +1381,14 @@ export type InvoiceItemInput = { description: string; details?: string | null; q
 
 /** Adds one or more invoice lines in one transaction. Returns the new ids, in order. */
 export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInput[]): Promise<Result<{ ids: string[]; positions: number[] }>> {
-  await requireUser();
+  const user = await requireUser();
   if (!Array.isArray(inputs) || inputs.length === 0) return fail("Nothing to add.");
   if (inputs.length > MAX_LINES_PER_BATCH) return fail("Too many lines at once.");
   if (inputs.some((i) => !str(i.description, 300))) return fail("Describe the line item.");
   const [inv] = await db.select({ id: serviceInvoices.id, voidedAt: serviceInvoices.voidedAt }).from(serviceInvoices).where(eq(serviceInvoices.id, invoiceId)).limit(1);
   if (!inv) return fail("Invoice not found.");
   if (inv.voidedAt) return fail("This invoice is void — reopen it before changing lines.");
+  const totalBefore = await invoiceRow(invoiceId).catch(() => null);
   const ids = await db.transaction(async (tx) => {
     const [{ max }] = await tx
       .select({ max: sql<number>`coalesce(max(${serviceInvoiceItems.position}), 0)::int` })
@@ -1347,6 +1412,24 @@ export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInpu
     return out;
   });
   await recalcInvoice(invoiceId);
+  await safeHistory(async () => {
+    const after = await invoiceRow(invoiceId);
+    if (!after) return;
+    const label = await invLabel(user.id, after);
+    const found = await db.select().from(serviceInvoiceItems).where(inArray(serviceInvoiceItems.id, ids.map((r) => r.id)));
+    await recordFinanceHistory(found.map((it) => {
+      const changes: FinanceChanges = {
+        description: { from: null, to: it.description }, qty: { from: null, to: it.qty },
+        unitPriceCents: { from: null, to: it.unitPriceCents }, taxable: { from: null, to: it.taxable },
+      };
+      if (found.length === 1 && totalBefore) changes.totalCents = { from: totalBefore.totalCents, to: after.totalCents };
+      return {
+        entityType: "invoice_item" as const, entityId: it.id, invoiceId, jobId: after.jobId, action: "create" as const,
+        summary: `${describeChange("invoice_item", "create", `"${it.description}" on ${label}`)} (${it.qty} x ${pesoExact(it.unitPriceCents)})`,
+        changes, actorName: actorOf(user),
+      };
+    }));
+  });
   touch();
   return ok({ ids: ids.map((r) => r.id), positions: ids.map((r) => r.position) });
 }
@@ -1360,9 +1443,10 @@ export async function updateInvoiceItem(
   id: string,
   patch: { description?: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean },
 ): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const [item] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
   if (!item) return fail("Line item not found.");
+  const invBefore = await invoiceRow(item.invoiceId).catch(() => null);
   await db
     .update(serviceInvoiceItems)
     .set({
@@ -1374,23 +1458,51 @@ export async function updateInvoiceItem(
     })
     .where(eq(serviceInvoiceItems.id, id));
   await recalcInvoice(item.invoiceId);
+  await safeHistory(async () => {
+    const [now] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
+    const invAfter = await invoiceRow(item.invoiceId);
+    if (!now || !invAfter) return;
+    const changes = diffFields(item, now, ["description", "details", "qty", "unitPriceCents", "taxable"]);
+    if (!Object.keys(changes).length) return;
+    if (invBefore && invBefore.totalCents !== invAfter.totalCents) changes.totalCents = { from: invBefore.totalCents, to: invAfter.totalCents };
+    await recordFinanceHistory({
+      entityType: "invoice_item", entityId: id, invoiceId: item.invoiceId, jobId: invAfter.jobId, action: "update",
+      summary: describeChange("invoice_item", "update", `"${now.description}" on ${await invLabel(user.id, invAfter)}`, changes), changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
 
 export async function deleteInvoiceItem(id: string): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const [item] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
   if (!item) return fail("Line item not found.");
+  const invBefore = await invoiceRow(item.invoiceId).catch(() => null);
   await db.delete(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id));
   await recalcInvoice(item.invoiceId);
+  await safeHistory(async () => {
+    const invAfter = await invoiceRow(item.invoiceId);
+    if (!invAfter) return;
+    const changes: FinanceChanges = {
+      description: { from: item.description, to: null }, qty: { from: item.qty, to: null },
+      unitPriceCents: { from: item.unitPriceCents, to: null }, taxable: { from: item.taxable, to: null },
+    };
+    if (invBefore && invBefore.totalCents !== invAfter.totalCents) changes.totalCents = { from: invBefore.totalCents, to: invAfter.totalCents };
+    await recordFinanceHistory({
+      entityType: "invoice_item", entityId: id, invoiceId: item.invoiceId, jobId: invAfter.jobId, action: "delete",
+      summary: `${describeChange("invoice_item", "delete", `"${item.description}" on ${await invLabel(user.id, invAfter)}`)} (${item.qty} x ${pesoExact(item.unitPriceCents)})`,
+      changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
 
 export async function setInvoiceStatus(id: string, status: string): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const next = oneOf(status, ["draft", "sent", "void"], "draft");
+  const before = await invoiceRow(id).catch(() => null);
   await db
     .update(serviceInvoices)
     .set({
@@ -1400,6 +1512,16 @@ export async function setInvoiceStatus(id: string, status: string): Promise<Resu
     })
     .where(eq(serviceInvoices.id, id));
   await recalcInvoice(id);
+  await safeHistory(async () => {
+    const after = await invoiceRow(id);
+    if (!before || !after) return;
+    const changes = diffFields(before, after, ["status"]);
+    if (!changes.status) return;
+    await recordFinanceHistory({
+      entityType: "invoice", entityId: id, invoiceId: id, jobId: after.jobId, action: "status",
+      summary: describeChange("invoice", "status", await invLabel(user.id, after), changes), changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
@@ -1410,7 +1532,7 @@ export async function recordPayment(input: {
   /** Needed when the invoice is still a draft: records the payment AND marks it sent in one step. */
   markSent?: boolean;
 }): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const amountCents = moneyToCents(input.amount);
   if (amountCents <= 0) return fail("Enter a payment amount above zero.");
   const [target] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, input.invoiceId)).limit(1);
@@ -1421,17 +1543,38 @@ export async function recordPayment(input: {
     await db.update(serviceInvoices).set({ sentAt: new Date(), updatedAt: new Date() }).where(eq(serviceInvoices.id, input.invoiceId));
   }
   const receivedAt = optionalDate(input.receivedAt) ?? new Date();
-  await db.insert(servicePayments).values({
+  const [paymentRow] = await db.insert(servicePayments).values({
     invoiceId: input.invoiceId,
     amountCents,
     method: oneOf(input.method, PAYMENT_METHODS.map((m) => m.key), "cash"),
     reference: str(input.reference, 120),
     receivedAt,
     note: str(input.note, 500),
-  });
+  }).returning();
   await recalcInvoice(input.invoiceId);
 
   const [invoice] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, input.invoiceId)).limit(1);
+  await safeHistory(async () => {
+    if (!paymentRow || !invoice) return;
+    const label = await invLabel(user.id, invoice);
+    const changes: FinanceChanges = {
+      amountCents: { from: null, to: paymentRow.amountCents }, method: { from: null, to: paymentRow.method },
+      receivedAt: { from: null, to: paymentRow.receivedAt.toISOString() },
+    };
+    if (paymentRow.reference) changes.reference = { from: null, to: paymentRow.reference };
+    const rows: FinanceHistoryEntry[] = [{
+      entityType: "payment", entityId: paymentRow.id, invoiceId: invoice.id, jobId: invoice.jobId, action: "create",
+      summary: `${describeChange("payment", "create", `${pesoExact(paymentRow.amountCents)} on ${label}`)} (${paymentRow.method})`, changes, actorName: actorOf(user),
+    }];
+    if (invoice.status !== target.status) {
+      const sc = { status: { from: target.status, to: invoice.status } };
+      rows.push({
+        entityType: "invoice", entityId: invoice.id, invoiceId: invoice.id, jobId: invoice.jobId, action: "status",
+        summary: describeChange("invoice", "status", label, sc), changes: sc, actorName: actorOf(user),
+      });
+    }
+    await recordFinanceHistory(rows);
+  });
   if (invoice?.jobId) {
     await db.insert(serviceJobEvents).values({
       jobId: invoice.jobId,
@@ -1446,11 +1589,34 @@ export async function recordPayment(input: {
 }
 
 export async function deletePayment(id: string): Promise<Result> {
-  await requireUser();
+  const user = await requireUser();
   const [payment] = await db.select().from(servicePayments).where(eq(servicePayments.id, id)).limit(1);
   if (!payment) return fail("Payment not found.");
+  const invBefore = await invoiceRow(payment.invoiceId).catch(() => null);
   await db.delete(servicePayments).where(eq(servicePayments.id, id));
   await recalcInvoice(payment.invoiceId);
+  await safeHistory(async () => {
+    const inv = await invoiceRow(payment.invoiceId);
+    if (!inv) return;
+    const label = await invLabel(user.id, inv);
+    const changes: FinanceChanges = {
+      amountCents: { from: payment.amountCents, to: null }, method: { from: payment.method, to: null },
+      receivedAt: { from: payment.receivedAt.toISOString(), to: null },
+    };
+    if (payment.reference) changes.reference = { from: payment.reference, to: null };
+    const rows: FinanceHistoryEntry[] = [{
+      entityType: "payment", entityId: id, invoiceId: inv.id, jobId: inv.jobId, action: "delete",
+      summary: `${describeChange("payment", "delete", `${pesoExact(payment.amountCents)} on ${label}`)} (${payment.method})`, changes, actorName: actorOf(user),
+    }];
+    if (invBefore && invBefore.status !== inv.status) {
+      const sc = { status: { from: invBefore.status, to: inv.status } };
+      rows.push({
+        entityType: "invoice", entityId: inv.id, invoiceId: inv.id, jobId: inv.jobId, action: "status",
+        summary: describeChange("invoice", "status", label, sc), changes: sc, actorName: actorOf(user),
+      });
+    }
+    await recordFinanceHistory(rows);
+  });
   touch();
   return ok();
 }
@@ -1463,7 +1629,25 @@ export async function deleteInvoice(id: string, confirmCode: string): Promise<Re
   if (!confirmMatches(confirmCode ?? "", invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate))) {
     return fail("Type the invoice number exactly to confirm.");
   }
+  const [nItems, nPayments] = await Promise.all([
+    db.select({ id: serviceInvoiceItems.id }).from(serviceInvoiceItems).where(eq(serviceInvoiceItems.invoiceId, id)).then((r) => r.length).catch(() => 0),
+    db.select({ id: servicePayments.id }).from(servicePayments).where(eq(servicePayments.invoiceId, id)).then((r) => r.length).catch(() => 0),
+  ]);
   await db.delete(serviceInvoices).where(eq(serviceInvoices.id, id));
+  await safeHistory(async () => {
+    const changes: FinanceChanges = {
+      status: { from: inv.status, to: null }, subtotalCents: { from: inv.subtotalCents, to: null },
+      discountCents: { from: inv.discountCents, to: null }, taxCents: { from: inv.taxCents, to: null },
+      totalCents: { from: inv.totalCents, to: null }, amountPaidCents: { from: inv.amountPaidCents, to: null },
+      itemCount: { from: nItems, to: null }, paymentCount: { from: nPayments, to: null },
+    };
+    const label = invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate);
+    await recordFinanceHistory({
+      entityType: "invoice", entityId: id, invoiceId: id, jobId: inv.jobId, action: "delete",
+      summary: `${describeChange("invoice", "delete", label)} (total ${pesoExact(inv.totalCents)}, paid ${pesoExact(inv.amountPaidCents)}, ${nItems} lines, ${nPayments} payments)`,
+      changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
@@ -1503,8 +1687,13 @@ function validReceipt(value: unknown): { ok: true; url: string | null } | { ok: 
   return { ok: true, url: value };
 }
 
+const EXPENSE_HISTORY_FIELDS = [
+  "description", "category", "kind", "amountCents", "spentAt", "jobId", "pianoId", "vendor", "method", "reimbursable", "note",
+] as const;
+
 export async function createExpense(input: ExpenseInput): Promise<Result<{ id: string }>> {
-  if (!(await requireFinance())) return FINANCE_DENIED;
+  const user = await requireFinance();
+  if (!user) return FINANCE_DENIED;
   const description = str(input.description, 300);
   if (!description) return fail("Describe the expense.");
   const receipt = validReceipt(input.receiptUrl);
@@ -1533,6 +1722,18 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
       receiptUrl: receipt.url,
     })
     .returning({ id: serviceExpenses.id });
+  await safeHistory(async () => {
+    const [e] = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, row!.id)).limit(1);
+    if (!e) return;
+    const changes = await nameRefs({
+      ...diffFields({} as Record<string, unknown>, e, EXPENSE_HISTORY_FIELDS),
+      ...(e.receiptUrl ? { receiptReplaced: { from: false, to: true } } : {}),
+    });
+    await recordFinanceHistory({
+      entityType: "expense", entityId: e.id, jobId: e.jobId, action: "create",
+      summary: `${describeChange("expense", "create", `"${e.description}"`)} (${pesoExact(e.amountCents)})`, changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok({ id: row!.id });
 }
@@ -1547,8 +1748,10 @@ export async function getExpenseReceipt(id: string): Promise<Result<{ url: strin
 }
 
 export async function updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Result> {
-  if (!(await requireFinance())) return FINANCE_DENIED;
+  const user = await requireFinance();
+  if (!user) return FINANCE_DENIED;
   if (!id) return fail("Missing expense.");
+  const before = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1).then((r) => r[0] ?? null).catch(() => null);
   // A receipt is only replaced when a new photo is supplied; omitted/empty leaves the stored one alone.
   let newReceipt: string | undefined;
   if (patch.receiptUrl !== undefined && patch.receiptUrl !== null && patch.receiptUrl !== "") {
@@ -1584,6 +1787,18 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
       updatedAt: new Date(),
     })
     .where(eq(serviceExpenses.id, id));
+  await safeHistory(async () => {
+    const [after] = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1);
+    if (!before || !after) return;
+    const changes = dropSameDay(diffFields(before, after, EXPENSE_HISTORY_FIELDS), ["spentAt"]);
+    if (newReceipt) changes.receiptReplaced = { from: !!before.receiptUrl, to: true };
+    if (!Object.keys(changes).length) return;
+    const named = await nameRefs(changes);
+    await recordFinanceHistory({
+      entityType: "expense", entityId: id, jobId: after.jobId, action: "update",
+      summary: describeChange("expense", "update", `"${after.description}"`, named), changes: named, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
@@ -1611,8 +1826,18 @@ export async function setExpenseKinds(items: { id: string; kind: string; pianoId
 }
 
 export async function deleteExpense(id: string): Promise<Result> {
-  if (!(await requireFinance())) return FINANCE_DENIED;
+  const user = await requireFinance();
+  if (!user) return FINANCE_DENIED;
+  const before = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1).then((r) => r[0] ?? null).catch(() => null);
   await db.delete(serviceExpenses).where(eq(serviceExpenses.id, id));
+  await safeHistory(async () => {
+    if (!before) return;
+    const changes = await nameRefs(diffFields(before, {} as Record<string, unknown>, EXPENSE_HISTORY_FIELDS));
+    await recordFinanceHistory({
+      entityType: "expense", entityId: id, jobId: before.jobId, action: "delete",
+      summary: `${describeChange("expense", "delete", `"${before.description}"`)} (${pesoExact(before.amountCents)})`, changes, actorName: actorOf(user),
+    });
+  });
   touch();
   return ok();
 }
