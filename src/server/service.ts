@@ -1790,7 +1790,7 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
   await safeHistory(async () => {
     const [after] = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1);
     if (!before || !after) return;
-    const changes = diffFields(before, after, EXPENSE_HISTORY_FIELDS);
+    const changes = dropSameDay(diffFields(before, after, EXPENSE_HISTORY_FIELDS), ["spentAt"]);
     if (newReceipt) changes.receiptReplaced = { from: !!before.receiptUrl, to: true };
     if (!Object.keys(changes).length) return;
     const named = await nameRefs(changes);

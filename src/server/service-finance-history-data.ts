@@ -40,7 +40,9 @@ async function load(where: ReturnType<typeof eq> | ReturnType<typeof and>): Prom
     };
   } catch (e) {
     if (pgErrorCode(e) === "42P01") return { items: [], tableMissing: true };
-    throw e;
+    // Any other failure must not take the invoice or expenses page down: History just shows empty.
+    console.error("finance history read failed", e);
+    return { items: [], tableMissing: false };
   }
 }
 

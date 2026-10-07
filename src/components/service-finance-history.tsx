@@ -35,7 +35,7 @@ export default function FinanceHistoryList({ items, tableMissing }: { items: Fin
 function HistoryRow({ item }: { item: FinanceHistoryItem }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const entries = Object.entries(item.changes ?? {}).filter(([k]) => k !== "receiptReplaced" || true);
+  const entries = Object.entries(item.changes ?? {});
   const text = (
     <>
       <span className="block text-[12px] tnum" style={{ color: "var(--color-svc-text-dim)" }}>
