@@ -80,13 +80,13 @@ export default function TimeClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1300px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Time
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             Travel, on-site, and break minutes across the crew
           </p>
         </div>
@@ -112,14 +112,14 @@ export default function TimeClient({
               <div key={log.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <span className="w-2 h-2 rounded-full anim-pulse-soft" style={{ background: "var(--color-svc-warn)" }} />
                 <div className="flex-1 min-w-0">
-                  <Link href={`/service/jobs/${log.jobId}`} className="text-[13px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                  <Link href={`/service/jobs/${log.jobId}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
                     {log.jobTitle}
                   </Link>
-                  <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                  <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                     {log.customerName} · {log.technicianName ?? "Unassigned"} · since {fmtTime(new Date(log.startedAt))}
                   </p>
                 </div>
-                <span className="text-[13px] tnum" style={{ color: "var(--color-svc-warn)" }}>
+                <span className="text-[14px] tnum" style={{ color: "var(--color-svc-warn)" }}>
                   {fmtMinutes(elapsedMinutes(log.startedAt))}
                 </span>
                 <GhostButton disabled={pending} onClick={() => run(() => stopTimer(log.id))} className="inline-flex items-center gap-1.5">
@@ -140,27 +140,27 @@ export default function TimeClient({
               hint="Start timers from a job, or add time manually on the job screen."
             />
           ) : (
-            <div className="overflow-x-auto thin-scroll">
-              <table className="w-full text-left">
+            <div className="svc-table-wrap thin-scroll">
+              <table className="svc-table w-full text-left">
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
                     {["Date", "Technician", "Job", "Type", "Window", "Minutes", ""].map((h) => (
-                      <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                      <th key={h} className="px-5 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal">{h || <span className="sr-only">Actions</span>}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="svc-divide">
                   {logs.map((log) => (
                     <tr key={log.id} className="group hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-2.5 text-[12.5px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
+                      <td className="px-5 py-2.5 text-[13px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {fmtDate(new Date(log.startedAt))}
                       </td>
                       <td className="px-5 py-2.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+                        <span className="inline-flex items-center gap-1.5 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
                           <Dot color={log.technicianColor ?? "#64748b"} /> {log.technicianName ?? "Unassigned"}
                         </span>
                       </td>
-                      <td className="px-5 py-2.5 text-[12.5px] max-w-[220px] truncate">
+                      <td className="px-5 py-2.5 text-[13px] max-w-[220px] truncate">
                         <Link href={`/service/jobs/${log.jobId}`} className="hover:underline" style={{ color: "var(--color-svc-text)" }}>
                           {log.jobTitle}
                         </Link>
@@ -170,13 +170,13 @@ export default function TimeClient({
                         <Chip tone={log.kind === "work" ? "azure" : log.kind === "travel" ? "violet" : "slate"}>
                           {TIME_KIND_LABEL[log.kind] ?? log.kind}
                         </Chip>
-                        <p className="text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</p>
+                        <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{timeSourceLabel(log)}</p>
                       </td>
                       <td className="px-5 py-2.5 text-[12px] tnum whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {fmtTime(new Date(log.startedAt))}
                         {log.endedAt ? ` – ${fmtTime(new Date(log.endedAt))}` : " · running"}
                       </td>
-                      <td className="px-5 py-2.5 text-[13px] tnum" style={{ color: "var(--color-svc-text)" }}>
+                      <td className="px-5 py-2.5 text-[14px] tnum" style={{ color: "var(--color-svc-text)" }}>
                         {log.endedAt ? fmtMinutes(log.minutes) : fmtMinutes(elapsedMinutes(log.startedAt))}
                       </td>
                       <td className="px-5 py-2.5 text-right whitespace-nowrap">
@@ -215,17 +215,17 @@ export default function TimeClient({
               byTech.map((t) => (
                 <div key={t.id}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--color-svc-text)" }}>
+                    <span className="inline-flex items-center gap-1.5 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
                       <Dot color={t.color} /> {t.name}
                     </span>
-                    <span className="text-[11.5px] tnum" style={{ color: "var(--color-svc-text-dim)" }}>
+                    <span className="text-[12px] tnum" style={{ color: "var(--color-svc-text-dim)" }}>
                       {t.utilization}%
                     </span>
                   </div>
                   <div className="mt-1.5">
                     <Bar pct={((t.work + t.travel) / maxMinutes) * 100} color={t.color} />
                   </div>
-                  <p className="text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+                  <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
                     {fmtMinutes(t.work)} on site · {fmtMinutes(t.travel)} travel · {fmtMinutes(t.break)} break ·{" "}
                     {t.jobs} job{t.jobs === 1 ? "" : "s"}
                   </p>
@@ -236,7 +236,7 @@ export default function TimeClient({
         </SectionCard>
       </div>
 
-      <p className="text-[11.5px]" style={{ color: "var(--color-svc-text-faint)" }}>
+      <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
         Tip: tap Start travel / Arrived on <Link href="/service/today" className="inline-flex items-center min-h-11 px-1 hover:underline" style={{ color: TONE_TEXT.azure }}>Today</Link> — the
         travel and on-site minutes fill in by themselves.
       </p>

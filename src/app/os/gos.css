@@ -1,23 +1,98 @@
+/* Growth OS: light, high legibility, phone-first. Tokens are scoped to .gos.
+   Contrast (on --gos-surface #fff unless noted): ink 17.9, ink-dim 8.9, accent #047857 5.5 (white text on it 5.5),
+   blue #2563EB 5.2, danger #b42318 6.5, ok #166534 7.1. #059669 is decoration only (3.8). */
 .gos {
-  --gos-bg: #f7f7f6;
+  --gos-bg: #f6f8f7;
   --gos-surface: #ffffff;
-  --gos-ink: #161616;
-  --gos-ink-dim: #4a4a4a;
-  --gos-line: #e3e3e0;
-  --gos-black: #161616;
-  --gos-gold: #c9a24a;        /* only on black */
-  --gos-gold-text: #80601a;   /* gold text on light backgrounds */
-  --gos-focus: #1d4ed8;
+  --gos-ink: #14201b;
+  --gos-ink-dim: #44514b;
+  --gos-line: #d5ddd9;
+  --gos-line-strong: #8a9690;
+  --gos-accent: #047857;
+  --gos-accent-hover: #065f46;
+  --gos-accent-deco: #059669;
+  --gos-accent-soft: #e7f6ef;
+  --gos-blue: #2563eb;
+  --gos-blue-soft: #e8effd;
+  --gos-focus: #2563eb;
   --gos-danger: #b42318;
-  --gos-ok: #1f7a3a;
+  --gos-danger-soft: #fdecea;
+  --gos-ok: #166534;
+  /* legacy aliases kept so older markup keeps working */
+  --gos-black: var(--gos-accent);
+  --gos-gold: #ffffff;
+  --gos-gold-text: var(--gos-blue);
+  --gos-r-sm: 10px;
+  --gos-r-md: 14px;
+  --gos-r-lg: 20px;
+  --gos-s-1: 4px; --gos-s-2: 8px; --gos-s-3: 12px; --gos-s-4: 16px; --gos-s-6: 24px;
+  --gos-shadow: 0 1px 2px rgb(20 32 27 / 0.06), 0 1px 1px rgb(20 32 27 / 0.04);
   background: var(--gos-bg);
   color: var(--gos-ink);
   min-height: 100dvh;
   font-family: var(--font-gos-body), system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
 }
-.gos h1, .gos h2 { font-family: var(--font-gos-head), system-ui, sans-serif; }
-.gos :focus-visible { outline: 3px solid var(--gos-focus); outline-offset: 2px; }
+.gos h1, .gos h2 { font-family: var(--font-gos-head), system-ui, sans-serif; letter-spacing: -0.01em; line-height: 1.2; }
+.gos h1 { font-size: 1.75rem; font-weight: 700; }
+.gos button, .gos a, .gos select, .gos input, .gos textarea { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.gos button { cursor: pointer; }
+.gos :focus-visible { outline: 3px solid var(--gos-focus); outline-offset: 2px; border-radius: 6px; }
 .gos .gos-tap { min-height: 44px; min-width: 44px; }
-.gos .gos-card { background: var(--gos-surface); border: 1px solid var(--gos-line); border-radius: 14px; padding: 16px; }
-.gos .gos-input { width: 100%; min-height: 44px; border: 1px solid #9a9a96; border-radius: 10px; padding: 8px 12px; background: #fff; color: var(--gos-ink); }
-.gos .gos-btn-black { background: var(--gos-black); color: var(--gos-gold); border-radius: 999px; min-height: 44px; padding: 0 18px; font-weight: 600; }
+
+.gos .gos-card { background: var(--gos-surface); border: 1px solid var(--gos-line); border-radius: var(--gos-r-md); padding: var(--gos-s-4); box-shadow: var(--gos-shadow); }
+.gos a.gos-card:hover { border-color: var(--gos-accent); box-shadow: 0 2px 8px rgb(20 32 27 / 0.1); }
+.gos a.gos-card:active { background: var(--gos-accent-soft); }
+
+.gos .gos-input { width: 100%; min-height: 44px; border: 1.5px solid var(--gos-line-strong); border-radius: var(--gos-r-sm); padding: 8px 12px; background: #fff; color: var(--gos-ink); font: inherit; }
+.gos .gos-input::placeholder { color: #5b6862; opacity: 1; }
+.gos .gos-input:hover { border-color: var(--gos-ink-dim); }
+.gos .gos-input:focus-visible { outline-offset: 0; border-color: var(--gos-focus); }
+.gos .gos-input[aria-invalid="true"] { border-color: var(--gos-danger); }
+.gos .gos-input:disabled { background: #eef1ef; color: #5b6862; cursor: not-allowed; }
+
+/* Buttons: primary (filled emerald), ghost (outlined), chip (filter pill) */
+.gos .gos-btn, .gos .gos-btn-black, .gos .gos-btn-ghost, .gos .gos-chip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; min-width: 44px; padding: 0 18px; border-radius: 999px; font-weight: 700; line-height: 1.2; text-align: center;
+}
+.gos .gos-btn, .gos .gos-btn-black { background: var(--gos-accent); color: #fff; border: 1.5px solid var(--gos-accent); }
+.gos .gos-btn:hover, .gos .gos-btn-black:hover { background: var(--gos-accent-hover); border-color: var(--gos-accent-hover); }
+.gos .gos-btn:active, .gos .gos-btn-black:active { transform: translateY(1px); }
+.gos .gos-btn-ghost { background: #fff; color: var(--gos-ink); border: 1.5px solid var(--gos-line-strong); font-weight: 600; }
+.gos .gos-btn-ghost:hover { background: var(--gos-accent-soft); border-color: var(--gos-accent); }
+.gos .gos-btn-ghost:active { background: #d3eee1; }
+.gos .gos-btn-danger { color: var(--gos-danger); border-color: var(--gos-danger); }
+.gos .gos-btn-danger:hover { background: var(--gos-danger-soft); border-color: var(--gos-danger); }
+.gos .gos-chip { background: #fff; color: var(--gos-ink); border: 1.5px solid var(--gos-line-strong); font-weight: 600; }
+.gos .gos-chip:hover { background: var(--gos-accent-soft); border-color: var(--gos-accent); }
+.gos .gos-chip[aria-pressed="true"] { background: var(--gos-accent); border-color: var(--gos-accent); color: #fff; }
+.gos .gos-btn:disabled, .gos .gos-btn-black:disabled, .gos .gos-btn-ghost:disabled { background: #e3e8e5; border-color: #c4cdc8; color: #4f5b55; cursor: not-allowed; transform: none; }
+.gos .gos-link { color: var(--gos-blue); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.gos .gos-link:hover { color: #1d4ed8; }
+.gos .gos-link-danger { color: var(--gos-danger); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Status badges: always icon + text, never colour alone */
+.gos .gos-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 0.875rem; font-weight: 700; border: 1.5px solid currentColor; line-height: 1.4; }
+.gos .gos-badge-wait { color: var(--gos-ink-dim); background: #fff; }
+.gos .gos-badge-late { color: var(--gos-danger); background: var(--gos-danger-soft); }
+.gos .gos-badge-ok { color: var(--gos-ok); background: var(--gos-accent-soft); }
+.gos .gos-badge-info { color: #1e40af; background: var(--gos-blue-soft); }
+.gos .gos-tag { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--gos-line-strong); border-radius: 6px; padding: 0 8px; font-size: 0.875rem; background: #fff; }
+.gos .gos-tag-warn { border-color: var(--gos-danger); color: var(--gos-danger); background: var(--gos-danger-soft); }
+.gos .gos-late-edge { border-left: 5px solid var(--gos-danger); }
+
+.gos .gos-toast { background: #14201b; color: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.gos .gos-toast button { color: #86efac; }
+.gos .gos-nav-item { border-radius: var(--gos-r-md); font-weight: 600; color: var(--gos-ink-dim); }
+.gos .gos-nav-item:hover { background: #fff; color: var(--gos-ink); }
+.gos .gos-nav-item[aria-current="page"] { background: var(--gos-accent); color: #fff; }
+.gos .gos-skeleton { background: linear-gradient(90deg, #e6ece9, #f2f5f3, #e6ece9); background-size: 200% 100%; animation: gos-shimmer 1.4s linear infinite; border-radius: var(--gos-r-sm); }
+@keyframes gos-shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gos *, .gos *::before, .gos *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+.gos .gos-wait-edge { border-left: 5px solid var(--gos-line-strong); }

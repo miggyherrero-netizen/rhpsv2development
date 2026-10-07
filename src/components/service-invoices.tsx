@@ -91,18 +91,18 @@ export default function InvoicesClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Invoices
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {filtered.length} shown · {aging.buckets.reduce((s, b) => s + b.count, 0)} unpaid
             {drafts.count > 0 ? (
               <>
                 {" · "}
-                <button type="button" onClick={() => setFilter("draft")} className="svc-num inline-flex items-center gap-1 underline underline-offset-4 min-h-8" style={{ color: "var(--color-svc-text-dim)" }}>
+                <button type="button" onClick={() => setFilter("draft")} className="svc-num inline-flex items-center gap-1 underline underline-offset-4 min-h-11" style={{ color: "var(--color-svc-text-dim)" }}>
                   <FileClock size={12} /> {drafts.count} draft{drafts.count === 1 ? "" : "s"} · {peso(drafts.totalCents)} not yet sent
                 </button>
               </>
@@ -119,16 +119,18 @@ export default function InvoicesClient({
       <div className="svc-tiles">
         <StatCard label="Invoiced" value={<Money cents={totals.invoiced} />} icon={<Receipt size={15} />} sub="sent · all time" />
         <StatCard label="Collected" value={<Money cents={totals.collected} />} tone="success" icon={<Wallet2 size={15} />} sub="on sent invoices" />
-        <button type="button" onClick={() => setFilter("open")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]" aria-label="Show unpaid invoices">
+        <button type="button" onClick={() => setFilter("open")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]">
           <StatCard label="Outstanding" value={<Money cents={totals.outstanding} />} tone="warn" sub="sent, unpaid balance" />
+          <span className="sr-only">Show unpaid invoices</span>
         </button>
-        <button type="button" onClick={() => setFilter("overdue")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]" aria-label="Show overdue invoices">
+        <button type="button" onClick={() => setFilter("overdue")} className="text-left rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]">
           <StatCard
             label="Overdue"
             value={<Money cents={aging.overdueCents} />}
             tone={aging.overdueCents > 0 ? "danger" : "slate"}
             sub="past due date"
           />
+          <span className="sr-only">Show overdue invoices</span>
         </button>
       </div>
 
@@ -152,7 +154,7 @@ export default function InvoicesClient({
           ) : (
             <>
               {/* Desktop / tablet: compact table that fits without sideways scrolling */}
-              <table className="hidden md:table w-full text-left table-fixed">
+              <table className="svc-table hidden md:table w-full text-left table-fixed">
                 <colgroup>
                   <col />
                   <col className="w-[132px]" />
@@ -164,7 +166,7 @@ export default function InvoicesClient({
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
                     {["Invoice / customer", "Issued · due", "Total", "Balance", "Status", ""].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                      <th key={h} className="px-4 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal">{h || <span className="sr-only">Actions</span>}</th>
                     ))}
                   </tr>
                 </thead>
@@ -174,16 +176,16 @@ export default function InvoicesClient({
                       <td className="px-4 py-3 min-w-0">
                         <Link
                           href={`/service/invoices/${inv.id}`}
-                          className="text-[12.5px] font-mono hover:underline"
+                          className="text-[13px] font-mono hover:underline"
                           style={{ color: "var(--color-svc-text)" }}
                         >
                           {invoiceCode(invoicePrefix, inv.invoiceNumber, inv.issueDate)}
                         </Link>
-                        <p className="text-[12.5px] truncate" style={{ color: "var(--color-svc-text-dim)" }} title={inv.customerName}>
+                        <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }} title={inv.customerName}>
                           {inv.customerName}
                         </p>
                         {inv.jobTitle ? (
-                          <p className="text-[11.5px] truncate" style={{ color: "var(--color-svc-text-faint)" }} title={inv.jobTitle}>
+                          <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-faint)" }} title={inv.jobTitle}>
                             {inv.jobTitle}
                           </p>
                         ) : null}
@@ -194,11 +196,11 @@ export default function InvoicesClient({
                           {inv.dueDate ? `due ${fmtDate(new Date(inv.dueDate))}` : "no due date"}
                         </p>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap"><Money cents={inv.totalCents} className="text-[13px]" /></td>
+                      <td className="px-4 py-3 whitespace-nowrap"><Money cents={inv.totalCents} className="text-[14px]" /></td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {inv.status === "draft" || inv.voidedAt
-                          ? <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>—</span>
-                          : <Money cents={inv.balanceCents} className="text-[13px]" />}
+                          ? <span className="text-[13px]" style={{ color: "var(--color-svc-text-faint)" }}>—</span>
+                          : <Money cents={inv.balanceCents} className="text-[14px]" />}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>
@@ -221,10 +223,10 @@ export default function InvoicesClient({
                   <li key={inv.id} className="px-4 py-3.5 space-y-2">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <Link href={`/service/invoices/${inv.id}`} className="text-[13px] font-mono hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                        <Link href={`/service/invoices/${inv.id}`} className="text-[14px] font-mono hover:underline" style={{ color: "var(--color-svc-text)" }}>
                           {invoiceCode(invoicePrefix, inv.invoiceNumber, inv.issueDate)}
                         </Link>
-                        <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{inv.customerName}</p>
+                        <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text-dim)" }}>{inv.customerName}</p>
                       </div>
                       <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</Chip>
                     </div>
@@ -267,7 +269,7 @@ export default function InvoicesClient({
                   pct={(b.amountCents / maxBucket) * 100}
                   color={TONE_BAR[b.key === "current" ? "azure" : b.key === "90_plus" ? "danger" : "warn"]}
                 />
-                <p className="text-[10.5px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
+                <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>
                   {b.count} invoice{b.count === 1 ? "" : "s"}
                 </p>
               </div>
@@ -311,12 +313,12 @@ function InvoiceActions({ inv, pending, onPay, onSend }: { inv: InvoiceRow; pend
   return (
     <>
       {inv.balanceCents > 0 && !inv.voidedAt && (
-        <GhostButton disabled={pending} onClick={onPay} className="!min-h-10 !text-[12px]">Record payment</GhostButton>
+        <GhostButton disabled={pending} onClick={onPay} className="!min-h-11 !text-[12px]">Record payment</GhostButton>
       )}
       {inv.status === "draft" && (
-        <GhostButton disabled={pending} onClick={onSend} className="!min-h-10 !text-[12px]">Mark sent</GhostButton>
+        <GhostButton disabled={pending} onClick={onSend} className="!min-h-11 !text-[12px]">Mark sent</GhostButton>
       )}
-      <Link href={`/service/invoices/${inv.id}`} className="grid place-items-center h-10 w-10 rounded-lg hover:bg-white/[0.06]" style={{ color: TONE_TEXT.azure }} aria-label="Open invoice">
+      <Link href={`/service/invoices/${inv.id}`} className="grid place-items-center h-11 w-11 rounded-lg hover:bg-white/[0.06]" style={{ color: TONE_TEXT.azure }} aria-label="Open invoice">
         <ArrowUpRight size={14} />
       </Link>
     </>
@@ -382,10 +384,10 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>Lines</p>
+          <p className="text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>Lines</p>
           {catalog.length > 0 && (
             <Select
-              aria-label="Add a line from the price book" value="" className="!w-auto !min-h-10"
+              aria-label="Add a line from the price book" value="" className="!w-auto !min-h-11"
               onChange={(e) => {
                 const item = catalog.find((c) => c.id === e.target.value);
                 if (!item) return;
@@ -412,7 +414,7 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
               )}
               <button
                 type="button" disabled={lines.length === 1} onClick={() => setLines((cur) => cur.filter((x) => x.key !== l.key))}
-                aria-label={`Remove line ${i + 1}`} className="grid place-items-center h-10 w-10 rounded-lg hover:bg-white/[0.06] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
+                aria-label={`Remove line ${i + 1}`} className="grid place-items-center h-11 w-11 rounded-lg hover:bg-white/[0.06] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
                 style={{ color: TONE_TEXT.danger }}
               >
                 <X size={16} />
@@ -420,7 +422,7 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
             </div>
           ))}
         </div>
-        <GhostButton onClick={() => addLine()} className="mt-2 inline-flex items-center gap-1.5 !min-h-10"><Plus size={13} /> Add line</GhostButton>
+        <GhostButton onClick={() => addLine()} className="mt-2 inline-flex items-center gap-1.5 !min-h-11"><Plus size={13} /> Add line</GhostButton>
         {priceBad && <p role="alert" className="text-[12px] mt-2" style={{ color: TONE_TEXT.danger }}>Check the prices — use numbers like 2,500.</p>}
       </div>
 
@@ -432,7 +434,7 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <p className="text-[13px] svc-num" style={{ color: "var(--color-svc-text-dim)" }}>Subtotal <b className="font-medium" style={{ color: "var(--color-svc-text)" }}>{peso(totalCents)}</b>{vatEnabled ? " + VAT" : ""}</p>
+        <p className="text-[14px] svc-num" style={{ color: "var(--color-svc-text-dim)" }}>Subtotal <b className="font-medium" style={{ color: "var(--color-svc-text)" }}>{peso(totalCents)}</b>{vatEnabled ? " + VAT" : ""}</p>
         <div className="flex gap-2">
           <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
           <PrimaryButton
@@ -481,7 +483,7 @@ function PaymentModal({
     >
       <div className="space-y-3.5">
         {invoice.status === "draft" && (
-          <p className="text-[12.5px] rounded-lg px-3 py-2" style={{ background: "var(--color-svc-warn-soft)", color: "var(--color-svc-warn)" }}>
+          <p className="text-[13px] rounded-lg px-3 py-2" style={{ background: "var(--color-svc-warn-soft)", color: "var(--color-svc-warn)" }}>
             This invoice is still a draft. Recording a payment will <b className="font-medium">mark it as sent</b> first.
           </p>
         )}
@@ -508,7 +510,7 @@ function PaymentModal({
           <DateField kind="date" value={receivedAt} onChange={setReceivedAt} />
         </Field>
         <div className="flex flex-wrap gap-2 pt-2">
-          <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-10">Full balance</GhostButton>
+          <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-11">Full balance</GhostButton>
           <div className="flex-1" />
           <GhostButton onClick={onClose}>Cancel</GhostButton>
           <PrimaryButton

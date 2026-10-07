@@ -44,9 +44,9 @@ export default async function TodayPage() {
   }));
   return (
     <div className="mt-2 space-y-4">
-      <h1 className="text-2xl font-bold">Today</h1>
+      <h1>Today</h1>
       {rows.length === 0 ? (
-        <p className="gos-card">All replied ✓</p>
+        <p className="gos-card flex items-center gap-2 border-[var(--gos-accent)] bg-[var(--gos-accent-soft)] font-bold text-[var(--gos-ok)]">All replied ✓</p>
       ) : (
         <TodayReply rows={rows} />
       )}

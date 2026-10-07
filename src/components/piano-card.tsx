@@ -45,14 +45,14 @@ function PianoPhoto({ piano, className = "" }: { piano: PublicPiano; className?:
   );
 }
 
-/** Availability tag in the public palette (sky dot = available, terracotta = reserved, olive = sold). It sits in the text area, never over the photo — flyers carry their own logo and price. */
+/** Availability tag in the public palette (green dot = available, bronze = reserved, grey = sold). It sits in the text area, never over the photo — flyers carry their own logo and price. */
 const STATUS_PILL: Record<string, string> = {
   available: "bg-paper text-ink border-line",
   reserved: "bg-paper text-ink border-line",
   sold: "bg-paper text-subtle border-line",
 };
 /** The small dot in front of the availability text. */
-const STATUS_DOT: Record<string, string> = { available: "bg-sky", reserved: "bg-terracotta", sold: "bg-olive" };
+const STATUS_DOT: Record<string, string> = { available: "bg-emerald-700", reserved: "bg-gold", sold: "bg-subtle" };
 
 function StatusPill({ status, children, className = "" }: { status: string; children: React.ReactNode; className?: string }) {
   return (
@@ -76,10 +76,9 @@ export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g:
     <button
       type="button"
       onClick={() => onOpen(group)}
-      aria-label={`View ${p.brand} ${p.model}${many ? `, ${group.availableCount} available` : ""}`}
-      className={`group block w-full text-left rounded-2xl border border-white/8 bg-card p-3 shadow-[0_14px_30px_-22px_rgba(46,47,56,0.35)] transition duration-300 hover:border-gold/60 hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-22px_rgba(46,47,56,0.45)] ${FOCUS_RING}`}
+      className={`group block w-full text-left rounded-[14px] border border-white/8 bg-card p-3 shadow-[0_14px_30px_-22px_rgba(28,25,23,0.35)] transition-[transform,box-shadow,border-color] duration-200 ease-out hover:border-gold hover:-translate-y-0.5 active:translate-y-0 hover:shadow-[0_22px_40px_-22px_rgba(28,25,23,0.45)] ${FOCUS_RING}`}
     >
-      <div className="relative overflow-hidden rounded-xl bg-parchment aspect-[4/3] ring-1 ring-inset ring-white/10">
+      <div className="relative overflow-hidden rounded-[10px] bg-parchment aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto key={p.id} piano={p} className="transition-transform duration-700 ease-out group-hover:scale-[1.03]" />
       </div>
       {/* Brand and year on the left, availability on the right: the tag lives here, off the photo */}
@@ -88,12 +87,12 @@ export function PianoCard({ group, onOpen }: { group: ShowroomGroup; onOpen: (g:
         <StatusPill status={p.status}>{badge}</StatusPill>
       </div>
       <div className="flex items-end justify-between mt-2 gap-3 px-1">
-        <p className="font-serif font-medium text-[2rem] leading-none text-ink group-hover:text-gold transition-colors">{p.model}</p>
+        <p className="font-serif font-semibold text-[2rem] leading-none text-ink group-hover:text-gold transition-colors">{p.model}</p>
         <p className="shrink-0 text-[16.5px] font-semibold tnum text-gold">{p.priceCents ? peso(p.priceCents) : "On Request"}</p>
       </div>
       <p className="text-[14.5px] text-subtle mt-2.5 px-1">{details}</p>
       <p className="mt-4 px-1 pb-1 flex items-center gap-1.5 text-[15px] font-semibold text-gold">
-        <span className="border-b-[1.5px] border-olive pb-px">View Instrument</span> <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+        <span className="border-b-[1.5px] border-olive pb-px">View Instrument</span> <ArrowRight size={16} aria-hidden="true" className="transition-transform group-hover:translate-x-1" />
       </p>
     </button>
   );
@@ -134,7 +133,7 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
 
   return (
     <div>
-      <div className="relative rounded-xl overflow-hidden bg-paper aspect-[4/3] ring-1 ring-inset ring-white/10">
+      <div className="relative rounded-[10px] overflow-hidden bg-paper aspect-[4/3] ring-1 ring-inset ring-white/10">
         <PianoPhoto key={selected.id} piano={selected} />
       </div>
       {group.units.length > 1 && (
@@ -144,7 +143,7 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
             {group.units.map((u, i) => (
               <button
                 key={u.id} type="button" onClick={() => setUnitIdx(i)} aria-pressed={i === unitIdx}
-                className={`text-[14px] font-medium rounded-full border px-4 min-h-10 transition-colors ${FOCUS_RING} ${i === unitIdx ? "border-gold bg-gold text-onbrass" : "border-white/15 bg-card text-ink hover:border-gold"}`}
+                className={`text-[14px] font-medium rounded-full border px-4 min-h-11 transition-colors duration-200 ${FOCUS_RING} ${i === unitIdx ? "border-ink bg-ink text-paper" : "border-white/20 bg-card text-ink hover:border-gold"}`}
               >
                 Unit {i + 1}{u.year ? ` · ${u.year}` : ""}{u.status === "reserved" ? " · Reserved" : ""}
               </button>
@@ -157,26 +156,26 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
           <StatusPill status={selected.status}>{PIANO_STATUS[selected.status]?.label}</StatusPill>
           <p className="text-[14.5px] text-subtle">{titleCase(`${selected.type}${selected.year ? ` · ${selected.year}` : ""} · ${selected.condition}`)}</p>
         </div>
-        <p className="font-serif font-medium text-[1.75rem] tnum text-gold shrink-0">{selected.priceCents ? peso(selected.priceCents) : "Price on Request"}</p>
+        <p className="font-serif font-semibold text-[1.75rem] tnum text-gold shrink-0">{selected.priceCents ? peso(selected.priceCents) : "Price on Request"}</p>
       </div>
       {selected.description && <p className="text-[16px] text-chrome leading-relaxed mt-4">{selected.description}</p>}
-      <div className="grid grid-cols-2 gap-3 mt-5 text-[14.5px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5 text-[14.5px]">
         {selected.dimensions && (
-          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><Ruler size={16} className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Dimensions</span>{selected.dimensions}</span></div>
+          <div className="flex items-start gap-2.5 bg-white/5 rounded-[10px] p-3"><Ruler size={16} aria-hidden="true" className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Dimensions</span>{selected.dimensions}</span></div>
         )}
         {selected.recommendedUse && (
-          <div className="flex items-start gap-2.5 bg-white/5 rounded-lg p-3"><BadgeCheck size={16} className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Recommended For</span>{titleCase(selected.recommendedUse)}</span></div>
+          <div className="flex items-start gap-2.5 bg-white/5 rounded-[10px] p-3"><BadgeCheck size={16} aria-hidden="true" className="text-gold mt-0.5" /><span><span className="text-subtle block text-[13px]">Recommended For</span>{titleCase(selected.recommendedUse)}</span></div>
         )}
       </div>
       {selected.technicianNotes && (
-        <div className="mt-4 border border-white/10 rounded-xl p-4">
+        <div className="mt-4 border border-white/10 rounded-[10px] p-4">
           <p className="text-[14px] font-semibold text-ink mb-1.5">Technician&apos;s Notes</p>
-          <p className="text-[15px] text-chrome leading-relaxed font-serif">{selected.technicianNotes}</p>
+          <p className="text-[15px] text-chrome leading-relaxed">{selected.technicianNotes}</p>
         </div>
       )}
       {sent ? (
-        <div className="mt-6 bg-white/5 rounded-xl p-5 text-center">
-          <BadgeCheck size={28} className="mx-auto text-emerald-700" strokeWidth={1.5} />
+        <div className="mt-6 bg-white/5 rounded-[10px] p-5 text-center">
+          <BadgeCheck size={28} aria-hidden="true" className="mx-auto text-emerald-700" strokeWidth={1.5} />
           <p className="text-[15.5px] text-ink mt-2.5">Sent — a technician will get back to you within one working day.</p>
         </div>
       ) : open ? (
@@ -191,12 +190,12 @@ function DialogBody({ group }: { group: ShowroomGroup; onClose: () => void }) {
           />
           <textarea className="input-dark min-h-[80px] resize-y" aria-label="Message" placeholder="Anything else? (optional)" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
           {err && <p role="alert" className="text-red-700 text-[14px]">{err}</p>}
-          <button type="submit" disabled={busy} className={`w-full btn-brass text-[15.5px] rounded-full min-h-12 transition flex items-center justify-center gap-2 ${FOCUS_RING}`}>
+          <button type="submit" disabled={busy} className={`w-full btn-brass text-[15.5px] rounded-full min-h-12 flex items-center justify-center gap-2 ${FOCUS_RING}`}>
             {busy && <Spinner className="text-onbrass" />} Send Inquiry
           </button>
         </form>
       ) : (
-        <button onClick={() => setOpen(true)} disabled={selected.status === "sold"} className={`mt-6 w-full btn-brass text-[15.5px] rounded-full min-h-12 transition ${FOCUS_RING}`}>
+        <button onClick={() => setOpen(true)} disabled={selected.status === "sold"} className={`mt-6 w-full btn-brass text-[15.5px] rounded-full min-h-12 ${FOCUS_RING}`}>
           {selected.status === "sold" ? "This Instrument Has Found a Home" : "Inquire About This Piano"}
         </button>
       )}

@@ -54,7 +54,7 @@ export default function CustomersClient({ rows }: { rows: Row[] }) {
 
   return (
     <div className="mt-2 space-y-4">
-      <h1 className="text-2xl font-bold">Customers</h1>
+      <h1>Customers</h1>
       <label className="block">
         <span className="sr-only">Search customers</span>
         <input id="gos-search" className="gos-input" placeholder="Search name, area, phone, note  ( / )" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -62,7 +62,7 @@ export default function CustomersClient({ rows }: { rows: Row[] }) {
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter">
         {FILTERS.map((f) => (
           <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
-            className={`gos-tap rounded-full border px-4 ${filter === f ? "bg-[var(--gos-black)] text-white" : "bg-white"}`}>{f}</button>
+            className="gos-chip">{f}</button>
         ))}
         {!found && (
           <label className="ml-auto text-sm">Sort{" "}
@@ -78,7 +78,7 @@ export default function CustomersClient({ rows }: { rows: Row[] }) {
         <section aria-label="Recently opened">
           <h2 className="mb-1 text-sm font-bold text-[var(--gos-ink-dim)]">Recent</h2>
           <ul className="flex flex-wrap gap-2">
-            {recent.map((r) => <li key={r.id}><Link className="gos-tap inline-flex items-center rounded-full border bg-white px-3" href={`/os/customers/${r.id}`}>{r.name}</Link></li>)}
+            {recent.map((r) => <li key={r.id}><Link className="gos-chip !font-normal" href={`/os/customers/${r.id}`}>{r.name}</Link></li>)}
           </ul>
         </section>
       )}
@@ -92,14 +92,14 @@ export default function CustomersClient({ rows }: { rows: Row[] }) {
           <li key={r.id}>
             <Link href={`/os/customers/${r.id}`} className="gos-card gos-tap block">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-bold">{r.name}</span>
-                <span>{customerStatusLabel(r.status as CustomerStatus)}</span>
+                <span className="text-lg font-bold">{r.name}</span>
+                <span className={`gos-badge ${r.status === "Lost" ? "gos-badge-late" : r.status === "New" ? "gos-badge-info" : r.status === "Paid" ? "gos-badge-ok" : "gos-badge-wait"}`}>{customerStatusLabel(r.status as CustomerStatus)}</span>
               </div>
               <div className="mt-1 flex flex-wrap gap-2 text-sm text-[var(--gos-ink-dim)]">
                 {r.area && <span>{r.area}</span>}
                 <span>Updated {manilaDate(new Date(r.updatedAt))}</span>
-                {r.cameFrom === "Messenger" && r.adKind === "unknown" && <span className="rounded border px-1">No ad tag</span>}
-                {r.possibleDuplicate && <span className="rounded border border-[var(--gos-danger)] px-1">⚠ Possible duplicate</span>}
+                {r.cameFrom === "Messenger" && r.adKind === "unknown" && <span className="gos-tag">No ad tag</span>}
+                {r.possibleDuplicate && <span className="gos-tag gos-tag-warn">⚠ Possible duplicate</span>}
               </div>
             </Link>
           </li>

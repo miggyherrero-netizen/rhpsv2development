@@ -6,7 +6,7 @@ import { fillTemplate, firstName, messengerHref, smsHref, type Placeholder } fro
 import { markMessaged } from "@/server/service-waitlist";
 
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
-const BTN = "btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[12.5px]";
+const BTN = "btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[13px]";
 
 /**
  * The generated message for one client with the four things you do with it: Copy, Open Messenger (after copying),
@@ -41,7 +41,7 @@ export default function MessageActions({
   return (
     <div className="space-y-2.5">
       {!compact && (
-        <p className="text-[13px] rounded-xl px-3.5 py-3 whitespace-pre-wrap select-text" style={{ background: "var(--color-svc-surface-2)", color: "var(--color-svc-text)", border: "1px solid var(--color-svc-border)" }}>
+        <p className="text-[14px] rounded-xl px-3.5 py-3 whitespace-pre-wrap select-text" style={{ background: "var(--color-svc-surface-2)", color: "var(--color-svc-text)", border: "1px solid var(--color-svc-border)" }}>
           {filled.text}
         </p>
       )}
@@ -79,7 +79,7 @@ export default function MessageActions({
           </button>
         )}
       </div>
-      {!fb && !compact && <p className="text-[11.5px]" style={DIM}>No Messenger username saved — add one on the customer page to get a Messenger button.</p>}
+      {!fb && !compact && <p className="text-[12px]" style={DIM}>No Messenger username saved — add one on the customer page to get a Messenger button.</p>}
       {error && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>{error}</p>}
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Message copied" : done ? "Marked as messaged" : ""}</p>
     </div>

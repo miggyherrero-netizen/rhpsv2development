@@ -23,7 +23,7 @@ function Panel({ title, action, children, id }: { title: string; action?: React.
   return (
     <section id={id} className="card-dark p-4 scroll-mt-20">
       <div className="flex items-center justify-between mb-3 min-h-6">
-        <h2 className="text-[11px] uppercase tracking-[0.14em] text-subtle">{title}</h2>
+        <h2 className="text-xs uppercase tracking-[0.14em] text-subtle">{title}</h2>
         {action}
       </div>
       {children}
@@ -149,7 +149,7 @@ export default function AdminDashboard({ data, firstName }: { data: Dashboard; f
         {topActions.map((a, i) => (
           <Link key={a.label} href={a.href}
             className={`inline-flex items-center gap-2 h-11 px-4 rounded-xl text-[13px] transition-colors ${FOCUS} ${
-              i === 0 ? "bg-white text-black font-medium hover:bg-chrome" : "border border-white/15 bg-white/[0.05] text-chrome hover:text-white hover:bg-white/[0.1]"
+              i === 0 ? "bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium hover:brightness-110" : "border border-white/15 bg-white/[0.05] text-chrome hover:text-white hover:bg-white/[0.1]"
             }`}>
             <a.icon size={15} /> {a.label}
           </Link>
@@ -302,7 +302,7 @@ export default function AdminDashboard({ data, firstName }: { data: Dashboard; f
         </select>
         {portalProject && (
           <div className="mt-4 bg-white/[0.04] border border-white/10 rounded-xl p-3.5 flex items-center gap-2">
-            <p className="text-[11.5px] text-chrome truncate flex-1 tnum">{portalLink}</p>
+            <p className="text-xs text-chrome truncate flex-1 tnum">{portalLink}</p>
             <button onClick={copyLink} aria-label="Copy link" className={`shrink-0 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-chrome ${FOCUS}`}>
               {copied ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
             </button>

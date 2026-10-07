@@ -86,13 +86,13 @@ export default function JobsClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Jobs
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {filtered.length} shown · <Money cents={totalQuoted} /> quoted
           </p>
         </div>
@@ -110,7 +110,7 @@ export default function JobsClient({
             aria-label="More status filters"
             value={PRIMARY_KEYS.has(status) ? "" : status}
             onChange={(e) => e.target.value && setStatus(e.target.value)}
-            className="min-h-10 rounded-full px-3.5 text-[12.5px] border cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+            className="min-h-11 rounded-full px-3.5 text-[13px] border cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
             style={{
               background: PRIMARY_KEYS.has(status) ? "var(--color-svc-surface-2)" : "var(--color-svc-accent-soft)",
               color: PRIMARY_KEYS.has(status) ? "var(--color-svc-text-dim)" : TONE_TEXT.azure,
@@ -159,16 +159,16 @@ export default function JobsClient({
             }
           />
         ) : (
-          <div className="overflow-x-auto thin-scroll">
-            <table className="w-full text-left">
+          <div className="svc-table-wrap thin-scroll">
+            <table className="svc-table w-full text-left">
               <thead>
                 <tr style={{ color: "var(--color-svc-text-faint)" }}>
                   {["When", "Customer / job", "Crew", "Type", "Status", "Quote", ""].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal whitespace-nowrap"
+                      className="px-5 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal whitespace-nowrap"
                     >
-                      {h}
+                      {h || <span className="sr-only">Actions</span>}
                     </th>
                   ))}
                 </tr>
@@ -186,10 +186,10 @@ export default function JobsClient({
                     <td className="px-5 py-3 whitespace-nowrap">
                       {job.scheduledStart ? (
                         <>
-                          <p className="text-[12.5px] tnum" style={{ color: "var(--color-svc-text)" }}>
+                          <p className="text-[13px] tnum" style={{ color: "var(--color-svc-text)" }}>
                             {fmtDate(new Date(job.scheduledStart))}
                           </p>
-                          <p className="text-[11px] tnum" style={{ color: "var(--color-svc-text-faint)" }}>
+                          <p className="text-[12px] tnum" style={{ color: "var(--color-svc-text-faint)" }}>
                             {fmtTime(new Date(job.scheduledStart))}
                           </p>
                         </>
@@ -200,7 +200,7 @@ export default function JobsClient({
                       )}
                     </td>
                     <td className="px-5 py-3 max-w-[320px]">
-                      <Link href={`/service/jobs/${job.id}`} className="text-[13.5px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
+                      <Link href={`/service/jobs/${job.id}`} className="text-[14px] hover:underline" style={{ color: "var(--color-svc-text)" }}>
                         {h.heading}
                       </Link>
                       <p className="text-[12px] truncate" style={{ color: "var(--color-svc-text-dim)" }} title={h.sub ? `${h.sub} — ${job.customerName}` : undefined}>
@@ -227,20 +227,20 @@ export default function JobsClient({
                       </Chip>
                       {closing ? <span className="ml-1.5 align-middle"><Chip tone="warn">Needs closing</Chip></span> : null}
                       {job.runningLog ? (
-                        <span className="ml-1.5 text-[11px]" style={{ color: "var(--color-svc-warn)" }}>
+                        <span className="ml-1.5 text-[12px]" style={{ color: "var(--color-svc-warn)" }}>
                           ● live
                         </span>
                       ) : null}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
                       {hasQuote(job.quotedCents)
-                        ? <Money cents={job.quotedCents} className="text-[13px]" />
-                        : <span className="text-[12.5px]" style={{ color: "var(--color-svc-text-faint)" }}>No quote</span>}
+                        ? <Money cents={job.quotedCents} className="text-[14px]" />
+                        : <span className="text-[13px]" style={{ color: "var(--color-svc-text-faint)" }}>No quote</span>}
                     </td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       <Link
                         href={`/service/jobs/${job.id}`}
-                        className="inline-grid place-items-center h-10 w-10 rounded-lg hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
+                        className="inline-grid place-items-center h-11 w-11 rounded-lg hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[var(--color-svc-accent)]"
                         style={{ color: TONE_TEXT.azure }}
                         aria-label={`Open ${h.heading} for ${job.customerName}`}
                       >

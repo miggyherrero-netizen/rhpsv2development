@@ -45,7 +45,7 @@ export default function ExpenseReviewClient({
           <ArrowLeft size={13} aria-hidden="true" /> Expenses
         </Link>
         <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Review expenses</h1>
-        <p className="text-[12.5px] mt-1 max-w-2xl" style={{ color: "var(--color-svc-text-dim)" }}>
+        <p className="text-[13px] mt-1 max-w-2xl" style={{ color: "var(--color-svc-text-dim)" }}>
           Tell Finance what each older expense was for. <b className="font-medium">Job cost</b> and <b className="font-medium">Overhead</b> hit profit right away;
           <b className="font-medium"> Piano stock</b> only counts once that piano is sold. The kind is suggested from the category — change any that are wrong, then save.
         </p>
@@ -58,7 +58,7 @@ export default function ExpenseReviewClient({
           <EmptyState
             icon={<CheckCircle2 size={19} strokeWidth={1.7} />} title={`Saved ${saved} expense${saved === 1 ? "" : "s"}`}
             hint="Finance now splits these into Service, Piano sales and Overhead."
-            action={<Link href="/service/expenses" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Back to expenses</Link>}
+            action={<Link href="/service/expenses" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[13px]">Back to expenses</Link>}
           />
         </SectionCard>
       ) : expenses.length === 0 ? (
@@ -69,7 +69,7 @@ export default function ExpenseReviewClient({
           action={<PrimaryButton pending={pending} disabled={stockWithoutPiano.length > 0} onClick={save} className="!min-h-11">Save all {expenses.length}</PrimaryButton>}
         >
           {stockWithoutPiano.length > 0 && (
-            <p role="alert" className="px-5 pt-3 text-[12.5px]" style={{ color: "var(--color-svc-warn)" }}>
+            <p role="alert" className="px-5 pt-3 text-[13px]" style={{ color: "var(--color-svc-warn)" }}>
               {stockWithoutPiano.length} piano-stock expense{stockWithoutPiano.length === 1 ? " needs" : "s need"} a piano before you can save (or change its kind).
             </p>
           )}
@@ -79,7 +79,7 @@ export default function ExpenseReviewClient({
               return (
                 <li key={e.id} className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-x-4 gap-y-2 px-5 py-3 items-center">
                   <div className="min-w-0">
-                    <p className="text-[13px] truncate" style={{ color: "var(--color-svc-text)" }}>{e.description}</p>
+                    <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>{e.description}</p>
                     <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>
                       {fmtDate(new Date(e.spentAt))} · {EXPENSE_CATEGORY_LABEL[e.category] ?? e.category}{e.jobCode ? ` · ${e.jobCode}` : ""} · <Money cents={e.amountCents} />
                     </p>

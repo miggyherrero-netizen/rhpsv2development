@@ -92,7 +92,7 @@ export default function ServiceShell({
                 href={item.href}
                 onClick={() => setOpen(false)}
                 aria-current={isActive(item.href) ? "page" : undefined}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${FOCUS}`}
+                className={`flex items-center gap-3 px-3.5 min-h-11 rounded-xl text-[14px] transition-colors ${FOCUS}`}
                 style={
                   isActive(item.href)
                     ? { background: "var(--color-svc-accent-soft)", color: "var(--color-svc-accent)" }
@@ -103,8 +103,8 @@ export default function ServiceShell({
                 {item.label}
                 {item.href === "/service/reminders" && dueReminders > 0 ? (
                   <span
-                    className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] leading-5 text-center svc-num"
-                    style={{ background: "var(--color-svc-accent)", color: "#06101f" }}
+                    className="ml-auto min-w-6 h-6 px-1.5 rounded-full text-[12px] leading-6 text-center svc-num"
+                    style={{ background: "var(--color-svc-primary)", color: "#fff" }}
                   >
                     {dueReminders}<span className="sr-only"> due</span>
                   </span>
@@ -116,7 +116,7 @@ export default function ServiceShell({
         return group.collapsible ? (
           <details key={group.label} open={group.items.some((i) => isActive(i.href))}>
             <summary
-              className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em] cursor-pointer select-none"
+              className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em] cursor-pointer select-none min-h-11 flex items-center"
               style={{ color: "var(--color-svc-text-faint)" }}
             >
               {group.label}
@@ -126,7 +126,7 @@ export default function ServiceShell({
         ) : (
           <div key={group.label}>
             <p
-              className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em]"
+              className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em]"
               style={{ color: "var(--color-svc-text-faint)" }}
             >
               {group.label}
@@ -138,7 +138,7 @@ export default function ServiceShell({
 
       <div>
         <p
-          className="px-3.5 pb-1.5 text-[11px] uppercase tracking-[0.14em]"
+          className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em]"
           style={{ color: "var(--color-svc-text-faint)" }}
         >
           The atelier
@@ -146,21 +146,21 @@ export default function ServiceShell({
         <div className="space-y-0.5">
           <Link
             href="/admin"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
+            className={`flex items-center gap-3 px-3.5 min-h-11 rounded-xl text-[14px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <LayoutDashboard size={16} strokeWidth={1.8} /> Shop
           </Link>
           <Link
             href="/owner/today"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
+            className={`flex items-center gap-3 px-3.5 min-h-11 rounded-xl text-[14px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <Calendar size={16} strokeWidth={1.8} /> My Desk
           </Link>
           <Link
             href="/os/today"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
+            className={`flex items-center gap-3 px-3.5 min-h-11 rounded-xl text-[14px] transition-colors hover:bg-white/[0.05] ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
           >
             <TrendingUp size={16} strokeWidth={1.8} /> Growth OS
@@ -175,7 +175,7 @@ export default function ServiceShell({
       <aside data-print-hide className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col svc-sidebar border-r z-40">
         <div className="px-5 pt-6 pb-5">
           <p
-            className="text-[11px] uppercase tracking-[0.2em]"
+            className="text-[12px] uppercase tracking-[0.2em]"
             style={{ color: "var(--color-svc-text-faint)" }}
           >
             Home Service
@@ -196,7 +196,7 @@ export default function ServiceShell({
         </div>
       </aside>
 
-      <div
+      <header
         data-print-hide
         className="md:hidden sticky top-0 z-40 svc-sidebar border-b"
         style={{ borderColor: "var(--color-svc-border)" }}
@@ -207,7 +207,7 @@ export default function ServiceShell({
           </span>
           <button
             onClick={() => setOpen(true)}
-            className={`p-3 ${FOCUS}`}
+            className={`inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg ${FOCUS}`}
             style={{ color: "var(--color-svc-text-dim)" }}
             aria-label="Open menu"
             aria-expanded={open}
@@ -217,7 +217,7 @@ export default function ServiceShell({
             <Menu size={20} />
           </button>
         </div>
-      </div>
+      </header>
 
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
@@ -227,7 +227,7 @@ export default function ServiceShell({
               <p className="font-serif text-lg" style={{ color: "var(--color-svc-text)" }}>
                 Home Service
               </p>
-              <button ref={closeRef} onClick={() => { setOpen(false); moreRef.current?.focus(); }} aria-label="Close menu" className={`p-2.5 ${FOCUS}`} style={{ color: "var(--color-svc-text-dim)" }}>
+              <button ref={closeRef} onClick={() => { setOpen(false); moreRef.current?.focus(); }} aria-label="Close menu" className={`inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg ${FOCUS}`} style={{ color: "var(--color-svc-text-dim)" }}>
                 <X size={18} />
               </button>
             </div>
@@ -261,7 +261,7 @@ export default function ServiceShell({
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[11px] ${FOCUS}`}
+              className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[12px] font-medium ${FOCUS}`}
               style={{ color: active ? "var(--color-svc-accent)" : "var(--color-svc-text-dim)" }}
             >
               <t.icon size={19} strokeWidth={active ? 2.2 : 1.8} />
@@ -277,7 +277,7 @@ export default function ServiceShell({
           aria-expanded={open}
           aria-controls="svc-drawer"
           aria-current={!onTab ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[11px] ${FOCUS}`}
+          className={`flex flex-col items-center justify-center gap-1 min-h-14 text-[12px] font-medium ${FOCUS}`}
           style={{ color: !onTab ? "var(--color-svc-accent)" : "var(--color-svc-text-dim)" }}
         >
           <Ellipsis size={19} strokeWidth={1.8} />

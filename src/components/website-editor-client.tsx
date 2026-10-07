@@ -11,7 +11,7 @@ type Step = WebsiteContent["process"]["steps"][number];
 type Testimonial = WebsiteContent["testimonials"][number];
 
 const input = "input-dark";
-const label = "block text-[10.5px] uppercase tracking-[0.18em] text-mist mb-1.5";
+const label = "block text-xs uppercase tracking-[0.18em] text-mist mb-1.5";
 
 function TextInput({
   title,
@@ -114,7 +114,7 @@ function HeroPhoto({ version, alt, onChange }: { version?: string; alt: string; 
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
           <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-2 bg-white text-black text-[13px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition disabled:opacity-60">
+            className="inline-flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition disabled:opacity-60">
             {busy ? <Spinner className="text-black" /> : <Upload size={14} />} {version ? "Replace photo" : "Upload photo"}
           </button>
           {version && (
@@ -148,7 +148,7 @@ function Section({
           <Icon size={16} />
         </span>
         <div>
-          <p className="text-[9.5px] uppercase tracking-[0.24em] text-mist/70">{eyebrow}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-mist">{eyebrow}</p>
           <h2 className="font-serif text-xl text-white">{title}</h2>
         </div>
       </div>
@@ -213,7 +213,7 @@ export default function WebsiteEditorClient({ initialContent }: { initialContent
             alt={content.hero.imageAlt ?? ""}
             onChange={({ version, alt }) => setContent((cur) => ({ ...cur, hero: { ...cur.hero, imageVersion: version, imageAlt: alt || undefined } }))}
           />
-          <p className="text-[11.5px] text-mist mt-3">The alt text is saved with the photo. Other website text still needs “Save website”.</p>
+          <p className="text-xs text-mist mt-3">The alt text is saved with the photo. Other website text still needs “Save website”.</p>
         </Section>
 
         <Section icon={Contact} eyebrow="Assessment section" title="Contact details">
@@ -273,21 +273,21 @@ export default function WebsiteEditorClient({ initialContent }: { initialContent
 
       <aside className="xl:sticky xl:top-7 self-start space-y-4">
         <section className="card-dark p-5">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2">Publishing</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2">Publishing</p>
           <p className="text-[12.5px] text-chrome/80 leading-relaxed">
             Changes update the public homepage immediately after saving. The showroom list still comes from piano records.
           </p>
           <button
             onClick={save}
             disabled={busy}
-            className="mt-4 w-full bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-60 flex items-center justify-center gap-2"
+            className="mt-4 w-full bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {busy ? <Spinner className="text-black" /> : <Save size={14} />} {saved ? "Saved" : "Save website"}
           </button>
         </section>
 
         <section className="card-dark p-5">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-mist mb-2">Editor scope</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-mist mb-2">Editor scope</p>
           <ul className="space-y-2 text-[12.5px] text-chrome/80">
             <li className="flex gap-2"><FileText size={14} className="text-mist mt-0.5 shrink-0" /> Homepage copy is editable here.</li>
             <li className="flex gap-2"><ListChecks size={14} className="text-mist mt-0.5 shrink-0" /> Pianos remain database-driven showroom records.</li>

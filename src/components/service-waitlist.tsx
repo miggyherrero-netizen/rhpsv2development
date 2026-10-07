@@ -17,7 +17,7 @@ import { Chip, EmptyState, ErrorLine, Select, StatCard, PrimaryButton } from "@/
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
 const TEXT = { color: "var(--color-svc-text)" } as const;
-const GHOST = "btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[12.5px]";
+const GHOST = "btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[13px]";
 
 const ago = (d: Date | null, now: Date): string => {
   if (!d) return "never";
@@ -102,7 +102,7 @@ export default function WaitlistClient({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 sm:px-5" style={{ background: depth === 0 ? "rgba(255,255,255,0.02)" : undefined, borderTop: "1px solid var(--color-svc-border)", paddingLeft: `${1 + depth * 0.6}rem` }}>
       <button type="button" onClick={() => toggle(gKey)} aria-expanded={expanded} className="flex items-center gap-2 min-h-11 text-left flex-1 min-w-[9rem]" style={TEXT}>
         {expanded ? <ChevronDown size={15} aria-hidden="true" className="shrink-0" style={FAINT} /> : <ChevronRight size={15} aria-hidden="true" className="shrink-0" style={FAINT} />}
-        <span className={`${depth === 0 ? "text-[14px] font-medium" : "text-[13.5px]"} min-w-0`}>{name}</span>
+        <span className={`${depth === 0 ? "text-[14px] font-medium" : "text-[14px]"} min-w-0`}>{name}</span>
         <span className="shrink-0"><Chip tone="slate">{count}</Chip></span>
       </button>
       <span className="text-[12px] order-last basis-full sm:order-none sm:basis-auto pb-1.5 sm:pb-0 pl-7 sm:pl-0" style={DIM}>
@@ -121,14 +121,14 @@ export default function WaitlistClient({
       <li style={{ borderTop: "1px solid var(--color-svc-border)" }}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 sm:px-5 py-3 min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_88px_110px_120px_auto]">
           <div className="min-w-0 basis-full min-[1100px]:basis-auto">
-            <Link href={`/service/customers/${i.customerId}`} className="text-[13.5px] font-medium hover:underline" style={TEXT}>{i.customerName}</Link>
+            <Link href={`/service/customers/${i.customerId}`} className="text-[14px] font-medium hover:underline" style={TEXT}>{i.customerName}</Link>
             <p className="text-[12px] truncate" style={DIM}>
               {i.pianoLabel ?? "No piano chosen"} · {SERVICE_TYPE_LABEL[i.serviceType] ?? i.serviceType}
               {i.areaLabel && i.areaLabel !== i.cityName ? ` · ${i.areaLabel}` : ""}
             </p>
           </div>
           <p className="text-[12px]" style={DIM}>{WAIT_SOURCE_LABEL[i.source] ?? i.source}{i.estValueCents ? ` · ${peso(i.estValueCents)}` : ""}</p>
-          <p className="text-[12.5px] svc-num" style={{ color: dw > LONG_WAIT_DAYS ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] svc-num" style={{ color: dw > LONG_WAIT_DAYS ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
             <span className="min-[1100px]:hidden" style={FAINT}>Waiting </span>{isUpcoming(i.requestedAt, now) ? `due ${fmtDate(i.requestedAt)}` : `${dw}d`}
           </p>
           <p className="text-[12px]" style={DIM}><span className="min-[1100px]:hidden" style={FAINT}>Contacted </span>{ago(i.lastContactedAt, now)}</p>
@@ -161,9 +161,9 @@ export default function WaitlistClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
           <h1 className="font-serif text-3xl mt-1" style={TEXT}>Waitlist by area</h1>
-          <p className="text-[12.5px] mt-1" style={DIM}>Who is waiting, where — so one trip covers everyone nearby</p>
+          <p className="text-[13px] mt-1" style={DIM}>Who is waiting, where — so one trip covers everyone nearby</p>
         </div>
         <PrimaryButton onClick={() => setModal({ mode: "new" })} className="!min-h-11"><Plus size={15} aria-hidden="true" /> Add to waitlist</PrimaryButton>
       </header>
@@ -178,18 +178,18 @@ export default function WaitlistClient({
       </section>
 
       <div className="flex flex-wrap items-end gap-3" role="group" aria-label="Filters">
-        <label className="block"><span className="block text-[11px] uppercase tracking-[0.1em] mb-1" style={DIM}>Area</span>
+        <label className="block"><span className="block text-[12px] uppercase tracking-[0.1em] mb-1" style={DIM}>Area</span>
           <Select aria-label="Filter by area" value={area} onChange={(e) => setArea(e.target.value)} className="!w-auto !min-h-11">
             <option value="all">All areas</option><option value="unsorted">Unsorted</option>
             {areas.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
           </Select></label>
-        <label className="block"><span className="block text-[11px] uppercase tracking-[0.1em] mb-1" style={DIM}>Status</span>
+        <label className="block"><span className="block text-[12px] uppercase tracking-[0.1em] mb-1" style={DIM}>Status</span>
           <Select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="!w-auto !min-h-11">
             <option value="active">Active</option><option value="all">Everything</option>
             {WAIT_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </Select></label>
         {routes.length > 0 && (
-          <label className="block"><span className="block text-[11px] uppercase tracking-[0.1em] mb-1" style={DIM}>Route</span>
+          <label className="block"><span className="block text-[12px] uppercase tracking-[0.1em] mb-1" style={DIM}>Route</span>
             <Select aria-label="Filter by saved route" value={route} onChange={(e) => setRoute(e.target.value)} className="!w-auto !min-h-11">
               <option value="all">Any</option>
               {routes.map((r) => <option key={r.id} value={r.id}>On route: {r.name}</option>)}

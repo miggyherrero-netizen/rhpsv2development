@@ -45,7 +45,7 @@ export default function PriceBook({ catalog }: { catalog: ServiceCatalogItem[] }
   return (
     <SectionCard title={<>Price book <span className="font-normal text-[12px]" style={FAINT}>· changes save as you go</span></>}>
       <div className="px-5 py-4 space-y-5">
-        <p className="text-[13px] max-w-[62ch]" style={DIM}>
+        <p className="text-[14px] max-w-[62ch]" style={DIM}>
           Your standard services, parts and packages. While quoting, type a name and pick it — the price and details fill in.
         </p>
 
@@ -62,7 +62,7 @@ export default function PriceBook({ catalog }: { catalog: ServiceCatalogItem[] }
           <div className="space-y-6">
             {groups.map((g) => (
               <section key={g.key} aria-label={GROUP_TITLE[g.key] ?? g.label}>
-                <h3 className="text-[13px] font-medium mb-1" style={{ color: "var(--color-svc-text)" }}>
+                <h3 className="text-[14px] font-medium mb-1" style={{ color: "var(--color-svc-text)" }}>
                   {GROUP_TITLE[g.key] ?? g.label} <span className="font-normal" style={FAINT}>· {g.items.length}</span>
                 </h3>
                 <ul className="svc-divide">
@@ -104,7 +104,7 @@ function NewItemForm({
 
   return (
     <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
-      <p className="text-[13px] font-medium" style={{ color: "var(--color-svc-text)" }}>Add to the price book</p>
+      <p className="text-[14px] font-medium" style={{ color: "var(--color-svc-text)" }}>Add to the price book</p>
       <div className="grid grid-cols-2 gap-3 min-[900px]:grid-cols-[minmax(0,1fr)_150px_130px_90px_auto] min-[900px]:items-end">
         <Field label="Item name" className="col-span-2 min-[900px]:col-span-1">
           <TextInput value={item.name} onChange={(e) => set({ name: e.target.value })} placeholder={isPackage ? "Basic piano service package" : "Concert tuning"} />
@@ -127,7 +127,7 @@ function NewItemForm({
 
       {isPackage ? (
         <div className="space-y-2">
-          <p className="flex items-start gap-2 text-[12.5px]" style={DIM}>
+          <p className="flex items-start gap-2 text-[13px]" style={DIM}>
             <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
             A package is sold for one price. List what is in it below; it prints under the package name.
           </p>
@@ -169,10 +169,10 @@ function IncludesEditor({
       </Field>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {options.length > 0 ? (
-          <label className="inline-flex items-center gap-2 text-[12.5px]" style={DIM}>
+          <label className="inline-flex items-center gap-2 text-[13px]" style={DIM}>
             Add from price book
             <Select
-              aria-label="Add a price-book item to this list" value="" className="!w-auto !min-h-10 !text-[12.5px] max-w-56"
+              aria-label="Add a price-book item to this list" value="" className="!w-auto !min-h-11 !text-[13px] max-w-56"
               onChange={(e) => { addName(e.target.value); }}
             >
               <option value="">Choose…</option>
@@ -180,7 +180,7 @@ function IncludesEditor({
             </Select>
           </label>
         ) : null}
-        {preview ? <p className="text-[12.5px]" style={FAINT}>Prints as: <span style={DIM}>{preview}</span></p> : null}
+        {preview ? <p className="text-[13px]" style={FAINT}>Prints as: <span style={DIM}>{preview}</span></p> : null}
       </div>
     </div>
   );
@@ -219,13 +219,13 @@ function ItemRow({
           <input
             aria-label="Item name" defaultValue={item.name} maxLength={160}
             onBlur={(e) => { if (e.target.value.trim() && e.target.value !== item.name) run(() => updateCatalogItem(item.id, { name: e.target.value })); }}
-            className="input-svc !py-1.5 !px-2.5 text-[13.5px] font-medium"
+            className="input-svc !py-1.5 !px-2.5 text-[14px] font-medium"
           />
         </div>
         <Select
           aria-label={`Type for ${item.name}`} defaultValue={item.kind}
           onChange={(e) => run(() => updateCatalogItem(item.id, { kind: e.target.value }))}
-          className="!py-1.5 !px-2 text-[13px]"
+          className="!py-1.5 !px-2 text-[14px]"
         >
           {KIND_OPTIONS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
         </Select>
@@ -233,14 +233,14 @@ function ItemRow({
           type="number" prefix="₱" step="50" aria-label={`${isPackage ? "Package price" : "Price"} for ${item.name}`}
           defaultValue={item.unitPriceCents / 100}
           onBlur={(e) => run(() => updateCatalogItem(item.id, { unitPrice: Number(e.target.value) }))}
-          className="input-svc !py-1.5 text-[13px]"
+          className="input-svc !py-1.5 text-[14px]"
         />
         <input
           type="number" step="15" aria-label={`Minutes for ${item.name}`} defaultValue={item.estimatedMinutes}
           onBlur={(e) => run(() => updateCatalogItem(item.id, { estimatedMinutes: Number(e.target.value) }))}
-          className="input-svc !py-1.5 !px-2 text-[13px]"
+          className="input-svc !py-1.5 !px-2 text-[14px]"
         />
-        <label className="inline-flex items-center gap-2 min-h-11 text-[12.5px] cursor-pointer" style={DIM}>
+        <label className="inline-flex items-center gap-2 min-h-11 text-[13px] cursor-pointer" style={DIM}>
           <input
             type="checkbox" className="w-5 h-5" defaultChecked={item.isQuickAdd} aria-label={`Quick-add chip for ${item.name}`}
             onChange={(e) => run(() => updateCatalogItem(item.id, { isQuickAdd: e.target.checked }))}
@@ -264,10 +264,10 @@ function ItemRow({
               label="What’s included"
             />
             {legacyMembers.length > 0 ? (
-              <div className="rounded-lg px-3 py-2.5 text-[12.5px] flex flex-wrap items-center gap-x-3 gap-y-1" style={{ background: "var(--color-svc-accent-soft)", color: "var(--color-svc-text)" }}>
+              <div className="rounded-lg px-3 py-2.5 text-[13px] flex flex-wrap items-center gap-x-3 gap-y-1" style={{ background: "var(--color-svc-accent-soft)", color: "var(--color-svc-text)" }}>
                 <Chip tone="azure">Old setup</Chip>
                 <span>This package still uses the old “In package” links ({legacyMembers.map((m) => m.name).join(", ")}).</span>
-                <button type="button" onClick={convertLegacy} className="underline min-h-8" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}>
+                <button type="button" onClick={convertLegacy} className="underline min-h-11" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}>
                   Use these as the “What’s included” list
                 </button>
               </div>
@@ -278,7 +278,7 @@ function ItemRow({
             aria-label={`Details for ${item.name}`} key={`${item.id}:${item.description ?? ""}`} defaultValue={item.description ?? ""} maxLength={500}
             placeholder="Details (optional), printed under the name, e.g. Brass pedal rod and felt"
             onBlur={(e) => { if (e.target.value.trim() !== (item.description ?? "")) run(() => updateCatalogItem(item.id, { description: e.target.value.trim() || null })); }}
-            className="input-svc !py-1.5 !px-2.5 text-[12.5px]" style={DIM}
+            className="input-svc !py-1.5 !px-2.5 text-[13px]" style={DIM}
           />
         )}
         <p className="sr-only">{KIND_LABEL[item.kind] ?? item.kind}</p>

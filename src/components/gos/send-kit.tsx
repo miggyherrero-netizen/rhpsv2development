@@ -52,7 +52,7 @@ export default function SendKit({
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" className="gos-btn-black" onClick={copy}>{copied ? "✓ Copied" : copyLabel}</button>
-        <button type="button" className="gos-tap rounded-full border border-[var(--gos-line)] bg-white px-4" onClick={openInbox}>Open Inbox</button>
+        <button type="button" className="gos-btn-ghost" onClick={openInbox}>Open Inbox</button>
       </div>
       <span role="status" className="sr-only">{copied ? "Copied" : ""}</span>
       {manual && (
@@ -68,7 +68,7 @@ export default function SendKit({
         <div role="alertdialog" aria-label="Did you send it?" className="gos-card flex flex-wrap items-center gap-2">
           <span className="font-bold">Did you send it?</span>
           <button type="button" className="gos-btn-black" onClick={async () => { setAsking(false); await onSent(); }}>{sentLabel}</button>
-          <button type="button" className="gos-tap rounded-full border px-4" onClick={() => setAsking(false)}>Not yet</button>
+          <button type="button" className="gos-btn-ghost" onClick={() => setAsking(false)}>Not yet</button>
         </div>
       )}
     </div>

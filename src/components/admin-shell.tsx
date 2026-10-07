@@ -35,17 +35,18 @@ export default function AdminShell({ children, userName }: { children: ReactNode
           key={item.href}
           href={item.href}
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${
+          aria-current={isActive(item.href) ? "page" : undefined}
+          className={`flex items-center gap-3 px-3.5 min-h-11 rounded-[10px] text-sm transition-colors duration-150 ${
             isActive(item.href)
-              ? "bg-white/[0.09] text-white border border-white/[0.08]"
-              : "text-mist hover:text-white hover:bg-white/[0.045] border border-transparent"
+              ? "bg-[#22C55E]/12 text-white border border-[#22C55E]/35 font-medium"
+              : "text-mist hover:text-white hover:bg-white/[0.06] border border-transparent"
           }`}
         >
-          <item.icon size={16} strokeWidth={1.8} />
+          <item.icon size={18} strokeWidth={1.8} aria-hidden="true" className={isActive(item.href) ? "text-[#22C55E]" : ""} />
           {item.label}
         </Link>
       ))}
-      <div className="pt-5 pb-2 px-3.5 text-[10.5px] uppercase tracking-[0.18em] text-subtle">Beyond the shop</div>
+      <div className="pt-5 pb-2 px-3.5 text-xs uppercase tracking-[0.14em] text-subtle">Beyond the shop</div>
       {[
         { href: "/service/today", label: "Home Service", icon: Home },
         { href: "/owner/today", label: "My Desk", icon: CalendarDays },
@@ -54,59 +55,59 @@ export default function AdminShell({ children, userName }: { children: ReactNode
         { href: "/", label: "Public Website", icon: Globe },
       ].map((item) => (
         <Link key={item.href} href={item.href}
-          className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-mist hover:text-white hover:bg-white/[0.045] transition-colors">
-          <item.icon size={16} strokeWidth={1.8} /> {item.label}
+          className="flex items-center gap-3 px-3.5 min-h-11 rounded-[10px] text-sm text-mist hover:text-white hover:bg-white/[0.06] transition-colors duration-150">
+          <item.icon size={18} strokeWidth={1.8} aria-hidden="true" /> {item.label}
         </Link>
       ))}
     </nav>
   );
 
   return (
-    <div className="min-h-screen bg-coal text-chrome">
+    <div className="adm-shell min-h-screen bg-coal text-chrome">
       {/* sidebar desktop */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-white/[0.07] bg-[#0b0e13] z-40">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-slate-700/70 bg-panel z-40">
         <div className="px-5 pt-6 pb-5">
           <Link href="/admin">
-            <p className="font-serif text-lg text-white tracking-wide leading-none">HERRERO</p>
-            <p className="text-[10px] uppercase tracking-[0.24em] text-subtle mt-1.5">Shop</p>
+            <p className="font-serif text-lg text-white tracking-[0.14em] leading-none">HERRERO</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#22C55E] mt-1.5">Shop</p>
           </Link>
         </div>
         {navList}
-        <div className="p-4 border-t border-white/[0.07]">
-          <p className="px-1.5 text-[12px] text-white truncate">{userName}</p>
-          <p className="px-1.5 text-[11px] text-subtle mb-2.5">Owner · Herrero Pianos Davao</p>
-          <button onClick={() => logout()} className="flex items-center gap-2.5 px-1.5 text-[12px] text-mist hover:text-white transition-colors">
-            <LogOut size={14} /> Sign out
+        <div className="p-4 border-t border-slate-700/70">
+          <p className="px-1.5 text-sm text-white truncate">{userName}</p>
+          <p className="px-1.5 text-xs text-subtle mb-2">Owner · Herrero Pianos Davao</p>
+          <button onClick={() => logout()} className="flex items-center gap-2.5 px-2 min-h-11 -ml-0.5 rounded-[10px] text-sm text-mist hover:text-white hover:bg-white/[0.06] transition-colors duration-150">
+            <LogOut size={16} aria-hidden="true" /> Sign out
           </button>
         </div>
       </aside>
 
       {/* mobile top bar */}
-      <div className="lg:hidden sticky top-0 z-40 glass-top">
+      <div className="lg:hidden sticky top-0 z-40 glass-top pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-4 h-14">
-          <Link href="/admin" className="font-serif text-base text-white">HERRERO</Link>
-          <button onClick={() => setMobileOpen(true)} className="p-2.5 text-chrome" aria-label="Open menu" aria-expanded={mobileOpen}><Menu size={20} /></button>
+          <Link href="/admin" className="font-serif text-base text-white tracking-[0.14em] min-h-11 flex items-center">HERRERO</Link>
+          <button onClick={() => setMobileOpen(true)} className="h-11 w-11 -mr-2 flex items-center justify-center rounded-[10px] text-chrome hover:bg-white/[0.06]" aria-label="Open menu" aria-expanded={mobileOpen}><Menu size={22} aria-hidden="true" /></button>
         </div>
       </div>
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-72 bg-[#0b0e13] border-r border-white/10 flex flex-col p-4 anim-drawer" style={{ animationName: "drawerIn", transform: "none" }}>
+          <div className="absolute left-0 top-0 h-full w-72 bg-panel border-r border-slate-700/70 flex flex-col p-4 anim-drawer" style={{ animationName: "drawerIn", transform: "none" }}>
             <div className="flex items-center justify-between px-2 pt-2 pb-4">
               <p className="font-serif text-lg text-white">HERRERO</p>
-              <button onClick={() => setMobileOpen(false)} className="p-2.5 text-chrome" aria-label="Close menu"><X size={18} /></button>
+              <button onClick={() => setMobileOpen(false)} className="h-11 w-11 flex items-center justify-center rounded-[10px] text-chrome hover:bg-white/[0.06]" aria-label="Close menu"><X size={20} aria-hidden="true" /></button>
             </div>
             {navList}
-            <div className="p-3 border-t border-white/[0.07] mt-2">
-              <button onClick={() => logout()} className="flex items-center gap-2.5 text-[12px] text-mist hover:text-white transition-colors">
-                <LogOut size={14} /> Sign out
+            <div className="p-3 border-t border-slate-700/70 mt-2">
+              <button onClick={() => logout()} className="flex items-center gap-2.5 min-h-11 text-sm text-mist hover:text-white transition-colors">
+                <LogOut size={16} aria-hidden="true" /> Sign out
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <main className="lg:pl-60 min-h-screen">{children}</main>
+      <main id="main" className="lg:pl-60 min-h-screen">{children}</main>
     </div>
   );
 }

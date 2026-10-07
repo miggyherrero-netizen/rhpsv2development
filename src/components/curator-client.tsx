@@ -93,14 +93,14 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
       <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 mb-6">
         {projects.map((p) => (
           <button key={p.id} onClick={() => { setLoading(true); setProjectId(p.id); }}
-            className={`shrink-0 flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 transition text-left ${projectId === p.id ? "bg-white text-black border-white" : "border-white/10 text-chrome hover:border-white/30"}`}>
+            className={`shrink-0 flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 transition text-left ${projectId === p.id ? "bg-[#22C55E] text-[#04210F] border-[#22C55E]" : "border-white/10 text-chrome hover:border-white/30"}`}>
             {p.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.imageUrl} alt="" className="w-8 h-8 rounded-lg object-cover" />
             ) : <ImagePlus size={18} />}
             <span>
               <span className="block text-[12px] font-medium leading-tight">{p.pianoBrand} {p.pianoModel}</span>
-              <span className={`block text-[10px] leading-tight mt-0.5 ${projectId === p.id ? "text-black/60" : "text-mist"}`}>{p.clientName}</span>
+              <span className={`block text-xs leading-tight mt-0.5 ${projectId === p.id ? "text-black/60" : "text-mist"}`}>{p.clientName}</span>
             </span>
           </button>
         ))}
@@ -123,7 +123,7 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
           <Send size={13} /> Publish all
         </button>
         <button onClick={() => setModal(true)}
-          className="flex items-center gap-1.5 text-[12px] bg-white text-black font-medium rounded-lg px-3.5 py-2 hover:bg-chrome transition">
+          className="flex items-center gap-1.5 text-[12px] bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium rounded-lg px-3.5 py-2 hover:brightness-110 transition">
           <Plus size={13} /> Add update
         </button>
         {project && (
@@ -150,26 +150,26 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
               onDrop={() => onDrop(i)}
               className={`card-dark p-3.5 flex items-center gap-3.5 transition ${dragIdx === i ? "opacity-40" : ""} ${!u.isVisibleToClient ? "opacity-60" : ""}`}
             >
-              <GripVertical size={16} className="text-mist/50 cursor-grab shrink-0" />
+              <GripVertical size={16} className="text-mist cursor-grab shrink-0" />
               {u.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={u.imageUrl} alt="" className="w-20 h-14 rounded-lg object-cover shrink-0" />
               ) : (
-                <div className="w-20 h-14 rounded-lg bg-white/[0.04] flex items-center justify-center text-mist/40 shrink-0"><ImagePlus size={16} /></div>
+                <div className="w-20 h-14 rounded-lg bg-white/[0.04] flex items-center justify-center text-mist shrink-0"><ImagePlus size={16} /></div>
               )}
               <div className="flex-1 min-w-0">
                 <p className={`text-[13.5px] truncate ${u.isVisibleToClient ? "text-white" : "text-mist line-through decoration-white/30"}`}>{u.title}</p>
-                {u.body && <p className="text-[11.5px] text-mist truncate mt-0.5">{u.body}</p>}
-                <p className="text-[10px] text-mist/60 mt-1 uppercase tracking-wider tnum">{fmtDate(new Date(u.updateDate))}</p>
+                {u.body && <p className="text-xs text-mist truncate mt-0.5">{u.body}</p>}
+                <p className="text-xs text-mist mt-1 uppercase tracking-wider tnum">{fmtDate(new Date(u.updateDate))}</p>
               </div>
               <button onClick={() => toggle(u.id, !u.isVisibleToClient)}
-                className={`shrink-0 flex items-center gap-1.5 text-[11px] rounded-lg px-3 py-2 border transition ${
+                className={`shrink-0 flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 border transition ${
                   u.isVisibleToClient ? "border-emerald-400/25 text-emerald-300 bg-emerald-400/10" : "border-white/12 text-mist hover:text-white"
                 }`}>
                 {u.isVisibleToClient ? <><Eye size={13} /> Visible</> : <><EyeOff size={13} /> Hidden</>}
               </button>
               <button onClick={async () => { if (confirm("Delete this entry?")) { await deleteUpdate(u.id); setUpdates((us) => us.filter((x) => x.id !== u.id)); } }}
-                className="shrink-0 p-2 text-mist/50 hover:text-rose-400 transition">
+                className="shrink-0 p-2 text-mist hover:text-rose-400 transition">
                 <Trash2 size={15} />
               </button>
             </li>
@@ -207,18 +207,18 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
                 <Upload size={15} /> Upload a photo
               </button>
             )}
-            {uploadError && <p className="text-rose-400 text-[11px] mt-1.5">{uploadError}</p>}
+            {uploadError && <p className="text-rose-400 text-xs mt-1.5">{uploadError}</p>}
           </Field>
           <label className="flex items-center gap-2.5 text-[12.5px] text-chrome cursor-pointer">
             <input type="checkbox" checked={form.visible} onChange={(e) => setForm({ ...form, visible: e.target.checked })} className="accent-white" />
             Visible to client immediately
           </label>
           <button onClick={add} disabled={busy || !form.title.trim()}
-            className="w-full bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+            className="w-full bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
             {busy && <Spinner className="text-black" />} Add to journal
           </button>
           {!form.title.trim() && (
-            <p className="text-amber-300/80 text-[11px] text-center -mt-1.5">Title is required before this entry can be added.</p>
+            <p className="text-amber-300/80 text-xs text-center -mt-1.5">Title is required before this entry can be added.</p>
           )}
         </div>
       </Modal>

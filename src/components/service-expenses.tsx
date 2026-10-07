@@ -84,13 +84,13 @@ export default function ExpensesClient({
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1300px] mx-auto space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
+          <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
             Home Service
           </p>
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>
             Expenses
           </h1>
-          <p className="text-[12.5px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
+          <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             Fuel, materials, subcontractors — everything that eats into margin
           </p>
         </div>
@@ -103,23 +103,23 @@ export default function ExpensesClient({
 
       {unreviewed > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: "var(--color-svc-warn-soft)", border: "1px solid var(--color-svc-border)" }}>
-          <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+          <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>
             <b className="font-medium">{unreviewed} expense{unreviewed === 1 ? "" : "s"}</b> {unreviewed === 1 ? "has" : "have"} no kind yet. Until you review them, Finance sorts them by category.
           </p>
-          <Link href="/service/expenses/review" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[12.5px]">Review expenses</Link>
+          <Link href="/service/expenses/review" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[13px]">Review expenses</Link>
         </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RangePicker options={RANGES} value={rangeKey} />
-        <p className="text-[12.5px]" style={{ color: "var(--color-svc-text-dim)" }}>
+        <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
           Showing <b className="font-medium">{rangeLabel.toLowerCase()}</b>
           {narrowed ? <> · <span className="svc-num">{filtered.length} of {expenses.length}</span> entries match your search</> : null}
         </p>
       </div>
 
       {expenses.length >= 1000 && (
-        <p className="text-[12.5px]" style={{ color: "var(--color-svc-warn)" }}>
+        <p className="text-[13px]" style={{ color: "var(--color-svc-warn)" }}>
           Showing the latest 1,000 entries — pick a shorter range for exact totals.
         </p>
       )}
@@ -166,19 +166,19 @@ export default function ExpensesClient({
               hint="Log fuel and materials against jobs to see true job margins."
             />
           ) : (
-            <div className="overflow-x-auto thin-scroll">
-              <table className="w-full text-left">
+            <div className="svc-table-wrap thin-scroll">
+              <table className="svc-table w-full text-left">
                 <thead>
                   <tr style={{ color: "var(--color-svc-text-faint)" }}>
                     {["Date", "Category", "Kind", "Description", "Job", "Method", "Amount", ""].map((h) => (
-                      <th key={h} className="px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] font-normal">{h}</th>
+                      <th key={h} className="px-5 py-2.5 text-[12px] uppercase tracking-[0.08em] font-normal">{h || <span className="sr-only">Actions</span>}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="svc-divide">
                   {filtered.map((e) => (
                     <tr key={e.id} className="group hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-2.5 text-[12.5px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
+                      <td className="px-5 py-2.5 text-[13px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {fmtDate(new Date(e.spentAt))}
                       </td>
                       <td className="px-5 py-2.5">
@@ -190,22 +190,22 @@ export default function ExpensesClient({
                         ) : (
                           <Chip tone="warn">Not reviewed</Chip>
                         )}
-                        {e.pianoLabel ? <p className="text-[11px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{e.pianoLabel}</p> : null}
+                        {e.pianoLabel ? <p className="text-[12px] mt-1" style={{ color: "var(--color-svc-text-faint)" }}>{e.pianoLabel}</p> : null}
                       </td>
-                      <td className="px-5 py-2.5 text-[13px]" style={{ color: "var(--color-svc-text)" }}>
+                      <td className="px-5 py-2.5 text-[14px]" style={{ color: "var(--color-svc-text)" }}>
                         {e.description}
                         {e.vendor ? (
-                          <span className="text-[11.5px] ml-2" style={{ color: "var(--color-svc-text-faint)" }}>
+                          <span className="text-[12px] ml-2" style={{ color: "var(--color-svc-text-faint)" }}>
                             {e.vendor}
                           </span>
                         ) : null}
                         {e.reimbursable ? (
-                          <span className="text-[11px] ml-2" style={{ color: "var(--color-svc-violet)" }}>reimbursable</span>
+                          <span className="text-[12px] ml-2" style={{ color: "var(--color-svc-violet)" }}>reimbursable</span>
                         ) : null}
                         {e.hasReceipt ? (
                           <button
                             type="button" onClick={() => openReceipt(e.id, e.description)}
-                            className="ml-2 inline-flex items-center gap-1 text-[12px] hover:underline min-h-8 align-middle"
+                            className="ml-2 inline-flex items-center gap-1 text-[12px] hover:underline min-h-11 align-middle"
                             style={{ color: "var(--color-svc-accent)" }} aria-label={`View receipt for ${e.description}`}
                           >
                             <Paperclip size={12} /> Receipt
@@ -222,7 +222,7 @@ export default function ExpensesClient({
                       <td className="px-5 py-2.5 text-[12px] whitespace-nowrap" style={{ color: "var(--color-svc-text-dim)" }}>
                         {PAYMENT_METHOD_LABEL[e.method] ?? e.method}
                       </td>
-                      <td className="px-5 py-2.5 whitespace-nowrap"><Money cents={e.amountCents} className="text-[13px]" /></td>
+                      <td className="px-5 py-2.5 whitespace-nowrap"><Money cents={e.amountCents} className="text-[14px]" /></td>
                       <td className="px-5 py-2.5 text-right">
                         <button
                           onClick={() => run(() => deleteExpense(e.id))}
@@ -258,7 +258,7 @@ export default function ExpensesClient({
                 </div>
               ))
             )}
-            <p className="text-[11px]" style={{ color: "var(--color-svc-text-faint)" }}>
+            <p className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
               Category totals cover the last 90 days.
             </p>
             {showFinance ? (
@@ -272,7 +272,7 @@ export default function ExpensesClient({
 
       <SvcModal open={!!receiptView} onClose={() => setReceiptView(null)} title="Receipt" subtitle={receiptView?.title} wide>
         {receiptView && !receiptView.url && (
-          <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{receiptView.error ?? "Loading receipt…"}</p>
+          <p className="text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{receiptView.error ?? "Loading receipt…"}</p>
         )}
         {receiptView?.url && (
           // eslint-disable-next-line @next/next/no-img-element

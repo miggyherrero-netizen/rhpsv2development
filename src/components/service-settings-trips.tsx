@@ -65,15 +65,15 @@ export default function TripSettings({
 
           <div>
             <div className="flex items-center justify-between gap-3 mb-2">
-              <p className="text-[11px] uppercase tracking-[0.1em]" style={DIM}>Saved routes</p>
+              <p className="text-[12px] uppercase tracking-[0.1em]" style={DIM}>Saved routes</p>
               {!editing && <GhostButton onClick={() => setEditing({ id: null, name: "", codes: [] })} className="inline-flex items-center gap-1.5 !min-h-11"><Plus size={13} aria-hidden="true" /> New route</GhostButton>}
             </div>
-            {routes.length === 0 && !editing && <p className="text-[12.5px]" style={FAINT}>No routes yet. A route is an ordered list of towns — e.g. “South Run: Digos → Sta. Cruz → Gensan” — so the waitlist can show who is on it.</p>}
+            {routes.length === 0 && !editing && <p className="text-[13px]" style={FAINT}>No routes yet. A route is an ordered list of towns — e.g. “South Run: Digos → Sta. Cruz → Gensan” — so the waitlist can show who is on it.</p>}
             <ul className="svc-divide">
               {routes.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>{r.name}</p>
+                    <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{r.name}</p>
                     <p className="text-[12px]" style={DIM}>{r.cityCodes.map((c) => (labels[c] ?? c).split(" · ")[0]).join(" → ")}</p>
                   </div>
                   <div className="flex gap-2">
@@ -91,7 +91,7 @@ export default function TripSettings({
                   {editing.codes.map((c, i) => (
                     <li key={c} className="flex items-center gap-2">
                       <span className="w-6 text-[12px] text-right" style={FAINT}>{i + 1}.</span>
-                      <span className="flex-1 text-[13px]" style={{ color: "var(--color-svc-text)" }}>{labels[c] ?? c}</span>
+                      <span className="flex-1 text-[14px]" style={{ color: "var(--color-svc-text)" }}>{labels[c] ?? c}</span>
                       <button type="button" aria-label={`Move ${labels[c] ?? c} up`} disabled={i === 0} className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06] disabled:opacity-30" style={DIM}
                         onClick={() => { const a = [...editing.codes]; [a[i - 1], a[i]] = [a[i]!, a[i - 1]!]; setEditing({ ...editing, codes: a }); }}><ArrowUp size={14} aria-hidden="true" /></button>
                       <button type="button" aria-label={`Move ${labels[c] ?? c} down`} disabled={i === editing.codes.length - 1} className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06] disabled:opacity-30" style={DIM}
@@ -122,7 +122,7 @@ export default function TripSettings({
 
       <SectionCard title={<>Message templates <span className="font-normal text-[12px]" style={FAINT}>· saves instantly</span></>}>
         <div className="px-5 py-4 space-y-5">
-          <p className="text-[12.5px]" style={DIM}>
+          <p className="text-[13px]" style={DIM}>
             Placeholders get filled in for each client: {PLACEHOLDERS.map((p) => <code key={p} className="mx-0.5 px-1 rounded" style={{ background: "var(--color-svc-surface-2)" }}>{`{${p}}`}</code>)}
           </p>
           {templates.map((t) => <TemplateEditor key={t.key} t={t} pending={pending} onSave={(body, name) => run(() => saveTemplate(t.key, { body, name }), `“${name}” saved ✓`)} />)}

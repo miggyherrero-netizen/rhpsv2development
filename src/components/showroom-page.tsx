@@ -25,11 +25,11 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
     <div className={`${PUB_ROOT} bg-paper text-ink min-h-screen`}>
       <SiteHeader home={false} solid />
       <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-28 pb-24">
-        <Link href="/" className={`inline-flex items-center gap-1.5 text-[14.5px] text-subtle hover:text-ink transition-colors rounded-sm min-h-10 ${FOCUS_RING}`}>
-          <ArrowLeft size={14} /> Back to Home
+        <Link href="/" className={`inline-flex items-center gap-1.5 text-[14.5px] text-subtle hover:text-ink transition-colors rounded-sm min-h-11 ${FOCUS_RING}`}>
+          <ArrowLeft size={16} aria-hidden="true" /> Back to Home
         </Link>
         <p className="pub-kicker mt-8">The Showroom</p>
-        <h1 className="font-serif font-medium tracking-[-0.01em] text-[2.6rem] sm:text-5xl lg:text-[3.25rem] leading-[1.06] mt-3.5">All Instruments</h1>
+        <h1 className="font-serif font-semibold tracking-[-0.01em] text-[2.75rem] sm:text-5xl lg:text-[3.25rem] leading-[1.06] mt-3.5">All Instruments</h1>
         <p className="text-subtle text-[16px] max-w-xl leading-relaxed mt-4">
           Every piano below is for sale, priced as marked. Identical models are grouped — open one to choose a specific unit.
         </p>
@@ -38,8 +38,8 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
           {FILTERS.map((f) => (
             <button
               key={f.id} type="button" onClick={() => setFilter(f.id)} aria-pressed={filter === f.id}
-              className={`text-[14.5px] font-medium rounded-full border px-5 min-h-11 transition-colors ${FOCUS_RING} ${
-                filter === f.id ? "border-gold bg-gold text-onbrass" : "border-white/20 bg-card text-ink hover:border-gold hover:text-gold"
+              className={`text-[14.5px] font-medium rounded-full border px-5 min-h-11 transition-colors duration-200 ${FOCUS_RING} ${
+                filter === f.id ? "border-ink bg-ink text-paper" : "border-white/20 bg-card text-ink hover:border-gold hover:text-gold"
               }`}
             >
               {f.label} <span className={filter === f.id ? "opacity-90" : "text-subtle"}>({counts[f.id]})</span>
@@ -55,8 +55,8 @@ export default function ShowroomPage({ pianos, content }: { pianos: PublicPiano[
             {shown.map((g) => <PianoCard key={g.key} group={g} onOpen={setOpen} />)}
           </div>
         ) : (
-          <div className="mt-10 rounded-2xl border border-white/10 bg-card p-10 text-center">
-            <p className="font-serif font-medium text-[1.75rem]">Nothing in this range right now.</p>
+          <div className="mt-10 rounded-[14px] border border-white/10 bg-card p-6 sm:p-10 text-center">
+            <p className="font-serif font-semibold text-[1.75rem]">Nothing in this range right now.</p>
             <p className="text-subtle text-[15.5px] mt-2">Message us — new instruments arrive often, and we can look for one for you.</p>
             <div className="mt-6 flex justify-center"><MessengerButton /></div>
           </div>

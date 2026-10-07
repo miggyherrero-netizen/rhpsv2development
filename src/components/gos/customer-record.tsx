@@ -56,19 +56,19 @@ export default function CustomerRecord(props: {
 
   return (
     <div className="mt-2 space-y-4">
-      <Link href="/os/customers" className="gos-tap inline-flex items-center text-sm underline">← Customers</Link>
+      <Link href="/os/customers" className="gos-tap gos-link inline-flex items-center">← Customers</Link>
       <header className="gos-card">
-        <h1 className="text-2xl font-bold">{c.name}</h1>
-        <p className="mt-1">{customerStatusLabel(status)}{c.area ? ` · ${c.area}` : ""}</p>
+        <h1>{c.name}</h1>
+        <p className="mt-2 flex flex-wrap items-center gap-2"><span className={`gos-badge ${status === "Lost" ? "gos-badge-late" : status === "New" ? "gos-badge-info" : "gos-badge-wait"}`}>{customerStatusLabel(status)}</span>{c.area && <span>{c.area}</span>}</p>
         <p className="text-sm text-[var(--gos-ink-dim)]">Came from: {c.cameFrom}{props.adName ? ` · ${props.adName}` : ""}</p>
-        {c.phone && <a className="gos-tap mt-1 inline-flex items-center underline" href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}>{c.phone}</a>}
+        {c.phone && <a className="gos-tap gos-link mt-1 inline-flex items-center" href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}>{c.phone}</a>}
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
-          {c.cameFrom === "Messenger" && c.adKind === "unknown" && <span className="rounded border px-1">No ad tag</span>}
+          {c.cameFrom === "Messenger" && c.adKind === "unknown" && <span className="gos-tag">No ad tag</span>}
           {c.possibleDuplicate && (
             <>
-              <span className="rounded border border-[var(--gos-danger)] px-1">⚠ Possible duplicate</span>
-              <button type="button" className="underline" onClick={onMerge}>Merge</button>
-              <button type="button" className="underline" onClick={() => run(() => markNotDuplicate(c.id), "Marked: not the same.")}>Not the same</button>
+              <span className="gos-tag gos-tag-warn">⚠ Possible duplicate</span>
+              <button type="button" className="gos-tap gos-link" onClick={onMerge}>Merge</button>
+              <button type="button" className="gos-tap gos-link" onClick={() => run(() => markNotDuplicate(c.id), "Marked: not the same.")}>Not the same</button>
             </>
           )}
         </div>
@@ -81,21 +81,21 @@ export default function CustomerRecord(props: {
           {isNew ? (
             <>
               <SendKit text={props.replyText} onSent={() => run(() => markReplied(c.id), "Replied ✓", true).then(() => undefined)} />
-              <button type="button" className="gos-tap rounded-full border px-4" onClick={() => run(() => markReplied(c.id), "Replied ✓", true)}>Mark replied</button>
+              <button type="button" className="gos-btn-ghost" onClick={() => run(() => markReplied(c.id), "Replied ✓", true)}>Mark replied</button>
             </>
           ) : (
             <>
               <SendKit text={props.replyText} copyLabel="Copy message" sentLabel="Yes, sent" onSent={() => run(() => logSent(c.id, "Message"), "Logged ✓")} />
               {status === "Replied" && (
-                <button type="button" className="gos-tap rounded-full border px-4" onClick={() => run(() => undoReplied(c.id), "Back to New.")}>Undo replied</button>
+                <button type="button" className="gos-btn-ghost" onClick={() => run(() => undoReplied(c.id), "Back to New.")}>Undo replied</button>
               )}
             </>
           )}
-          <button type="button" className="gos-tap rounded-full border border-[var(--gos-danger)] px-4 text-[var(--gos-danger)]" onClick={() => setShowLost((v) => !v)}>Lost</button>
+          <button type="button" className="gos-btn-ghost gos-btn-danger" onClick={() => setShowLost((v) => !v)}>Lost</button>
           {showLost && (
             <div role="group" aria-label="Lost reason" className="flex flex-wrap gap-2">
               {lostReasons.map((r) => (
-                <button key={r} type="button" className="gos-tap rounded-full border bg-white px-4"
+                <button key={r} type="button" className="gos-btn-ghost"
                   onClick={() => { setShowLost(false); void run(() => markLost(c.id, r), `Marked Lost: ${r}`, true); }}>{r}</button>
               ))}
             </div>
@@ -108,22 +108,22 @@ export default function CustomerRecord(props: {
         </section>
       )}
 
-      {error && <p role="alert" className="text-[var(--gos-danger)]">✕ {error}</p>}
+      {error && <p role="alert" className="gos-tag gos-tag-warn !whitespace-normal py-2">✕ {error}</p>}
 
       <section className="gos-card" aria-label="Activity">
         <h2 className="mb-2 text-lg font-bold">Activity</h2>
         <ul className="space-y-2">
           {shown.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--gos-line)] pb-2">
+            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--gos-line)] pb-2 last:border-b-0 last:pb-0">
               <span>{a.text}<span className="block text-xs text-[var(--gos-ink-dim)]">{a.when}</span></span>
-              {a.undoable && <button type="button" className="gos-tap rounded-full border px-3 text-sm" onClick={() => run(() => undoActivity(a.id), "Undone ✓")}>Undo</button>}
+              {a.undoable && <button type="button" className="gos-btn-ghost !min-h-11 !px-3 text-sm" onClick={() => run(() => undoActivity(a.id), "Undone ✓")}>Undo</button>}
             </li>
           ))}
         </ul>
-        {!showAll && activity.length > 20 && <button type="button" className="gos-tap mt-2 underline" onClick={() => setShowAll(true)}>Show older</button>}
+        {!showAll && activity.length > 20 && <button type="button" className="gos-tap gos-link mt-2" onClick={() => setShowAll(true)}>Show older</button>}
       </section>
 
-      <button type="button" className="gos-tap text-sm text-[var(--gos-danger)] underline"
+      <button type="button" className="gos-tap gos-link-danger text-sm"
         onClick={async () => {
           if (!window.confirm(`Delete ${c.name} and all her records?`)) return;
           const r = await deleteCustomer(c.id);
@@ -132,9 +132,9 @@ export default function CustomerRecord(props: {
         }}>Delete customer</button>
 
       {toast && (
-        <div role="status" className="fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-[var(--gos-black)] p-3 text-white lg:bottom-6">
+        <div role="status" className="fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-md items-center justify-between gap-3 gos-toast rounded-xl p-3 lg:bottom-6">
           <span>{toast.text}</span>
-          {toast.undoId && <button type="button" className="gos-tap font-bold text-[var(--gos-gold)] underline" onClick={() => { const id = toast.undoId!; void run(() => undoActivity(id), "Undone ✓"); }}>Undo</button>}
+          {toast.undoId && <button type="button" className="gos-tap font-bold underline" onClick={() => { const id = toast.undoId!; void run(() => undoActivity(id), "Undone ✓"); }}>Undo</button>}
         </div>
       )}
     </div>

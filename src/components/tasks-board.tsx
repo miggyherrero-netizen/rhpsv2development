@@ -129,8 +129,8 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
           <p className={`text-[13px] leading-snug ${t.status === "done" ? "line-through text-mist" : "text-white"}`}>{t.title}</p>
           <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${p.dot}`} title={p.label} />
         </div>
-        <p className="text-[11px] text-mist mt-1">{t.pianoName ?? "Shop-wide"}{t.projectName ? ` · ${t.projectName}` : ""}</p>
-        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2.5 text-[10.5px] text-mist/80">
+        <p className="text-xs text-mist mt-1">{t.pianoName ?? "Shop-wide"}{t.projectName ? ` · ${t.projectName}` : ""}</p>
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2.5 text-xs text-mist">
           <span className="flex items-center gap-1"><Clock3 size={11} /> {fmtDuration(t.estimatedMinutes * 60000)}</span>
           {t.dueDate && <span className={`flex items-center gap-1 ${overdue ? "text-rose-400" : ""}`}><CalendarDays size={11} /> {fmtDate(new Date(t.dueDate))}</span>}
           {t.waitingParts && <span className="text-amber-300 uppercase tracking-wide">parts</span>}
@@ -138,7 +138,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
         {(t.claimedName || t.assigneeNames.length > 0) && (
           <div className="flex items-center gap-2 mt-2.5">
             <Avatar name={(t.claimedName ?? t.assigneeNames[0])!} size={18} />
-            <span className="text-[10.5px] text-chrome/80">{t.claimedName ? `${t.claimedName.split(" ")[0]} (claimed)` : assigneeLabel(t.assigneeNames)}</span>
+            <span className="text-xs text-chrome/80">{t.claimedName ? `${t.claimedName.split(" ")[0]} (claimed)` : assigneeLabel(t.assigneeNames)}</span>
           </div>
         )}
       </button>
@@ -166,7 +166,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
             <Plus size={15} /> Open Work for All
           </button>
           <button onClick={() => { setError(""); setModal({ data: { ...BLANK, kind, projectId: kind === "project" && projectFilter !== "all" ? projectFilter : null } }); }}
-            className="flex items-center gap-2 bg-white text-black text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:bg-chrome transition">
+            className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 py-2.5 hover:brightness-110 transition">
             <Plus size={15} /> Create Task
           </button>
         </div>
@@ -186,7 +186,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
         <div className="flex rounded-xl border border-white/10 bg-white/[0.04] p-1" aria-label="Task type">
           {([['standalone', 'Task'], ['project', 'Project + Task']] as const).map(([value, label]) => (
             <button key={value} aria-pressed={kind === value} onClick={() => { setKind(value); setProjectFilter("all"); setError(""); }}
-              className={`rounded-lg px-4 py-2 text-[13px] transition ${kind === value ? "bg-white text-black font-medium" : "text-mist hover:text-white"}`}>
+              className={`rounded-lg px-4 py-2 text-[13px] transition ${kind === value ? "bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium" : "text-mist hover:text-white"}`}>
               {label} <span className="ml-1.5 opacity-60">{tasks.filter((t) => !!t.projectId === (value === "project") && !!t.archivedAt === archived).length}</span>
             </button>
           ))}
@@ -219,7 +219,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
         {!archived && <div className="ml-auto flex bg-white/[0.05] border border-white/10 rounded-xl p-1">
           {([["kanban", LayoutGrid], ["list", Rows3]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-3.5 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition ${view === v ? "bg-white text-black font-medium" : "text-mist hover:text-white"}`}>
+              className={`px-3.5 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition ${view === v ? "bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium" : "text-mist hover:text-white"}`}>
               <Icon size={13} /> {v === "kanban" ? "Kanban" : "List"}
             </button>
           ))}
@@ -240,8 +240,8 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
                 onDrop={(e) => { e.preventDefault(); setDragOver(null); const id = e.dataTransfer.getData("text/plain"); if (id) moveTask(id, col.key); }}
               >
                 <div className="flex items-center justify-between px-1.5 mb-2.5">
-                  <p className="text-[10.5px] uppercase tracking-[0.18em] text-mist">{col.label}</p>
-                  <span className="text-[10.5px] text-mist/60 tnum">{cards.length}</span>
+                  <p className="text-xs uppercase tracking-[0.18em] text-mist">{col.label}</p>
+                  <span className="text-xs text-mist tnum">{cards.length}</span>
                 </div>
                 <div className="space-y-2.5 min-h-[120px]">{cards.map(card)}</div>
               </div>
@@ -254,7 +254,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
         <div className="card-dark overflow-x-auto anim-fade-in thin-scroll">
           <table className="w-full text-[12.5px] min-w-[900px]">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
+              <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Task", "Project / Piano", "Status", "Priority", "Est.", "Due", "Assigned", "Claimed by"].map((h) => (
                   <th key={h} className="px-4 py-3 font-medium">{h}</th>
                 ))}
@@ -268,8 +268,8 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
                   <tr key={t.id} onClick={() => setModal({ id: t.id, data: toInput(t) })} className="border-b border-white/[0.04] hover:bg-white/[0.035] cursor-pointer transition-colors">
                     <td className={`px-4 py-3.5 max-w-[260px] ${t.status === "done" ? "line-through text-mist" : "text-white"}`}>{t.title}</td>
                     <td className="px-4 py-3.5 text-mist">{t.pianoName ?? "Shop"}{t.projectName ? ` · ${t.projectName}` : ""}</td>
-                    <td className="px-4 py-3.5"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-[10.5px]">{TASK_LABEL[t.status]}</span></td>
-                    <td className="px-4 py-3.5"><span className={`flex items-center gap-1.5 text-[11px] ${p.text}`}><span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />{p.label}</span></td>
+                    <td className="px-4 py-3.5"><span className="bg-white/[0.07] border border-white/10 rounded-full px-2.5 py-1 text-xs">{TASK_LABEL[t.status]}</span></td>
+                    <td className="px-4 py-3.5"><span className={`flex items-center gap-1.5 text-xs ${p.text}`}><span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />{p.label}</span></td>
                     <td className="px-4 py-3.5 text-mist tnum">{fmtDuration(t.estimatedMinutes * 60000)}</td>
                     <td className={`px-4 py-3.5 tnum ${overdue ? "text-rose-400" : "text-mist"}`}>{t.dueDate ? fmtDate(new Date(t.dueDate)) : "—"}</td>
                     <td className="px-4 py-3.5 text-chrome">{assigneeLabel(t.assigneeNames) ?? "—"}</td>
@@ -321,7 +321,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
             {error && <p role="alert" className="sm:col-span-2 text-rose-400 text-xs">{error}</p>}
             <div className="sm:col-span-2 flex flex-wrap gap-2 mt-1">
               {!modalArchived && <button onClick={save} disabled={busy || !modal.data.title.trim() || (modal.data.kind === "project" && !modal.data.projectId)}
-                className="flex-1 bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2">
+                className="flex-1 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {busy && <Spinner className="text-black" />} {modal.id ? "Save changes" : "Create task"}
               </button>}
               {modal.id && (modalArchived ? (
@@ -422,7 +422,7 @@ function RapidWorkModal({
                   onClick={() => toggleWorker(w.id)}
                   aria-pressed={workerIds.includes(w.id)}
                   className={`flex items-center gap-1.5 rounded-full pl-1 pr-3 py-1 text-[12px] border transition ${
-                    workerIds.includes(w.id) ? "bg-white text-black border-white font-medium" : "border-white/15 text-mist hover:text-white"
+                    workerIds.includes(w.id) ? "bg-[#22C55E] text-[#04210F] border-[#22C55E] font-medium" : "border-white/15 text-mist hover:text-white"
                   }`}
                 >
                   <Avatar name={w.name} url={w.avatarUrl} size={20} />
@@ -461,7 +461,7 @@ function RapidWorkModal({
         <button
           onClick={submit}
           disabled={busy || !canSubmit}
-          className="w-full bg-white text-black text-[13px] font-medium rounded-xl py-3 hover:bg-chrome transition disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[13px] font-medium rounded-xl py-3 hover:brightness-110 transition disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {busy && <Spinner className="text-black" />} Assign
         </button>

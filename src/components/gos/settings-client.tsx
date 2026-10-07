@@ -90,7 +90,7 @@ export default function SettingsClient({ initial, initialAds }: { initial: GosSe
 
   return (
     <div className="mt-2 space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1>Settings</h1>
 
       <fieldset className="gos-card space-y-4">
         <legend className="px-1 text-lg font-bold">Prices</legend>
@@ -166,7 +166,7 @@ export default function SettingsClient({ initial, initialAds }: { initial: GosSe
           {ads.map((ad) => (
             <li key={ad.id} className="flex items-center justify-between gap-3">
               <span>{ad.name}{ad.retired ? " (retired)" : ""}</span>
-              <button type="button" className="gos-tap rounded-full border px-4"
+              <button type="button" className="gos-btn-ghost"
                 onClick={async () => {
                   const res = await setAdRetired(ad.id, !ad.retired);
                   if (res.ok) { setAds(ads.map((a) => (a.id === ad.id ? { ...a, retired: !a.retired } : a))); setAdError(""); }

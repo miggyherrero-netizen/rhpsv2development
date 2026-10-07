@@ -71,9 +71,9 @@ export function CityPicker({
   if (value.cityCode) {
     return (
       <div className="space-y-2">
-        <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>{label}</p>
+        <p className="text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>{label}</p>
         <div className="flex items-center justify-between gap-2 rounded-xl px-3.5 min-h-11" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
-          <span className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>{shownLabel ?? value.cityCode}</span>
+          <span className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{shownLabel ?? value.cityCode}</span>
           <button
             ref={changeRef} type="button" aria-label="Change city" className="inline-flex items-center justify-center min-w-11 min-h-11 -mr-2 rounded-lg hover:bg-white/[0.06]"
             style={{ color: "var(--color-svc-text-faint)" }} onClick={() => { moved.current = "cleared"; setPicked(null); onChange({ cityCode: null, barangayCode: null }); }}
@@ -93,7 +93,7 @@ export function CityPicker({
 
   return (
     <div className="relative">
-      <label htmlFor={`${id}-in`} className="block text-[11px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{label}</label>
+      <label htmlFor={`${id}-in`} className="block text-[12px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>{label}</label>
       <TextInput
         ref={inputRef} id={`${id}-in`} role="combobox" aria-expanded={open && list.length > 0} aria-controls={`${id}-list`} aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? `${id}-o${active}` : undefined} autoComplete="off" autoFocus={autoFocus}
@@ -114,11 +114,11 @@ export function CityPicker({
           {list.map((h, i) => (
             <li
               key={h.code} id={`${id}-o${i}`} role="option" aria-selected={i === active} onMouseDown={(e) => { e.preventDefault(); choose(h); }}
-              className="px-3 py-2 min-h-11 flex flex-col justify-center cursor-pointer text-[13px]"
+              className="px-3 py-2 min-h-11 flex flex-col justify-center cursor-pointer text-[14px]"
               style={{ background: i === active ? "var(--color-svc-accent-soft)" : undefined, color: "var(--color-svc-text)" }}
             >
               <span>{h.name}</span>
-              <span className="text-[11.5px]" style={{ color: "var(--color-svc-text-dim)" }}>{h.provinceName ? `${h.provinceName} · ` : ""}Region {h.regionShort}</span>
+              <span className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>{h.provinceName ? `${h.provinceName} · ` : ""}Region {h.regionShort}</span>
             </li>
           ))}
         </ul>

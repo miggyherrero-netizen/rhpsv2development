@@ -51,28 +51,28 @@ export default function OwnerTasksClient({ bundle: rawBundle }: { bundle: OwnerB
 
   return (
     <div className="p-4 sm:p-7 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between gap-3 mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl text-[var(--color-ow-text)]">Tasks</h1>
-          <p className="text-[var(--color-ow-text-dim)] text-[12.5px] mt-1">Your personal action list — dates optional, never lost.</p>
+          <p className="text-[var(--color-ow-text-dim)] text-[13px] mt-1">Your personal action list — dates optional, never lost.</p>
         </div>
-        <button onClick={() => setModal({})} className="btn-ow-primary flex items-center gap-1.5 text-[12.5px] rounded-xl px-4 py-2.5">
+        <button onClick={() => setModal({})} className="btn-ow-primary flex items-center gap-1.5 text-[14px] rounded-[10px] px-5 shrink-0">
           <Plus size={14} /> Add task
         </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks…" className={`${inp} flex-1 min-w-[160px]`} />
-        <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className={`${inp} !w-auto`}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks…" aria-label="Search tasks" className={`${inp} flex-1 min-w-[160px]`} />
+        <select aria-label="Status filter" value={statusF} onChange={(e) => setStatusF(e.target.value)} className={`${inp} !w-auto`}>
           <option value="active">Active</option>
           <option value="done">Completed</option>
           <option value="all">Everything</option>
         </select>
-        <select value={prioF} onChange={(e) => setPrioF(e.target.value)} className={`${inp} !w-auto`}>
+        <select aria-label="Priority filter" value={prioF} onChange={(e) => setPrioF(e.target.value)} className={`${inp} !w-auto`}>
           <option value="all">Any priority</option>
           <option value="urgent">Urgent</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option>
         </select>
-        <select value={catF} onChange={(e) => setCatF(e.target.value)} className={`${inp} !w-auto`}>
+        <select aria-label="Category filter" value={catF} onChange={(e) => setCatF(e.target.value)} className={`${inp} !w-auto`}>
           <option value="all">All categories</option>
           {bundle.categories.filter((c) => !c.hidden).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -80,12 +80,12 @@ export default function OwnerTasksClient({ bundle: rawBundle }: { bundle: OwnerB
 
       {tasks.length === 0 ? (
         <EmptyState title="Nothing here" body="Add a task, or capture thoughts in the Inbox and convert them later."
-          action={<button onClick={() => setModal({})} className="btn-ow-primary text-[12px] rounded-lg px-4 py-2">Add task</button>} />
+          action={<button onClick={() => setModal({})} className="btn-ow-primary text-[14px] rounded-[10px] px-5">Add task</button>} />
       ) : (
         <div className="space-y-6">
           {groups.map((g) => g.tasks.length > 0 && (
             <section key={g.label}>
-              <p className={`text-[10.5px] uppercase tracking-[0.22em] mb-2.5 ${g.cls}`}>{g.label} · {g.tasks.length}</p>
+              <p className={`text-[12px] uppercase tracking-[0.1em] mb-2.5 ${g.cls}`}>{g.label} · {g.tasks.length}</p>
               <ul className="card-ow ow-divide">
                 {g.tasks
                   .sort((a, b) => (a.dueDate?.getTime() ?? a.scheduledStart?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? b.scheduledStart?.getTime() ?? Infinity))
@@ -93,14 +93,14 @@ export default function OwnerTasksClient({ bundle: rawBundle }: { bundle: OwnerB
                     const overdue = (t.dueDate && startOfDay(new Date(t.dueDate)) < today) || (t.scheduledStart && startOfDay(new Date(t.scheduledStart)) < today);
                     const done = t.status === "done";
                     return (
-                      <li key={t.id} className={`flex items-center gap-3 px-4 py-3 group ${done ? "opacity-55" : ""}`}>
+                      <li key={t.id} className={`flex items-center gap-1 px-3 py-1.5 group ${done ? "ow-done" : ""}`}>
                         <TaskCheck done={done} onToggle={() => setOwnerTaskDone(t.id, !done)} />
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModal({ edit: taskToEdit(t) })}>
-                          <p className={`text-[13.5px] leading-snug flex items-center gap-1.5 text-[var(--color-ow-text)] ${done ? "line-through" : ""}`}>
+                        <div className="flex-1 min-w-0 cursor-pointer rounded-lg" role="button" tabIndex={0} onClick={() => setModal({ edit: taskToEdit(t) })} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setModal({ edit: taskToEdit(t) }); } }}>
+                          <p className={`text-[14px] leading-snug flex items-center gap-1.5 text-[var(--color-ow-text)] ${done ? "line-through" : ""}`}>
                             <PriorityDot priority={t.priority} /> {t.title}
                             {t.recurrence && <Repeat2 size={11} className="text-[var(--color-ow-text-faint)]" />}
                           </p>
-                          <p className="text-[10.5px] text-[var(--color-ow-text-dim)] mt-0.5 flex items-center gap-2 flex-wrap">
+                          <p className="text-[12px] text-[var(--color-ow-text-dim)] mt-0.5 flex items-center gap-2 flex-wrap">
                             <CategoryChip category={catMap.get(t.categoryId ?? "")} />
                             {t.dueDate && <span style={overdue && !done ? { color: "var(--color-ow-rose)", fontWeight: 500 } : undefined}>due {ymd(new Date(t.dueDate))}</span>}
                             {t.scheduledStart && (
@@ -109,10 +109,10 @@ export default function OwnerTasksClient({ bundle: rawBundle }: { bundle: OwnerB
                             {!t.dueDate && !t.scheduledStart && !done && <span className="text-[var(--color-ow-text-faint)]">no date — drag onto calendar</span>}
                           </p>
                         </div>
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
-                          <button title={t.onToday ? "Remove from today" : "Focus today"} onClick={() => toggleOnToday(t.id, !t.onToday)}
-                            className="p-1.5 transition" style={{ color: t.onToday ? "var(--color-ow-accent)" : "var(--color-ow-text-faint)" }}><Sun size={14} /></button>
-                          <button title="Delete" onClick={() => deleteOwnerTask(t.id)} className="p-1.5 transition text-[var(--color-ow-text-faint)] hover:text-[var(--color-ow-rose)]"><Trash2 size={14} /></button>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition shrink-0">
+                          <button title={t.onToday ? "Remove from today" : "Focus today"} aria-label={t.onToday ? "Remove from today" : "Focus today"} onClick={() => toggleOnToday(t.id, !t.onToday)}
+                            className="ow-icon-btn transition" style={{ color: t.onToday ? "var(--color-ow-accent-text)" : "var(--color-ow-text-faint)" }}><Sun size={14} /></button>
+                          <button title="Delete" aria-label="Delete" onClick={() => deleteOwnerTask(t.id)} className="ow-icon-btn transition text-[var(--color-ow-text-faint)] hover:text-[var(--color-ow-rose)]"><Trash2 size={14} /></button>
                         </div>
                       </li>
                     );

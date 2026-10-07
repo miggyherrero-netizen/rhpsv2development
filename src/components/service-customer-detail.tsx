@@ -76,7 +76,7 @@ export default function CustomerDetailClient({
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-5">
       <div>
-        <Link href="/service/customers" className={`inline-flex items-center gap-1.5 text-[12.5px] hover:underline rounded-sm ${FOCUS}`} style={FAINT}>
+        <Link href="/service/customers" className={`inline-flex items-center gap-1.5 text-[13px] hover:underline rounded-sm ${FOCUS}`} style={FAINT}>
           <ArrowLeft size={13} /> Customers
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
@@ -85,7 +85,7 @@ export default function CustomerDetailClient({
               <h1 className="font-serif text-3xl break-words" style={{ color: "var(--color-svc-text)" }}>{customer.name}</h1>
               {batch && <Chip tone="violet">Trip / batch</Chip>}
             </div>
-            {customer.company ? <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>{customer.company}</p> : null}
+            {customer.company ? <p className="text-[14px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>{customer.company}</p> : null}
             <p className="text-[14px] mt-2 svc-num" style={{ color: "var(--color-svc-text-dim)" }}>
               {canSeeMoney ? billedHeadline(jobs.length, detail.billedCents) : `${jobs.length} job${jobs.length === 1 ? "" : "s"}`}
             </p>
@@ -102,15 +102,15 @@ export default function CustomerDetailClient({
 
       <div className="flex flex-wrap items-center gap-2.5">
         {phone ? (
-          <a href={phone} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[13px] ${FOCUS}`}><Phone size={15} /> Call {customer.phone}</a>
+          <a href={phone} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[14px] ${FOCUS}`}><Phone size={15} /> Call {customer.phone}</a>
         ) : null}
         {messenger ? (
-          <a href={`https://m.me/${messenger}`} target="_blank" rel="noopener noreferrer" className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[13px] ${FOCUS}`}><MessageCircle size={15} /> Messenger</a>
+          <a href={`https://m.me/${messenger}`} target="_blank" rel="noopener noreferrer" className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[14px] ${FOCUS}`}><MessageCircle size={15} /> Messenger</a>
         ) : (
-          <button type="button" onClick={() => setMessengerOpen(true)} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[13px] ${FOCUS}`}><MessageCircle size={15} /> Add Messenger</button>
+          <button type="button" onClick={() => setMessengerOpen(true)} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[14px] ${FOCUS}`}><MessageCircle size={15} /> Add Messenger</button>
         )}
         {customer.email ? (
-          <a href={`mailto:${customer.email}`} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[13px] ${FOCUS}`}><Mail size={15} /> {customer.email}</a>
+          <a href={`mailto:${customer.email}`} className={`btn-svc-ghost rounded-xl px-4 min-h-11 inline-flex items-center gap-2 text-[14px] ${FOCUS}`}><Mail size={15} /> {customer.email}</a>
         ) : null}
       </div>
 
@@ -131,14 +131,14 @@ export default function CustomerDetailClient({
               {locations.map((l) => (
                 <li key={l.id} className="flex items-start justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-[13.5px]" style={{ color: "var(--color-svc-text)" }}>{l.label}</p>
-                    <p className="text-[12.5px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{l.addressLine}{l.area ? ` · ${l.area}` : ""}</p>
+                    <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{l.label}</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{l.addressLine}{l.area ? ` · ${l.area}` : ""}</p>
                     {l.accessNotes ? <p className="text-[12px] mt-1" style={FAINT}>{l.accessNotes}</p> : null}
                   </div>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${l.addressLine}, ${l.city ?? ""}`)}`}
                     target="_blank" rel="noopener noreferrer"
-                    className={`shrink-0 inline-flex items-center gap-1 min-h-10 text-[12.5px] hover:underline ${FOCUS}`} style={{ color: TONE_TEXT.azure }}
+                    className={`shrink-0 inline-flex items-center gap-1 min-h-11 text-[13px] hover:underline ${FOCUS}`} style={{ color: TONE_TEXT.azure }}
                   >
                     <ExternalLink size={12} /> Directions
                   </a>
@@ -156,8 +156,8 @@ export default function CustomerDetailClient({
               {pianos.map((p) => (
                 <li key={p.id} className="flex items-start justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-[13.5px]" style={{ color: "var(--color-svc-text)" }}>{[p.brand, p.model].filter(Boolean).join(" ") || p.type}</p>
-                    <p className="text-[12.5px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{p.type}{p.year ? ` · ${p.year}` : ""}</p>
+                    <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{[p.brand, p.model].filter(Boolean).join(" ") || p.type}</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{p.type}{p.year ? ` · ${p.year}` : ""}</p>
                   </div>
                   <div className="text-right text-[12px] shrink-0" style={FAINT}>
                     {p.nextServiceDueAt ? <>Next service<br /><span className="svc-num" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(new Date(p.nextServiceDueAt))}</span></> : "No recall set"}
@@ -172,7 +172,7 @@ export default function CustomerDetailClient({
       {reminders.length > 0 && (
         <SectionCard
           title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders · {reminders.length}</span>}
-          action={<GhostButton onClick={() => setRemindOpen(true)} className="inline-flex items-center gap-1 !min-h-10"><Plus size={13} /> Add</GhostButton>}
+          action={<GhostButton onClick={() => setRemindOpen(true)} className="inline-flex items-center gap-1 !min-h-11"><Plus size={13} /> Add</GhostButton>}
         >
           <ul className="svc-divide">
             {reminders.map((r) => <ReminderItem key={r.id} r={r} now={now} showClient={false} />)}
@@ -180,7 +180,7 @@ export default function CustomerDetailClient({
         </SectionCard>
       )}
 
-      <SectionCard title={`Jobs · ${jobs.length}`} action={<GhostButton onClick={() => setNewJob(true)} className="inline-flex items-center gap-1 !min-h-10"><Plus size={13} /> New job</GhostButton>}>
+      <SectionCard title={`Jobs · ${jobs.length}`} action={<GhostButton onClick={() => setNewJob(true)} className="inline-flex items-center gap-1 !min-h-11"><Plus size={13} /> New job</GhostButton>}>
         {jobs.length === 0 ? (
           <EmptyState title="No jobs yet" hint="Create the first visit for this customer." />
         ) : (
@@ -191,13 +191,13 @@ export default function CustomerDetailClient({
                 <li key={j.id}>
                   <Link href={`/service/jobs/${j.id}`} className={`flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-white/[0.03] ${FOCUS}`}>
                     <div className="min-w-0">
-                      <p className="text-[13.5px] truncate" style={{ color: "var(--color-svc-text)" }}>{h.heading}</p>
+                      <p className="text-[14px] truncate" style={{ color: "var(--color-svc-text)" }}>{h.heading}</p>
                       <p className="text-[12px] mt-0.5 svc-num" style={{ color: "var(--color-svc-text-dim)" }}>
                         <span className="font-mono">{jobCode(jobPrefix, j.jobNumber, j.createdAt)}</span> · {j.scheduledStart ? fmtDate(new Date(j.scheduledStart)) : "Unscheduled"}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      {canSeeMoney && (hasQuote(j.quotedCents) ? <Money cents={j.quotedCents} className="text-[13px]" /> : <span className="text-[12.5px]" style={FAINT}>No quote</span>)}
+                      {canSeeMoney && (hasQuote(j.quotedCents) ? <Money cents={j.quotedCents} className="text-[14px]" /> : <span className="text-[13px]" style={FAINT}>No quote</span>)}
                       <Chip tone={JOB_STATUS_TONE[j.status] ?? "slate"}>{JOB_STATUS_LABEL[j.status] ?? j.status}</Chip>
                     </div>
                   </Link>
@@ -218,12 +218,12 @@ export default function CustomerDetailClient({
                 <li key={i.id}>
                   <Link href={`/service/invoices/${i.id}`} className={`flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-white/[0.03] ${FOCUS}`}>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-mono" style={{ color: "var(--color-svc-text)" }}>{invoiceCode(invoicePrefix, i.invoiceNumber, i.issueDate)}</p>
+                      <p className="text-[14px] font-mono" style={{ color: "var(--color-svc-text)" }}>{invoiceCode(invoicePrefix, i.invoiceNumber, i.issueDate)}</p>
                       <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{fmtDate(new Date(i.issueDate))}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0 text-right">
                       <div>
-                        <Money cents={i.totalCents} className="text-[13px]" />
+                        <Money cents={i.totalCents} className="text-[14px]" />
                         {i.status !== "draft" && !i.voidedAt && i.balanceCents > 0 && <p className="text-[12px]" style={FAINT}>Balance {peso(i.balanceCents)}</p>}
                       </div>
                       <Chip tone={INVOICE_STATUS_TONE[i.status] ?? "slate"}>{INVOICE_STATUS_LABEL[i.status] ?? i.status}</Chip>
@@ -237,7 +237,7 @@ export default function CustomerDetailClient({
       )}
 
       {customer.notes ? (
-        <SectionCard title="Notes"><p className="px-5 py-4 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.notes}</p></SectionCard>
+        <SectionCard title="Notes"><p className="px-5 py-4 text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.notes}</p></SectionCard>
       ) : null}
 
       <RemindMeModal open={remindOpen} onClose={() => setRemindOpen(false)} customerId={customer.id} customerName={customer.name} />

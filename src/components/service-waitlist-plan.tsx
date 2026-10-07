@@ -91,7 +91,7 @@ export default function PlanTripClient({
       <header>
         <Link href="/service/waitlist" className="inline-flex items-center gap-1.5 min-h-11 text-[12px] hover:underline" style={FAINT}><ArrowLeft size={13} aria-hidden="true" /> Waitlist</Link>
         <h1 className="font-serif text-3xl mt-1" style={TEXT}>Plan a trip</h1>
-        <p className="text-[12.5px] mt-1" style={DIM}>Pick where you are going, tick who comes along, message them, then book.</p>
+        <p className="text-[13px] mt-1" style={DIM}>Pick where you are going, tick who comes along, message them, then book.</p>
       </header>
 
       <ErrorLine>{error}</ErrorLine>
@@ -108,7 +108,7 @@ export default function PlanTripClient({
             From <b className="font-medium">{plan.home.name}</b> to <b className="font-medium">{plan.dest.name}</b> — clients within {plan.radiusKm} km of the straight line, or within {plan.radiusKm} km of {plan.dest.name}.
           </p>
         )}
-        {plan && !plan.home && <p role="alert" className="px-5 pb-4 text-[12.5px]" style={{ color: "var(--color-svc-warn)" }}>Set a home base with a known location in Settings → Trips &amp; areas to get route-based suggestions.</p>}
+        {plan && !plan.home && <p role="alert" className="px-5 pb-4 text-[13px]" style={{ color: "var(--color-svc-warn)" }}>Set a home base with a known location in Settings → Trips &amp; areas to get route-based suggestions.</p>}
       </SectionCard>
 
       {!plan ? (
@@ -127,7 +127,7 @@ export default function PlanTripClient({
                     <label className="flex items-start gap-3 px-5 py-3 min-h-11 cursor-pointer">
                       <input type="checkbox" className="mt-1 w-5 h-5 shrink-0" checked={selected.has(c.item.id)} onChange={() => toggle(c.item.id)} aria-label={`Take ${c.item.customerName}`} />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[13.5px] font-medium" style={TEXT}>{c.item.customerName}</span>
+                        <span className="block text-[14px] font-medium" style={TEXT}>{c.item.customerName}</span>
                         <span className="block text-[12px]" style={DIM}>
                           {c.item.pianoLabel ?? "No piano chosen"} · {SERVICE_TYPE_LABEL[c.item.serviceType] ?? c.item.serviceType} · {c.item.cityName ?? "Unsorted"}
                           {" · "}<span style={{ color: dw > LONG_WAIT_DAYS ? "var(--color-svc-danger)" : undefined }}>{dw}d waiting</span>
@@ -135,7 +135,7 @@ export default function PlanTripClient({
                       </span>
                       <span className="text-right shrink-0">
                         <Chip tone={r.tone}>{r.label}</Chip>
-                        {c.routeKm !== null && <span className="block text-[11.5px] mt-1 svc-num" style={DIM}>{c.reason === "on_the_way" ? `${fmtKm(c.routeKm)} from route` : `${fmtKm(c.destKm ?? 0)} from ${plan.dest?.name}`}</span>}
+                        {c.routeKm !== null && <span className="block text-[12px] mt-1 svc-num" style={DIM}>{c.reason === "on_the_way" ? `${fmtKm(c.routeKm)} from route` : `${fmtKm(c.destKm ?? 0)} from ${plan.dest?.name}`}</span>}
                       </span>
                     </label>
                   </li>
@@ -149,8 +149,8 @@ export default function PlanTripClient({
               <ul className="svc-divide">
                 {Object.values(booked).map((b) => (
                   <li key={b.item.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-                    <p className="text-[13.5px]" style={TEXT}>{b.item.customerName} <span className="text-[12px]" style={DIM}>· {b.item.pianoLabel} · {b.time}</span></p>
-                    <Link href={`/service/jobs/${b.jobId}`} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[12.5px]"><CalendarCheck size={14} aria-hidden="true" /> Open visit</Link>
+                    <p className="text-[14px]" style={TEXT}>{b.item.customerName} <span className="text-[12px]" style={DIM}>· {b.item.pianoLabel} · {b.time}</span></p>
+                    <Link href={`/service/jobs/${b.jobId}`} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[13px]"><CalendarCheck size={14} aria-hidden="true" /> Open visit</Link>
                   </li>
                 ))}
               </ul>
@@ -180,7 +180,7 @@ export default function PlanTripClient({
                       />
                       {(
                         <div className="flex flex-wrap items-end gap-3 pt-1">
-                          <label className="block"><span className="block text-[11px] uppercase tracking-[0.1em] mb-1" style={DIM}>Visit time</span>
+                          <label className="block"><span className="block text-[12px] uppercase tracking-[0.1em] mb-1" style={DIM}>Visit time</span>
                             <TextInput type="time" aria-label={`Visit time for ${it.customerName}`} value={times[it.id] ?? defaultTime(idx)} onChange={(e) => setTimes((t) => ({ ...t, [it.id]: e.target.value }))} className="!w-36 !min-h-11" /></label>
                           <PrimaryButton pending={pending} onClick={() => confirm(it, idx)} className="!min-h-11"><CalendarCheck size={14} aria-hidden="true" /> Confirm + time</PrimaryButton>
                         </div>
@@ -191,7 +191,7 @@ export default function PlanTripClient({
               </ul>
               {tripId && (
                 <div className="px-5 py-3 flex flex-wrap items-center justify-between gap-2" style={{ borderTop: "1px solid var(--color-svc-border)" }}>
-                  <p className="text-[12.5px]" style={DIM}>{Object.keys(booked).length} booked on this trip.</p>
+                  <p className="text-[13px]" style={DIM}>{Object.keys(booked).length} booked on this trip.</p>
                   <GhostButton className="!min-h-11" onClick={() => router.push("/service/waitlist")}>Back to waitlist</GhostButton>
                 </div>
               )}
