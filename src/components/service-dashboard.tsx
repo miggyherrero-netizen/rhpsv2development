@@ -5,12 +5,17 @@ import Link from "next/link";
 import {
   Sun, MapPin, Square, CheckCircle2, Phone, Wallet, Plus, Send, Copy, MessageCircle,
   AlertTriangle, CalendarClock, FileClock, Check, TrendingUp, ClipboardCheck, ListChecks,
-  Bell,
+  Bell, Gauge,
 } from "lucide-react";
 import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
 import { jobHeading } from "@/lib/service-reports";
 import { telHref } from "@/lib/dashboard";
-import { groupByManilaDay, isAllClear, reminderText } from "@/lib/service-today";
+import { groupByManilaDay, reminderText } from "@/lib/service-today";
+import { attentionQueue, crewStatus, deltaOf, marginPct } from "@/lib/service-dashboard";
+import {
+  AgingChart, AttentionQueue, CashflowChart, CrewStrip, DeltaLine, PipelineChart, RecentPayments,
+} from "@/components/service-dashboard-widgets";
+import type { DashboardBoard } from "@/server/service-dashboard-data";
 import { ReminderItem } from "@/components/service-reminders";
 import type { ReminderRow } from "@/server/service-reminders-data";
 import {
@@ -26,7 +31,7 @@ import StepButton from "@/components/service-step-button";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import {
   Chip, DateField, Dot, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard,
-  Select, StatCard, SvcModal, TextInput, TONE_TEXT, useNow,
+  Select, StatCard, SvcModal, TextInput, TONE_TEXT, useNow, EmptyState,
 } from "@/components/service-ui";
 
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
@@ -47,8 +52,8 @@ function Elapsed({ startedAt, now }: { startedAt: Date; now: Date | null }) {
   );
 }
 
-export default function TodayClient({
-  board,
+export default function DashboardClient({
+  dash,
   customers,
   showroomPianos,
   waitlistFollowUps,
@@ -56,7 +61,7 @@ export default function TodayClient({
   tripPrompts,
   templates,
 }: {
-  board: TodayBoard;
+  dash: DashboardBoard;
   customers: { id: string; name: string; isBatch?: boolean }[];
   showroomPianos: ShowroomPiano[];
   waitlistFollowUps: WaitlistItem[];
@@ -65,6 +70,7 @@ export default function TodayClient({
   tripPrompts: TripPrompt[];
   templates: { key: string; name: string; body: string }[];
 }) {
+  const { board, finance } = dash;
   // `clock` is null until mount — anything time-sensitive waits for it so the server and client markup agree.
   const clock = useNow(1_000);
   const [pending, startTransition] = useTransition();
@@ -100,6 +106,38 @@ export default function TodayClient({
     week: weekHasData ? 1 : 0,
   };
 
+  // ---- dashboard numbers (all from real reads; money only when the server sent `finance`) ----
+  const live = visits.filter((j) => j.status !== "cancelled");
+  const doneToday = live.filter((j) => ["completed", "invoiced", "paid"].includes(j.status)).length;
+  const countOf = (status: string) => dash.pipeline.find((p) => p.status === status)?.count ?? 0;
+  const onSite = countOf("in_progress");
+  const enRoute = countOf("en_route");
+  const crew = useMemo(
+    () => crewStatus(
+      live.map((j) => ({ id: j.id, title: j.title, status: j.status, scheduledStart: j.scheduledStart, technicianId: j.technicianId, customerName: j.customerName, area: j.area })),
+      board.technicians.filter((t) => t.active).map((t) => ({ id: t.id, name: t.name, color: t.color })),
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [board.jobs, board.technicians],
+  );
+  const attention = attentionQueue({
+    overdueInvoices: { count: finance?.overdueCount ?? 0, amountCents: finance?.aging.overdueCents },
+    drafts: { count: board.stats.draftCount, amountCents: finance ? board.stats.draftCents : undefined },
+    closeOut: board.unfinished.length,
+    remindersDue: reminders.length,
+    recallsDue: dash.recallsDue,
+    staleQuotes: board.staleQuotes.length,
+    waitlistFollowUps: waitlistFollowUps.length,
+    unreviewedExpenses: finance?.unreviewedExpenses ?? null,
+    health: finance?.health ?? null,
+  });
+  const attentionTotal = attention.reduce((n, i) => n + i.count, 0);
+  const series = finance?.series ?? [];
+  const thisMonth = series[series.length - 1];
+  const lastMonth = series[series.length - 2];
+  const invoicedDelta = finance ? deltaOf(finance.month.invoicedCents, lastMonth?.invoicedCents ?? 0) : null;
+  const margin = finance ? marginPct(finance.month.profitCents, finance.month.moneyInCents) : null;
+
   const copyReminder = async (inv: TodayBoard["unpaid"][number]) => {
     const text = reminderText({
       customerName: inv.customerName, code: inv.code, balanceCents: inv.balanceCents,
@@ -115,11 +153,11 @@ export default function TodayClient({
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
-          <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Today</h1>
+          <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Dashboard</h1>
           <p className="text-[13px] mt-1" style={DIM}>{fmtDateLong(board.date)}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -131,16 +169,65 @@ export default function TodayClient({
       <ErrorLine>{error}</ErrorLine>
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Reminder copied to the clipboard" : ""}</p>
 
-      {isAllClear(counts) && (
-        <p className="flex items-center gap-2 text-[14px] py-4" style={DIM}>
-          <CheckCircle2 size={18} style={{ color: "var(--color-svc-success)" }} aria-hidden="true" />
-          All clear — no visits, nothing to send or chase, and nothing coming up. Add a job to get going.
-        </p>
-      )}
+      {/* KPI strip: every tile opens the page its number comes from */}
+      <section aria-label="Key numbers" className={`grid grid-cols-2 gap-3 ${finance ? "md:grid-cols-3 xl:grid-cols-6" : "md:grid-cols-4"}`}>
+        <StatCard
+          label="Visits today" icon={<CalendarClock size={15} aria-hidden="true" />} href="/service/schedule"
+          value={`${doneToday}/${live.length}`}
+          sub={live.length === 0 ? "Nothing scheduled" : live.length - doneToday === 0 ? "All done" : `${live.length - doneToday} left`}
+        />
+        <StatCard
+          label="Jobs in progress" icon={<Gauge size={15} aria-hidden="true" />} href="/service/jobs?filter=in_progress"
+          value={onSite + enRoute}
+          sub={onSite + enRoute === 0 ? "None on the road" : `${onSite} on site · ${enRoute} en route`}
+        />
+        {finance && thisMonth && invoicedDelta ? (
+          <>
+            <StatCard
+              label="Invoiced this month" icon={<TrendingUp size={15} aria-hidden="true" />} href="/service/finance?range=month"
+              value={peso(finance.month.invoicedCents)}
+              sub={<DeltaLine delta={invoicedDelta} />}
+            />
+            <StatCard
+              label="Unpaid" icon={<Wallet size={15} aria-hidden="true" />} href="/service/invoices?filter=open"
+              value={peso(finance.aging.totalOutstandingCents)}
+              sub={finance.aging.overdueCents > 0
+                ? <span style={{ color: "var(--color-svc-danger)" }}>{peso(finance.aging.overdueCents)} overdue</span>
+                : "None overdue"}
+            />
+            <StatCard
+              label="Collected this month" icon={<Check size={15} aria-hidden="true" />} href="/service/finance?range=month" tone="success"
+              value={peso(finance.month.collectedCents)}
+              sub={`${peso(finance.month.expenseCents)} spent`}
+            />
+            <StatCard
+              label="Profit this month" icon={<TrendingUp size={15} aria-hidden="true" />} href="/service/finance?range=month"
+              tone={finance.month.profitCents >= 0 ? "azure" : "danger"}
+              value={<Money cents={finance.month.profitCents} />}
+              sub={margin === null ? "No income yet" : `${margin}% margin`}
+            />
+          </>
+        ) : (
+          <>
+            <StatCard label="Next 7 days" icon={<CalendarClock size={15} aria-hidden="true" />} href="/service/schedule" value={board.next7.length} sub={board.next7.length === 1 ? "visit coming up" : "visits coming up"} />
+            <StatCard label="Needs attention" icon={<AlertTriangle size={15} aria-hidden="true" />} value={attentionTotal} sub={attention.length === 0 ? "All clear" : `${attention.length} item${attention.length === 1 ? "" : "s"} below`} />
+          </>
+        )}
+      </section>
 
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
+      <div className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-6">
       {/* 1 · NOW */}
-      {counts.now > 0 && (
-        <SectionCard title="Now" action={<span className="text-[12px]" style={FAINT}>{visits.length} visit{visits.length === 1 ? "" : "s"} today</span>}>
+      <SectionCard
+        className="order-2 lg:order-none"
+        title="Today's visits"
+        action={<Link href="/service/schedule" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open schedule</Link>}
+      >
+        {counts.now === 0 ? (
+          <EmptyState icon={<CalendarClock size={19} strokeWidth={1.7} />} title="Nothing scheduled today" hint="Add a job or open the schedule to book a visit." />
+        ) : (
+        <>
+        {live.length > 0 && <CrewStrip crew={crew} />}
           <ul className="svc-divide">
             {otherRunning.map((log) => (
               <li key={log.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
@@ -209,12 +296,13 @@ export default function TodayClient({
               );
             })}
           </ul>
-        </SectionCard>
-      )}
+        </>
+        )}
+      </SectionCard>
 
       {/* Client reminders — who to follow up with today */}
       {counts.reminders > 0 && (
-        <SectionCard title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders ({reminders.length})</span>}>
+        <SectionCard className="order-3 lg:order-none" title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders ({reminders.length})</span>}>
           <ul className="svc-divide">
             {reminders.map((r) => <ReminderItem key={r.id} r={r} now={board.date} showClient />)}
           </ul>
@@ -224,6 +312,7 @@ export default function TodayClient({
       {/* 2 · MONEY TO ACT ON */}
       {counts.money > 0 && (
         <SectionCard
+          className="order-4 lg:order-none"
           title={<span className="inline-flex items-center gap-2"><Wallet size={14} style={{ color: "var(--color-svc-warn)" }} aria-hidden="true" /> Money to act on</span>}
           action={<Link href="/service/invoices?filter=open" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>All invoices</Link>}
         >
@@ -288,7 +377,7 @@ export default function TodayClient({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Money cents={inv.balanceCents} className="text-[14px] mr-1" />
-                      <button type="button" onClick={() => { void copyReminder(inv); }} className={ROW_BTN} aria-label={`Copy Messenger reminder for ${inv.customerName}`}>
+                      <button type="button" onClick={() => { void copyReminder(inv); }} className={ROW_BTN} aria-label={`Copy reminder for ${inv.customerName} to send on Messenger`}>
                         {copied === inv.id ? <><Check size={13} aria-hidden="true" /> Copied</> : <><Copy size={13} aria-hidden="true" /> Copy reminder</>}
                       </button>
                       {inv.messenger && (
@@ -311,6 +400,7 @@ export default function TodayClient({
       {/* Waitlist follow-ups */}
       {counts.waitlist > 0 && (
         <SectionCard
+          className="order-5 lg:order-none"
           title={<span className="inline-flex items-center gap-2"><ListChecks size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> {waitlistFollowUps.length > 0 ? `Follow up today (${waitlistFollowUps.length})` : "Trips"}</span>}
           action={<Link href="/service/waitlist" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open waitlist</Link>}
         >
@@ -354,7 +444,7 @@ export default function TodayClient({
 
       {/* 3 · NEXT 7 DAYS */}
       {counts.next7 > 0 && (
-        <SectionCard title="Next 7 days" action={<Link href="/service/schedule" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open schedule</Link>}>
+        <SectionCard className="order-7 lg:order-none" title="Next 7 days" action={<Link href="/service/schedule" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open schedule</Link>}>
           <div className="svc-divide">
             {next7Days.map((g) => (
               <div key={g.dayStart.toISOString()} className="px-5 py-3">
@@ -378,7 +468,7 @@ export default function TodayClient({
 
       {/* 4 · FOLLOW-UPS */}
       {counts.followUps > 0 && (
-        <SectionCard title={<span className="inline-flex items-center gap-2"><AlertTriangle size={14} style={{ color: "var(--color-svc-warn)" }} aria-hidden="true" /> Follow-ups</span>}>
+        <SectionCard className="order-8 lg:order-none" title={<span className="inline-flex items-center gap-2"><AlertTriangle size={14} style={{ color: "var(--color-svc-warn)" }} aria-hidden="true" /> Follow-ups</span>}>
           {board.staleQuotes.length > 0 && (
             <div>
               <p className="px-5 pt-3 text-[12px] uppercase tracking-[0.1em]" style={FAINT}>Quotes with no answer · {board.staleQuotes.length}</p>
@@ -440,7 +530,7 @@ export default function TodayClient({
 
       {/* 5 · THIS WEEK */}
       {weekHasData && (
-        <section aria-label="This week" className="space-y-2.5">
+        <section aria-label="This week" className="space-y-2.5 order-10 lg:order-none">
           <h2 className="text-[14px] font-medium" style={DIM}>This week</h2>
           <div className="svc-tiles">
             <WeekTile label="Booked" split={week.booked} icon={<CalendarClock size={15} />} />
@@ -454,6 +544,18 @@ export default function TodayClient({
           </p>
         </section>
       )}
+
+      </div>
+
+      {/* Right column: what to do next, then the trends */}
+      <div className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-6">
+        <div className="order-1 lg:order-none"><AttentionQueue items={attention} /></div>
+        {finance && <div className="order-6 lg:order-none"><CashflowChart months={finance.series} /></div>}
+        {finance && <div className="order-6 lg:order-none"><AgingChart aging={finance.aging} /></div>}
+        <div className="order-6 lg:order-none"><PipelineChart rows={dash.pipeline} /></div>
+        {finance && <div className="order-9 lg:order-none"><RecentPayments rows={finance.recentPayments} /></div>}
+      </div>
+      </div>
 
       <JobFormModal
         open={quickOpen}
