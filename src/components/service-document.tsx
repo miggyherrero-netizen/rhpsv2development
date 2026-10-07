@@ -26,7 +26,8 @@ export default function ServiceDocument({
   const receiptCode = payment ? paymentReceiptCode(payment.id, payment.receivedAt) : null;
   const settlement = payment ? paymentSettlement(invoice.totalCents, detail.payments, payment.id) : null;
   // The DB stores the invoice's rate and tax amount; changing today's setting does not rewrite its history.
-  const taxLabel = invoice.taxRateBps > 0 ? taxLineLabel(settings.taxLabel, invoice.taxRateBps) : "VAT not charged";
+  // No tax row at all when VAT was not charged (same as the quote); it only appears for invoices that carry VAT.
+  const taxLabel = taxLineLabel(settings.taxLabel, invoice.taxRateBps);
 
   return <main className={styles.studio}>
     <div className={styles.inner}>
@@ -60,7 +61,7 @@ export default function ServiceDocument({
               <div><p className={styles.label}>Dates</p><p className={styles.value}>Issued {fmtDateLong(invoice.issueDate)}</p>{invoice.dueDate ? <p className={styles.subvalue}>Due {fmtDateLong(invoice.dueDate)}</p> : null}</div>
             </div>
             <table className={styles.table}><thead><tr><th style={{width:"50%"}}>Description</th><th className={styles.number} style={{width:"12%"}}>Qty</th><th className={styles.number} style={{width:"20%"}}>Rate</th><th className={styles.number} style={{width:"18%"}}>Amount</th></tr></thead><tbody>{items.map(item=><tr key={item.id}><td><span className={styles.itemName}>{item.description}</span>{item.details ? <span className={styles.itemDetails}>{item.details}</span> : null}{!item.taxable && invoice.taxRateBps > 0 ? <span className={styles.exempt}>VAT exempt</span> : null}</td><td className={styles.number}>{item.qty}</td><td className={styles.number}>{documentMoney(item.unitPriceCents)}</td><td className={styles.number}>{documentMoney(item.qty * item.unitPriceCents)}</td></tr>)}</tbody></table>
-            <div className={styles.totals}><TotalsRow label="Subtotal" cents={invoice.subtotalCents}/>{invoice.discountCents ? <TotalsRow label="Discount" cents={-invoice.discountCents}/> : null}<TotalsRow label={taxLabel} cents={invoice.taxCents}/><TotalsRow label="Invoice total" cents={invoice.totalCents} variant="total"/><TotalsRow label="Payments received" cents={-invoice.amountPaidCents}/><TotalsRow label="Balance due" cents={invoice.balanceCents} variant="balance"/></div>
+            <div className={styles.totals}><TotalsRow label="Subtotal" cents={invoice.subtotalCents}/>{invoice.discountCents ? <TotalsRow label="Discount" cents={-invoice.discountCents}/> : null}{invoice.taxRateBps > 0 || invoice.taxCents !== 0 ? <TotalsRow label={taxLabel} cents={invoice.taxCents}/> : null}<TotalsRow label="Invoice total" cents={invoice.totalCents} variant="total"/><TotalsRow label="Payments received" cents={-invoice.amountPaidCents}/><TotalsRow label="Balance due" cents={invoice.balanceCents} variant="balance"/></div>
             {invoice.amountPaidCents > 0 ? <div className={styles.callout}><strong>Payment on record</strong><p>{documentMoney(invoice.amountPaidCents)} received. A separate receipt is available for each recorded payment. Please refer to {code} for future payments.</p></div> : null}
             {invoice.terms || invoice.notes ? <div className={styles.callout}><strong>Notes &amp; terms</strong><p>{invoice.terms}{invoice.terms && invoice.notes ? " · " : ""}{invoice.notes}</p></div> : null}
           </>}
