@@ -26,7 +26,7 @@ function PaymentControl({
     <div className="flex items-center gap-1.5">
       <span className="text-rose-300 text-xs tnum">{peso(balanceCents)} owed</span>
       <input
-        type="number" min={1} inputMode="decimal" value={amount}
+        type="number" min={1} inputMode="decimal" aria-label="Payment amount in pesos" value={amount}
         onChange={(e) => setAmount(e.target.value)}
         className="w-16 bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-xs text-white tnum focus:outline-none focus:border-white/30"
       />

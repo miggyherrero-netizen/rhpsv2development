@@ -100,7 +100,7 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
             ) : <ImagePlus size={18} />}
             <span>
               <span className="block text-[12px] font-medium leading-tight">{p.pianoBrand} {p.pianoModel}</span>
-              <span className={`block text-xs leading-tight mt-0.5 ${projectId === p.id ? "text-black/60" : "text-mist"}`}>{p.clientName}</span>
+              <span className={`block text-xs leading-tight mt-0.5 ${projectId === p.id ? "text-[#04210F]" : "text-mist"}`}>{p.clientName}</span>
             </span>
           </button>
         ))}
@@ -148,7 +148,7 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
               onDragStart={() => setDragIdx(i)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDrop(i)}
-              className={`card-dark p-3.5 flex items-center gap-3.5 transition ${dragIdx === i ? "opacity-40" : ""} ${!u.isVisibleToClient ? "opacity-60" : ""}`}
+              className={`card-dark p-3.5 flex items-center gap-3.5 transition ${dragIdx === i ? "opacity-40" : ""} ${!u.isVisibleToClient ? "opacity-80" : ""}`}
             >
               <GripVertical size={16} className="text-mist cursor-grab shrink-0" />
               {u.imageUrl ? (
@@ -169,8 +169,8 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
                 {u.isVisibleToClient ? <><Eye size={13} /> Visible</> : <><EyeOff size={13} /> Hidden</>}
               </button>
               <button onClick={async () => { if (confirm("Delete this entry?")) { await deleteUpdate(u.id); setUpdates((us) => us.filter((x) => x.id !== u.id)); } }}
-                className="shrink-0 p-2 text-mist hover:text-rose-400 transition">
-                <Trash2 size={15} />
+                aria-label="Delete update" className="shrink-0 h-11 w-11 flex items-center justify-center rounded-lg text-mist hover:text-rose-400 hover:bg-white/5 transition">
+                <Trash2 size={16} aria-hidden="true" />
               </button>
             </li>
           ))}

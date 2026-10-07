@@ -33,17 +33,17 @@ export default function OwnerInboxClient({ bundle: rawBundle }: { bundle: OwnerB
       </div>
 
       {/* capture */}
-      <div className="card-ow p-3.5 mb-6 flex items-center gap-2.5">
+      <div className="card-ow p-3 mb-6 flex flex-wrap items-center gap-2">
         <Inbox size={16} className="text-[var(--color-ow-text-faint)] ml-1 shrink-0" />
         <input
           value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && capture()}
-          placeholder="“Mrs. Santos called about restoring her Yamaha…”"
-          className="flex-1 bg-transparent outline-none text-[14px] text-[var(--color-ow-text)] placeholder:text-[var(--color-ow-text-faint)] min-w-0"
+          aria-label="Capture to inbox" placeholder="“Mrs. Santos called about restoring her Yamaha…”"
+          className="flex-1 bg-transparent outline-none focus-visible:!outline-none text-[15px] min-h-11 text-[var(--color-ow-text)] placeholder:text-[var(--color-ow-text-faint)] min-w-0"
         />
-        <select value={priority} onChange={(e) => setPriority(e.target.value)} className="input-ow !w-auto !py-2 !text-[12px]">
+        <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="input-ow !w-auto !text-[13px]">
           <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
         </select>
-        <button onClick={capture} className="btn-ow-primary text-[12px] rounded-lg px-4 py-2 shrink-0">Capture</button>
+        <button onClick={capture} className="btn-ow-primary text-[14px] rounded-[10px] px-5 shrink-0">Capture</button>
       </div>
 
       <p className="text-[12px] uppercase tracking-[0.1em] text-[var(--color-ow-text-faint)] mb-3">To process · {open.length}</p>
@@ -60,23 +60,23 @@ export default function OwnerInboxClient({ bundle: rawBundle }: { bundle: OwnerB
                   <p className="text-[12px] text-[var(--color-ow-text-faint)] mt-0.5">captured {timeAgo(new Date(i.capturedAt))}{i.dueDate ? ` · hopes for ${toDateInput(new Date(i.dueDate))}` : ""}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 mt-2.5 ml-4">
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 ml-4">
                 <button onClick={() => setConvertId(convertId === `${i.id}:task` ? null : `${i.id}:task`)}
-                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-lg px-2.5 py-1.5 transition hover:text-[var(--color-ow-text)]"><ListChecks size={11} /> Task</button>
+                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-[10px] px-3.5 min-h-11 transition hover:text-[var(--color-ow-text)]"><ListChecks size={11} /> Task</button>
                 <button onClick={() => setConvertId(convertId === `${i.id}:event` ? null : `${i.id}:event`)}
-                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-lg px-2.5 py-1.5 transition hover:text-[var(--color-ow-text)]"><CalendarPlus size={11} /> Appointment</button>
+                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-[10px] px-3.5 min-h-11 transition hover:text-[var(--color-ow-text)]"><CalendarPlus size={11} /> Appointment</button>
                 <button onClick={() => convertInboxItem(i.id, "reminder")}
-                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-lg px-2.5 py-1.5 transition hover:text-[var(--color-ow-text)]"><BellRing size={11} /> Reminder tomorrow</button>
+                  className="chip-ow flex items-center gap-1.5 text-[12px] rounded-[10px] px-3.5 min-h-11 transition hover:text-[var(--color-ow-text)]"><BellRing size={11} /> Reminder tomorrow</button>
                 <button onClick={() => archiveInboxItem(i.id)}
-                  className="flex items-center gap-1.5 text-[12px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] rounded-lg px-2.5 py-1.5 transition"><Archive size={11} /> Archive</button>
+                  className="flex items-center gap-1.5 text-[12px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] rounded-[10px] px-3.5 min-h-11 transition"><Archive size={11} /> Archive</button>
               </div>
               {(convertId === `${i.id}:task` || convertId === `${i.id}:event`) && (
-                <div className="flex items-center gap-2 mt-2.5 ml-4 anim-sheet">
+                <div className="flex flex-wrap items-center gap-2 mt-2 ml-4 anim-sheet">
                   <CornerDownRight size={13} className="text-[var(--color-ow-text-faint)]" />
-                  <input type="date" value={convertDate} onChange={(e) => setConvertDate(e.target.value)} className="input-ow !w-auto !py-1.5 !text-[12px]" />
+                  <input type="date" aria-label="Date" value={convertDate} onChange={(e) => setConvertDate(e.target.value)} className="input-ow !w-auto !text-[13px]" />
                   <button
                     onClick={() => { convertInboxItem(i.id, convertId.endsWith(":task") ? "task" : "event", convertDate ? new Date(`${convertDate}T09:00`).toISOString() : null); setConvertId(null); setConvertDate(""); }}
-                    className="btn-ow-primary text-[12px] rounded-lg px-3 py-1.5">
+                    className="btn-ow-primary text-[12px] rounded-[10px] px-3.5 min-h-11">
                     {convertId.endsWith(":task") ? "Create task" : "Create appointment"}
                   </button>
                   <span className="text-[12px] text-[var(--color-ow-text-faint)]">{convertId.endsWith(":task") ? "leave blank for unscheduled" : "blank → tomorrow 9:00 AM"}</span>
@@ -89,7 +89,7 @@ export default function OwnerInboxClient({ bundle: rawBundle }: { bundle: OwnerB
 
       {done.length > 0 && (
         <details className="mt-8 group">
-          <summary className="text-[12px] uppercase tracking-[0.1em] text-[var(--color-ow-text-faint)] cursor-pointer hover:text-[var(--color-ow-text)] transition">Processed history · {done.length}</summary>
+          <summary className="inline-flex items-center min-h-11 text-[12px] uppercase tracking-[0.1em] text-[var(--color-ow-text-faint)] cursor-pointer hover:text-[var(--color-ow-text)] transition">Processed history · {done.length}</summary>
           <ul className="mt-3 space-y-1.5">
             {done.slice(0, 15).map((i) => (
               <li key={i.id} className="text-[12px] text-[var(--color-ow-text-faint)] flex items-center gap-2">

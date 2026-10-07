@@ -105,7 +105,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Piano", "Type", "Condition", "Price", "Status", "Cost & margin", ""].map((h) => (
-                  <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                  <th key={h} className="px-4 py-3 font-medium">{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -122,7 +122,7 @@ export default function ShowroomClient({ pianos }: { pianos: PianoRow[] }) {
                     <td className="px-4 py-3">
                       <div className="relative inline-flex items-center">
                         <span className={`absolute left-3 w-1.5 h-1.5 rounded-full ${STATUS_DOT[p.status] ?? STATUS_DOT.available}`} />
-                        <select value={p.status} onChange={(e) => changeStatus(p.id, e.target.value)}
+                        <select aria-label={`Status for ${p.brand} ${p.model}`} value={p.status} onChange={(e) => changeStatus(p.id, e.target.value)}
                           className="text-xs rounded-full pl-6 pr-2.5 py-1 border border-white/10 bg-white/[0.06] text-chrome">
                           {Object.entries(PIANO_STATUS).map(([k, v]) => <option key={k} value={k} className="text-black">{v.label}</option>)}
                         </select>

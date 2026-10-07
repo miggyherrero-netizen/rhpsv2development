@@ -22,12 +22,12 @@ function ScopeModal({ open, onChoose, action }: { open: boolean; onChoose: (m: "
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm anim-fade-in" onClick={() => onChoose(null)} />
-      <div className="relative card-ow p-6 max-w-xs w-full anim-sheet">
+      <div role="dialog" aria-modal="true" aria-label="Recurring item" className="relative card-ow p-6 max-w-xs w-full anim-sheet">
         <p className="font-serif text-lg text-[var(--color-ow-text)]">This is a recurring item</p>
         <p className="text-[13px] text-[var(--color-ow-text-dim)] mt-1.5">{action} — apply to?</p>
         <div className="mt-4 space-y-2">
           <button onClick={() => onChoose("occurrence")} className="w-full text-[14px] rounded-[10px] min-h-11 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05]"
-            style={{ border: "1px solid var(--color-ow-border)" }}>Just this occurrence</button>
+            style={{ border: "1px solid var(--color-ow-border-strong)" }}>Just this occurrence</button>
           <button onClick={() => onChoose("series")} className="btn-ow-primary w-full text-[14px] rounded-[10px]">The whole series</button>
         </div>
       </div>
@@ -147,7 +147,7 @@ export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle
       {next && (
         <div className="card-ow p-4 mb-6 flex items-center gap-4">
           <div className="rounded-xl px-3.5 py-2.5 text-center shrink-0" style={{ background: "var(--color-ow-accent-soft)" }}>
-            <p className="text-[12px] uppercase tracking-widest text-[var(--color-ow-accent-text)] opacity-80">Next</p>
+            <p className="text-[12px] uppercase tracking-widest text-[var(--color-ow-accent-text)]">Next</p>
             <p className="text-[13px] font-medium tnum mt-0.5 text-[var(--color-ow-accent-text)]">{next.allDay ? "All day" : fmtTime(next.start, tf)}</p>
           </div>
           <div className="min-w-0">
@@ -180,8 +180,8 @@ export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle
           <option value="urgent">Urgent</option>
         </select>
         <button onClick={quickAdd} className="btn-ow-primary text-[13px] rounded-[10px] px-5 shrink-0">Add</button>
-        <button onClick={() => setModal({})} className="flex items-center justify-center gap-1.5 text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] rounded-[10px] px-3 min-h-11 min-w-11 transition shrink-0"
-          style={{ border: "1px solid var(--color-ow-border)" }}>
+        <button onClick={() => setModal({})} aria-label="Detailed" className="flex items-center justify-center gap-1.5 text-[13px] text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05] rounded-[10px] px-3 min-h-11 min-w-11 transition shrink-0"
+          style={{ border: "1px solid var(--color-ow-border-strong)" }}>
           <CalendarPlus size={13} /> <span className="hidden sm:inline">Detailed</span>
         </button>
       </div>

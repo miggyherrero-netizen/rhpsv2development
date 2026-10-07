@@ -26,7 +26,7 @@ export function PhoneText({ text }: { text: string }): ReactNode {
     const i = m.index ?? 0;
     if (i > last) parts.push(text.slice(last, i));
     parts.push(
-      <a key={i} href={`tel:${m[0].replace(/\D/g, "")}`} className={`underline underline-offset-4 decoration-current/30 hover:decoration-gold hover:text-ink transition-colors rounded-sm ${FOCUS_RING}`}>
+      <a key={i} href={`tel:${m[0].replace(/\D/g, "")}`} className={`whitespace-nowrap underline underline-offset-4 decoration-current/30 hover:decoration-gold hover:text-ink transition-colors rounded-sm ${FOCUS_RING}`}>
         {m[0]}
       </a>,
     );

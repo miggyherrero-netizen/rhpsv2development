@@ -187,7 +187,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
           {([['standalone', 'Task'], ['project', 'Project + Task']] as const).map(([value, label]) => (
             <button key={value} aria-pressed={kind === value} onClick={() => { setKind(value); setProjectFilter("all"); setError(""); }}
               className={`rounded-lg px-4 py-2 text-[13px] transition ${kind === value ? "bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer font-medium" : "text-mist hover:text-white"}`}>
-              {label} <span className="ml-1.5 opacity-60">{tasks.filter((t) => !!t.projectId === (value === "project") && !!t.archivedAt === archived).length}</span>
+              {label} <span className="ml-1.5 opacity-80">{tasks.filter((t) => !!t.projectId === (value === "project") && !!t.archivedAt === archived).length}</span>
             </button>
           ))}
         </div>
@@ -256,7 +256,7 @@ function TaskBoardContent({ tasks, workers, projects }: BoardProps) {
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Task", "Project / Piano", "Status", "Priority", "Est.", "Due", "Assigned", "Claimed by"].map((h) => (
-                  <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                  <th key={h} className="px-4 py-3 font-medium">{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>

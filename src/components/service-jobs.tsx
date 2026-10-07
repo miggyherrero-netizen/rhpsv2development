@@ -121,24 +121,24 @@ export default function JobsClient({
             {MORE_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </div>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
+        <div className="hidden sm:block flex-1" />
+        <div className="relative w-full sm:w-auto">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} aria-hidden="true" />
           <TextInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search customer, address…"
             aria-label="Search jobs"
-            className="!pl-9 w-64"
+            className="!pl-9 sm:w-64"
           />
         </div>
-        <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Filter by job type" className="!w-auto">
+        <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Filter by job type" className="sm:!w-auto flex-1 sm:flex-none">
           <option value="all">All types</option>
           {SERVICE_TYPES.map((s) => (
             <option key={s.key} value={s.key}>{s.label}</option>
           ))}
         </Select>
-        <Select value={tech} onChange={(e) => setTech(e.target.value)} aria-label="Filter by crew" className="!w-auto">
+        <Select value={tech} onChange={(e) => setTech(e.target.value)} aria-label="Filter by crew" className="sm:!w-auto flex-1 sm:flex-none">
           <option value="all">All crew</option>
           {technicians.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -159,7 +159,49 @@ export default function JobsClient({
             }
           />
         ) : (
-          <div className="svc-table-wrap thin-scroll">
+          <>
+          {/* Phone: one card per job, no sideways scrolling */}
+          <ul className="md:hidden svc-divide">
+            {filtered.map((job) => {
+              const h = jobHeading(job.title, job.serviceType);
+              const closing = needsClosing(job, new Date(nowMs));
+              return (
+                <li key={job.id} className="px-4 py-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/service/jobs/${job.id}`} className="block text-[15px] font-medium leading-snug" style={{ color: "var(--color-svc-text)" }}>
+                        {h.heading}
+                      </Link>
+                      <p className="text-[13px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>
+                        {job.customerName}{job.area ? ` · ${job.area}` : ""}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/service/jobs/${job.id}`}
+                      className="inline-grid place-items-center h-11 w-11 -mr-2 -mt-2 shrink-0 rounded-lg hover:bg-white/[0.06]"
+                      style={{ color: TONE_TEXT.azure }}
+                      aria-label={`Open ${h.heading} for ${job.customerName}`}
+                    >
+                      <ArrowUpRight size={16} aria-hidden="true" />
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
+                    <span className="tnum" style={{ color: job.scheduledStart ? "var(--color-svc-text)" : "var(--color-svc-text-faint)" }}>
+                      {job.scheduledStart ? `${fmtDate(new Date(job.scheduledStart))} · ${fmtTime(new Date(job.scheduledStart))}` : "Unscheduled"}
+                    </span>
+                    <Chip tone={JOB_STATUS_TONE[job.status] ?? "slate"}>{JOB_STATUS_LABEL[job.status] ?? job.status}</Chip>
+                    {closing ? <Chip tone="warn">Needs closing</Chip> : null}
+                    {job.runningLog ? <span style={{ color: "var(--color-svc-warn)" }}>● live</span> : null}
+                    {job.technicianName ? (
+                      <span className="inline-flex items-center gap-1.5"><Dot color={job.technicianColor ?? "#64748b"} /> {job.technicianName}</span>
+                    ) : null}
+                    {hasQuote(job.quotedCents) ? <Money cents={job.quotedCents} className="ml-auto" /> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden md:block svc-table-wrap thin-scroll">
             <table className="svc-table w-full text-left">
               <thead>
                 <tr style={{ color: "var(--color-svc-text-faint)" }}>
@@ -253,6 +295,7 @@ export default function JobsClient({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </SectionCard>
 

@@ -18,7 +18,7 @@ export default function SettingsClient({ staleDays }: { staleDays: number }) {
           Flag a project on the dashboard when its client hasn&apos;t received a journal update in this many days.
         </p>
         <div className="flex gap-2.5">
-          <input type="number" min={1} max={60} value={days} onChange={(e) => setDays(e.target.value)} className="input-dark w-24" />
+          <input type="number" min={1} max={60} aria-label="Days without a client update" value={days} onChange={(e) => setDays(e.target.value)} className="input-dark w-24" />
           <button
             onClick={async () => { setBusy(true); await saveStaleDays(Number(days) || 10); setBusy(false); setSaved(true); setTimeout(() => setSaved(false), 1600); }}
             className="flex items-center gap-2 bg-[#22C55E] text-[#04210F] min-h-11 cursor-pointer text-[12.5px] font-medium rounded-xl px-4 hover:brightness-110 transition">
@@ -40,7 +40,7 @@ export default function SettingsClient({ staleDays }: { staleDays: number }) {
       <section className="card-dark p-5">
         <p className="text-xs uppercase tracking-[0.22em] text-mist mb-3">Workspace access</p>
         <p className="text-[12.5px] text-chrome/80 leading-relaxed">
-          Signed in as the owner account. Your personal workspace lives at <a href="/owner/today" className="text-sky-300 hover:underline">/owner/today</a> —
+          Signed in as the owner account. Your personal workspace lives at <a href="/owner/today" className="text-sky-300 underline underline-offset-2 hover:text-sky-200">/owner/today</a> —
           a separate calendar, planner, and inbox that stays yours even when the shop is busy.
         </p>
       </section>

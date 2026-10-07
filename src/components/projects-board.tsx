@@ -132,7 +132,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search client, piano, serial…" className="input-dark pl-9" />
         </div>
-        <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="input-dark w-auto">
+        <select aria-label="Filter by stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="input-dark w-auto">
           <option value="all">All stages</option>
           {PROJECT_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>

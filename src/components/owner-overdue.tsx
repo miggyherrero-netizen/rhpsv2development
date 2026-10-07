@@ -46,11 +46,11 @@ export default function OwnerOverdueClient({ bundle: rawBundle }: { bundle: Owne
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2.5 ml-7">
-                    <button onClick={() => postponeOwnerTask(t.id, new Date().toISOString())} className="chip-ow text-[12px] rounded-lg px-2.5 py-1.5 transition hover:text-[var(--color-ow-text)]">Move to today</button>
-                    <button onClick={() => setReschedId(reschedId === t.id ? null : t.id)} className="chip-ow text-[12px] rounded-lg px-2.5 py-1.5 transition hover:text-[var(--color-ow-text)]">Reschedule…</button>
-                    <button onClick={() => cancelOwnerTask(t.id)} className="text-[12px] rounded-lg px-2.5 py-1.5 transition" style={{ color: "var(--color-ow-rose)" }}>Cancel task</button>
+                    <button onClick={() => postponeOwnerTask(t.id, new Date().toISOString())} className="chip-ow text-[12px] rounded-[10px] px-3.5 min-h-11 transition hover:text-[var(--color-ow-text)]">Move to today</button>
+                    <button onClick={() => setReschedId(reschedId === t.id ? null : t.id)} className="chip-ow text-[12px] rounded-[10px] px-3.5 min-h-11 transition hover:text-[var(--color-ow-text)]">Reschedule…</button>
+                    <button onClick={() => cancelOwnerTask(t.id)} className="text-[12px] rounded-[10px] px-3.5 min-h-11 transition" style={{ color: "var(--color-ow-rose)" }}>Cancel task</button>
                     {reschedId === t.id && (
-                      <input type="date" autoFocus className="input-ow !w-auto !py-1 !text-[12px]"
+                      <input type="date" aria-label="Reschedule to" autoFocus className="input-ow !w-auto !text-[13px]"
                         onChange={(e) => { if (e.target.value) { postponeOwnerTask(t.id, new Date(`${e.target.value}T18:00`).toISOString()); setReschedId(null); } }} />
                     )}
                   </div>
@@ -69,9 +69,9 @@ export default function OwnerOverdueClient({ bundle: rawBundle }: { bundle: Owne
                 <p className="text-[13px] truncate text-[var(--color-ow-text)]">{i.title}</p>
                 <p className="text-[12px] text-[var(--color-ow-text-faint)] mt-0.5 tnum">{ymd(i.start)} {fmtTime(i.start)}{i.person ? ` · ${i.person}` : ""}</p>
               </div>
-              <button onClick={() => completeOwnerEvent(i.sourceId, "series")} className="text-[12px] rounded-lg px-2.5 py-1.5 transition shrink-0"
+              <button onClick={() => completeOwnerEvent(i.sourceId, "series")} className="text-[13px] rounded-[10px] px-3.5 min-h-11 transition shrink-0 hover:brightness-125"
                 style={{ background: "var(--color-ow-accent-soft)", color: "var(--color-ow-accent-text)", border: "1px solid rgba(143,179,255,0.35)" }}>It happened</button>
-              <button onClick={() => deleteOwnerEvent(i.sourceId, "series")} className="text-[12px] px-2 py-1.5 transition shrink-0 text-[var(--color-ow-text-faint)] hover:text-[var(--color-ow-rose)]">Dismiss</button>
+              <button onClick={() => deleteOwnerEvent(i.sourceId, "series")} className="text-[12px] px-3.5 min-h-11 transition shrink-0 text-[var(--color-ow-text-faint)] hover:text-[var(--color-ow-rose)]">Dismiss</button>
             </li>
           ))}
         </ul>

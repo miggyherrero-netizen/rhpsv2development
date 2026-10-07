@@ -37,9 +37,9 @@ const FIELD = "input-svc !py-1.5 !px-2 text-[14px]";
 
 /** Column templates are written out in full so Tailwind can see them. Stacked below the breakpoint. */
 const GRID = {
-  plain: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_142px_92px_44px] min-[960px]:items-center",
+  plain: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_196px_92px_44px] min-[960px]:items-center",
   noType: "grid gap-2 grid-cols-2 min-[960px]:grid-cols-[minmax(0,1fr)_64px_116px_92px_44px] min-[960px]:items-center",
-  cost: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_142px_104px_92px_44px] min-[1100px]:items-center",
+  cost: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_196px_104px_92px_44px] min-[1100px]:items-center",
   costNoType: "grid gap-2 grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_64px_116px_104px_92px_44px] min-[1100px]:items-center",
 } as const;
 

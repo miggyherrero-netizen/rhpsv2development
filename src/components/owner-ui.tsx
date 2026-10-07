@@ -232,7 +232,7 @@ export function ItemModal({
 
 export function PriorityDot({ priority }: { priority: string }) {
   const p = PRIORITY_STYLE_OW[priority] ?? PRIORITY_STYLE_OW.normal;
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${p.dot}`} title={p.label} />;
+  return <span role="img" aria-label={`${p.label} priority`} className={`inline-block w-2 h-2 rounded-full shrink-0 ${p.dot}`} title={p.label} />;
 }
 
 export function CategoryChip({ category }: { category: OwnerCategory | undefined }) {
@@ -275,7 +275,7 @@ export function KindGlyph({ kind }: { kind: string }) {
   const letter: Record<string, string> = { event: "A", focus: "F", reminder: "R", "task-block": "T", "task-due": "D" };
   const c = map[kind] ?? { bg: "var(--color-ow-surface-2)", fg: "var(--color-ow-text-dim)" };
   return (
-    <span className="w-[18px] h-[18px] rounded-md text-[12px] font-semibold flex items-center justify-center shrink-0"
+    <span className="w-[22px] h-[22px] rounded-md text-[12px] font-semibold flex items-center justify-center shrink-0"
       style={{ background: c.bg, color: c.fg }}>
       {letter[kind] ?? "·"}
     </span>

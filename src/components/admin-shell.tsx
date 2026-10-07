@@ -29,7 +29,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
   const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
 
   const navList = (
-    <nav className="flex-1 px-3 space-y-1 overflow-y-auto thin-scroll">
+    <nav aria-label="Admin" className="flex-1 px-3 space-y-0.5 overflow-y-auto thin-scroll">
       {NAV.map((item) => (
         <Link
           key={item.href}
@@ -65,7 +65,7 @@ export default function AdminShell({ children, userName }: { children: ReactNode
   return (
     <div className="adm-shell min-h-screen bg-coal text-chrome">
       {/* sidebar desktop */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-slate-700/70 bg-panel z-40">
+      <aside aria-label="Admin sidebar" className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-slate-700/70 bg-panel z-40">
         <div className="px-5 pt-6 pb-5">
           <Link href="/admin">
             <p className="font-serif text-lg text-white tracking-[0.14em] leading-none">HERRERO</p>
@@ -83,12 +83,12 @@ export default function AdminShell({ children, userName }: { children: ReactNode
       </aside>
 
       {/* mobile top bar */}
-      <div className="lg:hidden sticky top-0 z-40 glass-top pt-[env(safe-area-inset-top)]">
+      <header className="lg:hidden sticky top-0 z-40 glass-top pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/admin" className="font-serif text-base text-white tracking-[0.14em] min-h-11 flex items-center">HERRERO</Link>
           <button onClick={() => setMobileOpen(true)} className="h-11 w-11 -mr-2 flex items-center justify-center rounded-[10px] text-chrome hover:bg-white/[0.06]" aria-label="Open menu" aria-expanded={mobileOpen}><Menu size={22} aria-hidden="true" /></button>
         </div>
-      </div>
+      </header>
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={() => setMobileOpen(false)} />

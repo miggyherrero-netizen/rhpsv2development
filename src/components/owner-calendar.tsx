@@ -150,7 +150,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
             {days.map((d) => {
               const isToday = sameDay(d, now);
               return (
-                <div key={d.toISOString()} className={`text-center py-2.5 cursor-pointer ${isToday ? "" : "opacity-75"}`} onClick={() => { setCursor(d); setView("day"); }}>
+                <div key={d.toISOString()} className={`text-center py-2.5 cursor-pointer `} onClick={() => { setCursor(d); setView("day"); }}>
                   <p className="text-[12px] uppercase tracking-[0.1em] text-[var(--color-ow-text-faint)]">{d.toLocaleDateString("en-US", { weekday: "short" })}</p>
                   <p className="font-serif text-lg leading-tight text-[var(--color-ow-text)]">
                     <span className={isToday ? "rounded-full px-2.5 py-0.5" : ""} style={isToday ? { background: "var(--color-ow-accent)", color: "#ffffff" } : undefined}>{d.getDate()}</span>
@@ -165,7 +165,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
             {days.map((d) => (
               <div key={d.toISOString()} className="px-1 py-1.5 space-y-1 min-h-[30px] min-w-0 overflow-hidden" style={{ borderLeft: "1px solid var(--color-ow-border)" }}>
                 {items.filter((i) => i.allDay && ymd(i.start) === ymd(d)).map((i) => (
-                  <button key={i.key} onClick={() => setDetail(i)} className={`block w-full max-w-full text-left text-[12px] rounded-md px-1.5 py-1 truncate ${i.status === "done" ? "line-through opacity-50" : ""}`} style={blockStyle(i)}>
+                  <button key={i.key} onClick={() => setDetail(i)} className={`block w-full max-w-full text-left text-[12px] rounded-md px-1.5 py-1 truncate ${i.status === "done" ? "line-through ow-done-block" : ""}`} style={blockStyle(i)}>
                     {i.title}
                   </button>
                 ))}
@@ -236,11 +236,11 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
                         draggable={!i.recurring}
                         onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ id: i.sourceId, kind: i.kind, dur, recurring: i.recurring }))}
                         onClick={() => setDetail(i)}
-                        className={`absolute inset-x-1 rounded-md px-1.5 py-1 text-left overflow-hidden transition-shadow hover:shadow-md cursor-pointer ${i.status === "done" ? "opacity-45 line-through" : ""}`}
+                        className={`absolute inset-x-1 rounded-md px-1.5 py-1 text-left overflow-hidden transition-shadow hover:shadow-md cursor-pointer ${i.status === "done" ? "ow-done-block line-through" : ""}`}
                         style={{ top, height: hgt, ...blockStyle(i), zIndex: 5 + idx, boxShadow: conflicted ? "0 0 0 1px var(--color-ow-rose)" : undefined }}
                       >
                         <p className="text-[12px] font-medium leading-tight truncate">{i.title}</p>
-                        {hgt > 34 && <p className="text-[12px] opacity-70 tnum">{fmtTime(i.start, tf)}{i.recurring ? " ↻" : ""}</p>}
+                        {hgt > 34 && <p className="text-[12px] tnum">{fmtTime(i.start, tf)}{i.recurring ? " ↻" : ""}</p>}
                       </button>
                     );
                   })}
@@ -290,10 +290,10 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
                 <p className="text-[12px] tnum mb-1" style={{ color: isToday ? "var(--color-ow-accent-text)" : inMonth ? "var(--color-ow-text)" : "var(--color-ow-text-faint)", fontWeight: isToday ? 700 : 400 }}>{d.getDate()}</p>
                 <div className="space-y-0.5">
                   {dayItems.slice(0, 3).map((i) => (
-                    <p key={i.key} onClick={(e) => { e.stopPropagation(); setDetail(i); }}
-                      className={`text-[12px] truncate rounded px-1 py-0.5 ${i.status === "done" ? "line-through opacity-50" : ""}`} style={blockStyle(i)}>
+                    <button type="button" key={i.key} onClick={(e) => { e.stopPropagation(); setDetail(i); }}
+                      className={`block w-full text-left text-[12px] truncate rounded px-1 py-0.5 ${i.status === "done" ? "line-through ow-done-block" : ""}`} style={blockStyle(i)}>
                       {i.title}
-                    </p>
+                    </button>
                   ))}
                   {dayItems.length > 3 && <p className="text-[12px] text-[var(--color-ow-text-faint)] pl-1">+{dayItems.length - 3} more</p>}
                 </div>
@@ -321,7 +321,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
               <ul className="space-y-1.5">
                 {dayItems.map((i) => (
                   <li key={i.key}>
-                    <button onClick={() => setDetail(i)} className={`w-full flex items-center gap-3 card-ow card-ow-hover px-3.5 py-2.5 text-left transition ${i.status === "done" ? "opacity-50" : ""}`}>
+                    <button onClick={() => setDetail(i)} className={`w-full flex items-center gap-3 card-ow card-ow-hover px-3.5 py-2.5 text-left transition ${i.status === "done" ? "ow-done-block" : ""}`}>
                       <span className="w-16 shrink-0 text-[12px] text-[var(--color-ow-text-dim)] tnum">{i.allDay ? "All day" : fmtTime(i.start, tf)}</span>
                       <span className="w-1 h-4 rounded-full shrink-0" style={{ background: (blockStyle(i).borderLeft as string | undefined)?.split(" ").pop() ?? "#7cb0ff" }} />
                       <span className={`text-[13px] truncate text-[var(--color-ow-text)] ${i.status === "done" ? "line-through" : ""}`}>{i.title}</span>
@@ -350,18 +350,18 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
       <div className="flex flex-wrap items-center gap-2.5 mb-5">
         <div className="flex items-center gap-1 mr-1">
           <button aria-label="Previous" onClick={() => nav(-1)} className="ow-icon-btn transition text-[var(--color-ow-text-dim)] hover:bg-white/[0.06]"><ChevronLeft size={16} /></button>
-          <button onClick={() => setCursor(new Date())} className="text-[12px] rounded-lg px-3 py-1.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}>Today</button>
+          <button onClick={() => setCursor(new Date())} className="text-[13px] rounded-[10px] px-3.5 min-h-11 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)] hover:bg-white/[0.05]" style={{ border: "1px solid var(--color-ow-border-strong)" }}>Today</button>
           <button aria-label="Next" onClick={() => nav(1)} className="ow-icon-btn transition text-[var(--color-ow-text-dim)] hover:bg-white/[0.06]"><ChevronRight size={16} /></button>
         </div>
         <h1 className="font-serif text-xl sm:text-2xl mr-auto text-[var(--color-ow-text)]">{title}</h1>
-        <div className="relative">
+        <div className="relative max-sm:w-full max-sm:order-last">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ow-text-faint)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="input-ow !w-44 !py-2 pl-8 !text-[12px]" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" aria-label="Search calendar" className="input-ow !w-44 max-sm:!w-full !pl-8 !text-[14px]" />
           {searchResults.length > 0 && (
             <div className="absolute right-0 top-11 w-72 card-ow p-1.5 z-30 max-h-80 overflow-auto thin-scroll">
               {searchResults.map((r, i) => r.type === "item" ? (
                 <button key={i} onClick={() => { setCursor(r.item.start); setView("day"); setDetail(r.item); setSearch(""); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06]">
+                  className="w-full text-left px-3 min-h-11 py-1.5 rounded-lg hover:bg-white/[0.06]">
                   <p className="text-[13px] truncate text-[var(--color-ow-text)]">{r.item.title}</p>
                   <p className="text-[12px] text-[var(--color-ow-text-faint)]">{fmtDate(r.item.start)} · {r.item.kind}</p>
                 </button>
@@ -375,39 +375,39 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
             </div>
           )}
         </div>
-        <div className="flex rounded-xl p-1" style={{ background: "var(--color-ow-surface-2)", border: "1px solid var(--color-ow-border)" }}>
+        <div className="flex rounded-xl p-1 gap-1" role="group" aria-label="Calendar view" style={{ background: "var(--color-ow-surface-2)", border: "1px solid var(--color-ow-border)" }}>
           {(["day", "week", "month", "agenda"] as View[]).map((v) => (
-            <button key={v} onClick={() => setView(v)}
-              className="px-3 py-1.5 rounded-lg text-[12px] capitalize transition"
+            <button key={v} onClick={() => setView(v)} aria-pressed={view === v}
+              className="px-3 min-h-10 rounded-lg text-[13px] capitalize transition hover:bg-white/[0.05]"
               style={view === v ? { background: "var(--color-ow-accent-soft)", color: "var(--color-ow-accent-text)", fontWeight: 500 } : { color: "var(--color-ow-text-dim)" }}>
               {v}
             </button>
           ))}
         </div>
         <button onClick={() => setAddModal({ date: cursor })}
-          className="btn-ow-primary flex items-center gap-1.5 text-[13px] rounded-xl px-4 py-2.5">
+          className="btn-ow-primary flex items-center gap-1.5 text-[14px] rounded-[10px] px-5">
           <Plus size={14} /> Add
         </button>
       </div>
 
       {/* filters */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-5 text-[12px]">
+      <div className="flex flex-wrap items-center gap-2 mb-5 text-[13px]">
         {[["all", "Everything"], ["appointments", "Appointments"], ["tasks", "Tasks"], ["focus", "Focus"]].map(([k, l]) => (
-          <button key={k} onClick={() => setKindFilter(k)}
-            className="rounded-full px-3 py-1.5 border transition"
+          <button key={k} onClick={() => setKindFilter(k)} aria-pressed={kindFilter === k}
+            className="rounded-full px-4 min-h-11 border transition hover:bg-white/[0.05]"
             style={kindFilter === k
               ? { background: "var(--color-ow-accent-soft)", borderColor: "var(--color-ow-accent)", color: "var(--color-ow-accent-text)" }
-              : { borderColor: "var(--color-ow-border)", color: "var(--color-ow-text-dim)" }}>
+              : { borderColor: "var(--color-ow-border-strong)", color: "var(--color-ow-text-dim)" }}>
             {l}
           </button>
         ))}
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="input-ow !w-auto !py-1.5 !text-[12px] !rounded-full">
+        <select aria-label="Category filter" value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="input-ow !w-auto !text-[13px] !rounded-full">
           <option value="all">All categories</option>
           {bundle.categories.filter((c) => !c.hidden).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button onClick={() => setShowDone(!showDone)}
-          className="rounded-full px-3 py-1.5 border transition"
-          style={showDone ? { borderColor: "var(--color-ow-border)", color: "var(--color-ow-text-dim)" } : { background: "var(--color-ow-surface-2)", borderColor: "var(--color-ow-border-strong)", color: "var(--color-ow-text)" }}>
+        <button onClick={() => setShowDone(!showDone)} aria-pressed={showDone}
+          className="rounded-full px-4 min-h-11 border transition hover:bg-white/[0.05]"
+          style={showDone ? { borderColor: "var(--color-ow-border-strong)", color: "var(--color-ow-text-dim)" } : { background: "var(--color-ow-surface-2)", borderColor: "var(--color-ow-border-strong)", color: "var(--color-ow-text)" }}>
           {showDone ? "Showing completed" : "Completed hidden"}
         </button>
       </div>
@@ -450,7 +450,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
                         ? { color: "var(--color-ow-text-dim)" }
                         : { color: "var(--color-ow-text-faint)" }}>
                       {d.getDate()}
-                      {has && !sel && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ background: "var(--color-ow-accent)" }} />}
+                      {has && !sel && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ background: "var(--color-ow-accent-text)" }} />}
                     </button>
                   );
                 });
@@ -480,7 +480,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
       {detail && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm anim-fade-in" onClick={() => setDetail(null)} />
-          <div className="relative card-ow rounded-t-2xl sm:rounded-2xl p-6 w-full max-w-sm anim-sheet">
+          <div role="dialog" aria-modal="true" aria-label={detail.title} className="relative card-ow rounded-t-2xl sm:rounded-2xl p-6 w-full max-w-sm anim-sheet">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[12px] uppercase tracking-[0.2em] text-[var(--color-ow-text-faint)]">
@@ -502,34 +502,34 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
             {detail.kind.startsWith("task") ? (
               <div className="mt-5 space-y-2">
                 <button onClick={() => { const t = bundle.tasks.find((x) => x.id === detail.sourceId); setOwnerTaskDone(detail.sourceId, t?.status !== "done"); setDetail(null); }}
-                  className="w-full flex items-center gap-2.5 text-[13px] rounded-xl py-2.5 px-3.5 transition"
+                  className="w-full flex items-center gap-2.5 text-[13px] rounded-[10px] min-h-11 px-3.5 transition"
                   style={{ background: "var(--color-ow-accent-soft)", color: "var(--color-ow-accent-text)", border: "1px solid rgba(143,179,255,0.35)" }}>
                   <CheckCheck size={15} /> {bundle.tasks.find((x) => x.id === detail.sourceId)?.status === "done" ? "Mark not done" : "Mark complete"}
                 </button>
                 {detail.kind === "task-block" && (
                   <button onClick={() => { scheduleOwnerTask(detail.sourceId, null, null); setDetail(null); }}
-                    className="w-full flex items-center gap-2.5 text-[13px] rounded-xl py-2.5 px-3.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]"
-                    style={{ border: "1px solid var(--color-ow-border)" }}>
+                    className="w-full flex items-center gap-2.5 text-[13px] rounded-[10px] min-h-11 px-3.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]"
+                    style={{ border: "1px solid var(--color-ow-border-strong)" }}>
                     <AlarmClockOff size={15} className="text-[var(--color-ow-text-faint)]" /> Back to unscheduled
                   </button>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => openEdit(detail)} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-xl py-2.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}><Pencil size={13} /> Edit</button>
-                  <button onClick={() => { cancelOwnerTask(detail.sourceId); setDetail(null); }} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-xl py-2.5 transition" style={{ color: "var(--color-ow-rose)", border: "1px solid rgba(251,113,133,0.4)" }}><Trash2 size={13} /> Cancel task</button>
+                  <button onClick={() => openEdit(detail)} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border-strong)" }}><Pencil size={13} /> Edit</button>
+                  <button onClick={() => { cancelOwnerTask(detail.sourceId); setDetail(null); }} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125" style={{ color: "var(--color-ow-rose)", border: "1px solid rgba(251,113,133,0.4)" }}><Trash2 size={13} /> Cancel task</button>
                 </div>
               </div>
             ) : (
               <div className="mt-5 space-y-2">
                 <button onClick={() => detail.recurring ? setScope({ item: detail, action: "complete" }) : (completeOwnerEvent(detail.sourceId, "series"), setDetail(null))}
-                  className="w-full flex items-center gap-2.5 text-[13px] rounded-xl py-2.5 px-3.5 transition"
+                  className="w-full flex items-center gap-2.5 text-[13px] rounded-[10px] min-h-11 px-3.5 transition"
                   style={{ background: "var(--color-ow-accent-soft)", color: "var(--color-ow-accent-text)", border: "1px solid rgba(143,179,255,0.35)" }}>
                   <CheckCheck size={15} /> Mark done
                 </button>
                 <div className="flex gap-2">
-                  <button onClick={() => openEdit(detail)} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-xl py-2.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}><Pencil size={13} /> Edit</button>
-                  <button onClick={() => { duplicateOwnerEvent(detail.sourceId); setDetail(null); }} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-xl py-2.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}><CopyPlus size={13} /> Duplicate</button>
+                  <button onClick={() => openEdit(detail)} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border-strong)" }}><Pencil size={13} /> Edit</button>
+                  <button onClick={() => { duplicateOwnerEvent(detail.sourceId); setDetail(null); }} className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border-strong)" }}><CopyPlus size={13} /> Duplicate</button>
                   <button onClick={() => detail.recurring ? setScope({ item: detail, action: "delete" }) : (deleteOwnerEvent(detail.sourceId, "series"), setDetail(null))}
-                    className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-xl py-2.5 transition" style={{ color: "var(--color-ow-rose)", border: "1px solid rgba(251,113,133,0.4)" }}><Trash2 size={13} /> Delete</button>
+                    className="flex-1 flex items-center justify-center gap-2 text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125" style={{ color: "var(--color-ow-rose)", border: "1px solid rgba(251,113,133,0.4)" }}><Trash2 size={13} /> Delete</button>
                 </div>
                 {/* nudge */}
                 {!detail.recurring && !detail.allDay && (
@@ -541,7 +541,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
                         const s = new Date(ev.startAt.getTime() + delta * 60000);
                         await updateOwnerEvent(ev.id, { startAt: s.toISOString(), endAt: ev.endAt ? new Date(ev.endAt.getTime() + delta * 60000).toISOString() : null });
                         setDetail(null);
-                      }} className="flex-1 text-[12px] rounded-lg py-2 transition flex items-center justify-center gap-1 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}>
+                      }} className="flex-1 text-[12px] rounded-[10px] min-h-11 transition flex items-center justify-center gap-1 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border-strong)" }}>
                         {delta < 0 ? <Minus size={11} /> : <PlusSm size={11} />} {Math.abs(delta)}m
                       </button>
                     ))}
@@ -557,7 +557,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
       {scope && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setScope(null)} />
-          <div className="relative card-ow p-6 max-w-xs w-full anim-sheet">
+          <div role="dialog" aria-modal="true" aria-label="Recurring item" className="relative card-ow p-6 max-w-xs w-full anim-sheet">
             <p className="font-serif text-lg text-[var(--color-ow-text)]">Recurring item</p>
             <p className="text-[13px] text-[var(--color-ow-text-dim)] mt-1.5">{scope.action === "complete" ? "Mark done" : "Delete"} — apply to?</p>
             <div className="mt-4 space-y-2">
@@ -565,7 +565,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
                 if (scope.action === "complete") await completeOwnerEvent(scope.item.sourceId, "occurrence", ymd(scope.item.start));
                 else await deleteOwnerEvent(scope.item.sourceId, "occurrence", ymd(scope.item.start));
                 setScope(null); setDetail(null);
-              }} className="w-full text-[13px] rounded-xl py-2.5 transition text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border)" }}>Just this occurrence</button>
+              }} className="w-full text-[13px] rounded-[10px] min-h-11 transition hover:brightness-125 text-[var(--color-ow-text-dim)] hover:text-[var(--color-ow-text)]" style={{ border: "1px solid var(--color-ow-border-strong)" }}>Just this occurrence</button>
               <button onClick={async () => {
                 if (scope.action === "complete") await completeOwnerEvent(scope.item.sourceId, "series");
                 else await deleteOwnerEvent(scope.item.sourceId, "series");

@@ -75,7 +75,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item, SKU, supplier, shelf…" className="input-dark pl-9" />
         </div>
-        <select value={cat} onChange={(e) => setCat(e.target.value)} className="input-dark w-auto">
+        <select aria-label="Filter by category" value={cat} onChange={(e) => setCat(e.target.value)} className="input-dark w-auto">
           <option value="all">All categories</option>
           {categories.map((c) => <option key={c}>{c}</option>)}
         </select>
@@ -91,7 +91,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.16em] text-mist border-b border-white/[0.07]">
                 {["Item", "Category", "SKU", "Supplier", "On hand", "Unit cost", "Value", "Reorder at", "Location", ""].map((h) => (
-                  <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                  <th key={h} className="px-4 py-3 font-medium">{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>

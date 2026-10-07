@@ -309,13 +309,13 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 30px -18px rgba(15, 23, 42, 0.16);
 }
 
+/* width/padding live in the components layer so utilities (w-auto, pl-9) can override them */
+@layer components { .input-dark { width: 100%; padding: 10px 12px; } }
 .input-dark {
-  width: 100%;
   background: #0b1120;
   border: 1px solid #475569;
   border-radius: 10px;
   min-height: 44px;
-  padding: 10px 12px;
   font-size: 14px;
   color: #f8fafc;
   outline: none;
@@ -457,6 +457,9 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
 .ow-shell button.chip-ow, .ow-shell a.chip-ow { min-height: 44px; padding-inline: 14px; cursor: pointer; transition: background-color 0.2s ease-out, color 0.2s ease-out; }
 .ow-shell button.chip-ow:hover { background: #22304f; }
 
+.ow-done p, .ow-done span { color: var(--color-ow-text-dim) !important; }
+.ow-done-block { background: var(--color-ow-surface-2) !important; color: var(--color-ow-text-dim) !important; border-left-color: var(--color-ow-border-strong) !important; }
+.ow-done-block * { color: inherit !important; }
 /* Shared interaction baseline for everything inside My Desk */
 .ow-shell :is(a, button, input, select, textarea, summary, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--color-ow-accent-text); outline-offset: 2px;
@@ -484,6 +487,7 @@ div[class*="overflow-x-auto"][class*="pb-4"][class*="anim-fade-in"] {
 .svc-shell :is(h1, h2, h3, .font-serif) { font-family: var(--font-serif); letter-spacing: -0.01em; }
 .svc-shell :is(button, [role="button"], summary, label[for], select, input[type="checkbox"], input[type="radio"]) { cursor: pointer; }
 .svc-shell :is(button, input, select, textarea):disabled { cursor: not-allowed; }
+.svc-shell input:is([type="checkbox"], [type="radio"]) { accent-color: var(--color-svc-primary); width: 18px; height: 18px; }
 .svc-sidebar { background: var(--color-svc-sidebar); border-color: var(--color-svc-border); }
 
 .card-svc {
@@ -588,6 +592,8 @@ textarea.input-svc { min-height: 88px; }
   [data-print-surface] * { color: #111 !important; }
   [data-print-surface] input { border: none !important; background: transparent !important; }
   .card-svc { break-inside: avoid; }
+  .svc-table-wrap { max-height: none !important; overflow: visible !important; }
+  .svc-table thead th { position: static; }
 }
 
 /* number ticker tabular */

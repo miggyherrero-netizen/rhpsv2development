@@ -268,13 +268,13 @@ export default function ScheduleClient({
                   <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>
                     {job.customerName} · {SERVICE_TYPE_LABEL[job.serviceType] ?? job.serviceType}
                   </p>
-                  <div className="flex gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {days.slice(0, 7).map((d, i) => (
                       <button
                         key={d.toISOString()}
                         disabled={pending}
                         onClick={() => move(job.id, i, 9 * 60)}
-                        className="px-2 py-1 rounded-lg text-[12px] transition hover:brightness-125"
+                        className="min-w-11 min-h-11 rounded-[10px] text-[13px] font-medium transition-colors hover:brightness-125 disabled:opacity-50"
                         style={{ background: "var(--color-svc-surface-2)", color: "var(--color-svc-text-dim)" }}
                         title={`Schedule on ${fmtDate(d)} at 9:00 AM`}
                       >

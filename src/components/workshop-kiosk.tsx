@@ -93,7 +93,7 @@ export default function WorkshopKiosk({ workers }: { workers: KioskWorker[] }) {
       <div className="kiosk-shell min-h-screen bg-coal text-chrome flex flex-col items-center justify-center px-5 py-14 relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.35]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/img/atelier.jpg" alt="" className="h-full w-full object-cover" />
+          <img src="/img/hero.jpg" alt="" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-coal/80 via-coal/70 to-coal" />
         </div>
         <main className="relative w-full max-w-3xl anim-fade-up">

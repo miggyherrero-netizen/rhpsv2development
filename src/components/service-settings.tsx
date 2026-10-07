@@ -395,7 +395,7 @@ export default function SettingsClient({
                 </label>
                 <button
                   onClick={() => run(() => updateTechnician(t.id, { active: !t.active }))}
-                  className="text-[12px]"
+                  className="text-[12px] min-h-11 px-1"
                 >
                   {t.active ? <Chip tone="success">active</Chip> : <Chip tone="slate">inactive</Chip>}
                 </button>

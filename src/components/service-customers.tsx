@@ -135,7 +135,7 @@ export default function CustomersClient({
                   </span>
                   <Link
                     href={`/service/jobs?new=1`}
-                    className="text-[12px] hover:underline"
+                    className="inline-flex items-center min-h-11 px-3 -mr-3 text-[13px] hover:underline"
                     style={{ color: TONE_TEXT.azure }}
                   >
                     Book visit

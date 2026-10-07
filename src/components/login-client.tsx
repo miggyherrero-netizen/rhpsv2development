@@ -29,7 +29,7 @@ export default function LoginClient() {
 
   return (
     <div className="adm-shell min-h-screen bg-coal text-chrome flex">
-      <div className="hidden lg:block relative w-[46%] overflow-hidden">
+      <aside aria-label="The Herrero Atelier" className="hidden lg:block relative w-[46%] overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/img/hero.jpg" alt="Herrero Pianos atelier" className="absolute inset-0 h-full w-full object-cover opacity-80" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/25 to-coal" />
@@ -39,7 +39,7 @@ export default function LoginClient() {
             “Every instrument that leaves this room carries our signature.”
           </p>
         </div>
-      </div>
+      </aside>
 
       <main id="main" className="flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-sm anim-fade-up card-dark p-7 sm:p-8 shadow-2xl shadow-black/40">
