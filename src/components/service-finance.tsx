@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LineChart, TrendingUp, Wallet2, Receipt, Gauge, FileClock } from "lucide-react";
+import { LineChart, TrendingUp, Wallet2, Receipt, Gauge, FileClock, HeartPulse } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
 import { EXPENSE_CATEGORY_LABEL } from "@/lib/service";
 import { RANGES, chartScale, compactPeso } from "@/lib/service-reports";
@@ -40,6 +40,13 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
           <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             Invoicing, collections, costs, and job profitability
           </p>
+          <Link
+            href="/service/finance/health"
+            className="mt-2 inline-flex items-center gap-2 rounded-xl px-3.5 min-h-11 text-[13px] card-svc card-svc-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+            style={{ color: "var(--color-svc-text-dim)" }}
+          >
+            <HeartPulse size={14} /> Health check
+          </Link>
         </div>
         <RangePicker options={RANGES} value={range.key} />
       </header>
