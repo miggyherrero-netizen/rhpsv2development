@@ -137,7 +137,11 @@ Unlike skills (passive reference docs I read myself), agents are subagent person
 
 6. **Schema changes need a manual migration on the live DB.** Vercel runs `next build` only; `drizzle-kit push` runs in Docker (`init-db.sh`), not on Vercel. Any new column in `src/db/schema.ts` must also get an additive, idempotent SQL file in `drizzle/manual/` (see its README) that the owner pastes into the live database *before* the deploy is used.
 
+## Design system (current — ui-ux-pro-max redesign, Oct 2026)
+The whole app was redesigned with the `ui-ux-pro-max` skill; **`docs/design-plan.md` is the source of truth** (principles, per-area palette/fonts, verification). It supersedes the older per-area theme notes below wherever they conflict (e.g. the owner theme is now blue-accent and may use amber for warnings; admin accent is green; public is light editorial with bronze/ink and Cormorant + Montserrat). Areas are still **scoped** (each redefines tokens inside its own wrapper: `.pub-theme`, owner `--color-ow-*`, service `--color-svc-*`, Growth OS `--gos-*`), so don't leak tokens across areas. Standards for every screen: contrast 4.5:1, 44px targets (kiosk 64px), visible focus ring, reduced-motion, no text under 12px, tabular numerals for money/time, SVG icons only. Verify UI changes with screenshots + axe (target: 0 colour-contrast failures); ideas not yet done are in `docs/design-backlog.md`.
+
 ## Personal Workspace design system (`/owner/*` only)
+> Older notes (superseded by the section above where they conflict).
 Dark, premium theme — deliberately different from the rest of the app. Tokens live in `src/app/globals.css` under `/* ---- Personal Workspace (premium dark) ---- */` (CSS vars prefixed `--color-ow-*`) plus reusable classes `.card-ow`, `.input-ow`, `.btn-ow-primary`, `.chip-ow`, `.ow-divide`, `.ow-shell`, `.ow-sidebar`.
 - Background: deep charcoal-navy (`--color-ow-bg` `#10141b`), surfaces one step lighter (`--color-ow-surface` `#171c25`).
 - Accent: muted teal (`--color-ow-accent` `#4fb8ab`) for primary actions/active nav — used sparingly.

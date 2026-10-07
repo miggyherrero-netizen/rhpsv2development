@@ -61,3 +61,8 @@ pass (the owner chose the skill over them). Scoping is still kept: each area red
 ## 5. Definition of done
 Every logged-in route and public page renders in the new system at 1440 and 390px with no console errors,
 zero new axe violations (target: zero colour-contrast failures), keyboard focus visible, and no behaviour change.
+
+## 6. Results (2026-10-07)
+- Axe, 37 routes: **224 issues (87 colour-contrast) before -> 0 at desktop 1440; 7 at mobile 390** (all `region` on owner pages, from the Next dev badge).
+- `tsc`, `eslint .`, `test:domain` (656) and `test:service` pass; `next build` passes against a local seeded Postgres.
+- Not verified in a real browser by the owner yet; not merged to `main`.

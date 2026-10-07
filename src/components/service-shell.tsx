@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp, ChevronDown,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -114,12 +114,13 @@ export default function ServiceShell({
           </div>
         );
         return group.collapsible ? (
-          <details key={group.label} open={group.items.some((i) => isActive(i.href))}>
+          <details key={group.label} className="group" open={group.items.some((i) => isActive(i.href))}>
             <summary
               className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em] cursor-pointer select-none min-h-11 flex items-center"
               style={{ color: "var(--color-svc-text-faint)" }}
             >
               {group.label}
+              <ChevronDown size={14} aria-hidden="true" className="ml-1.5 transition-transform duration-200 group-open:rotate-180" />
             </summary>
 {items}
           </details>
