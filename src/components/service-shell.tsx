@@ -5,37 +5,41 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp, ChevronDown,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
-const GROUPS: { label: string; collapsible?: boolean; items: { href: string; label: string; icon: typeof Sun }[] }[] = [
+const GROUPS: { label: string; items: { href: string; label: string; icon: typeof Sun }[] }[] = [
   {
-    label: "Daily",
+    label: "Operations",
     items: [
       { href: "/service/today", label: "Today", icon: Sun },
       { href: "/service/reminders", label: "Reminders", icon: Bell },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
-      { href: "/service/invoices", label: "Invoices", icon: Receipt },
-      { href: "/service/customers", label: "Customers", icon: Users },
+      { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
+      { href: "/service/time", label: "Time", icon: Timer },
     ],
   },
   {
-    // Collapsed by default on desktop (opens itself when one of its pages is active).
-    label: "More",
-    collapsible: true,
+    label: "Money",
     items: [
-      { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
-      { href: "/service/time", label: "Time", icon: Timer },
+      { href: "/service/invoices", label: "Invoices", icon: Receipt },
       { href: "/service/expenses", label: "Expenses", icon: Wallet },
       { href: "/service/finance", label: "Finance", icon: LineChart },
-      { href: "/service/settings", label: "Settings", icon: Settings },
     ],
+  },
+  {
+    label: "People & places",
+    items: [{ href: "/service/customers", label: "Customers", icon: Users }],
+  },
+  {
+    label: "Setup",
+    items: [{ href: "/service/settings", label: "Settings", icon: Settings }],
   },
 ];
 
-/** The tabs on a phone. "More" opens the full menu (Reminders, Customers, Waitlist, Time, Expenses, Finance, Settings…). */
+/** The tabs on a phone. "More" opens the full menu with every section. */
 const TABS = [
   { href: "/service/today", label: "Today", icon: Sun },
   { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
@@ -113,18 +117,7 @@ export default function ServiceShell({
             ))}
           </div>
         );
-        return group.collapsible ? (
-          <details key={group.label} className="group" open={group.items.some((i) => isActive(i.href))}>
-            <summary
-              className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em] cursor-pointer select-none min-h-11 flex items-center"
-              style={{ color: "var(--color-svc-text-faint)" }}
-            >
-              {group.label}
-              <ChevronDown size={14} aria-hidden="true" className="ml-1.5 transition-transform duration-200 group-open:rotate-180" />
-            </summary>
-{items}
-          </details>
-        ) : (
+        return (
           <div key={group.label}>
             <p
               className="px-3.5 pb-1.5 text-[12px] uppercase tracking-[0.14em]"
