@@ -138,10 +138,10 @@ export default function InvoicesClient({
         <SectionCard>
           <div className="flex flex-wrap items-center gap-3 px-5 py-3" style={{ borderBottom: "1px solid var(--color-svc-border)" }}>
             <FilterPills options={FILTERS} value={filter} onChange={setFilter} />
-            <div className="flex-1" />
-            <div className="relative">
+            <div className="hidden sm:block flex-1" />
+            <div className="relative w-full sm:w-auto">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-svc-text-faint)" }} />
-              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" aria-label="Search invoices" className="!pl-9 w-56" />
+              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" aria-label="Search invoices" className="!pl-9 sm:w-56" />
             </div>
           </div>
 
