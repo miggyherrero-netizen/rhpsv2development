@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Wallet, Search, Trash2, Pencil, Paperclip } from "lucide-react";
+import { Plus, Wallet, Search, Trash2, Pencil, Paperclip, History } from "lucide-react";
 import { RANGES, type RangeKey } from "@/lib/service-reports";
 import { ExpenseFormModal } from "@/components/service-forms";
 import { EXPENSE_KIND_LABEL } from "@/lib/service-finance-split";
@@ -12,6 +12,9 @@ import {
 } from "@/lib/service";
 import type { ExpenseRow } from "@/server/service-data";
 import { expenseToFormInitial, buildExpensePatch } from "@/lib/service-expense-edit";
+import FinanceHistoryList from "@/components/service-finance-history";
+import { loadExpenseHistory } from "@/server/service-finance-history-actions";
+import type { FinanceHistoryResult } from "@/server/service-finance-history-data";
 import { createExpense, deleteExpense, updateExpense, getExpenseReceipt } from "@/server/service";
 import {
   Bar, Chip, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
@@ -48,6 +51,17 @@ export default function ExpensesClient({
     setReceiptView({ url: null, title });
     const res = await getExpenseReceipt(id);
     setReceiptView({ url: res.ok ? res.data?.url ?? null : null, title, error: res.ok ? undefined : res.error });
+  };
+
+  const [historyView, setHistoryView] = useState<{ title: string; data: FinanceHistoryResult | null; error?: string } | null>(null);
+  const openHistory = async (id: string, title: string) => {
+    setHistoryView({ title, data: null });
+    try {
+      const res = await loadExpenseHistory(id);
+      setHistoryView({ title, data: res.ok ? res.data : null, error: res.ok ? undefined : res.error });
+    } catch {
+      setHistoryView({ title, data: null, error: "Could not load the history. Try again." });
+    }
   };
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
@@ -226,6 +240,16 @@ export default function ExpensesClient({
                       </td>
                       <td className="px-5 py-2.5 whitespace-nowrap"><Money cents={e.amountCents} className="text-[14px]" /></td>
                       <td className="px-5 py-2.5 text-right">
+                        {showFinance ? (
+                          <button
+                            onClick={() => openHistory(e.id, e.description)}
+                            className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
+                            style={{ color: "var(--color-svc-text-faint)" }}
+                            aria-label={`History of ${e.description}`}
+                          >
+                            <History size={13} />
+                          </button>
+                        ) : null}
                         <button
                           onClick={() => setEditing(e)}
                           className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
@@ -288,6 +312,15 @@ export default function ExpensesClient({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={receiptView.url} alt={`Receipt for ${receiptView.title}`} className="w-full max-h-[70vh] object-contain rounded-lg bg-black/30" />
         )}
+      </SvcModal>
+
+      <SvcModal open={!!historyView} onClose={() => setHistoryView(null)} title="Expense history" subtitle={historyView?.title}>
+        {historyView && !historyView.data ? (
+          <p className="text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{historyView.error ?? "Loading history…"}</p>
+        ) : null}
+        {historyView?.data ? (
+          <div className="-mx-5"><FinanceHistoryList items={historyView.data.items} tableMissing={historyView.data.tableMissing} /></div>
+        ) : null}
       </SvcModal>
 
       <ExpenseFormModal

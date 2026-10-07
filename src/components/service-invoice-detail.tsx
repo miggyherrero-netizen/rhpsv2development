@@ -34,12 +34,18 @@ const PAPER: React.CSSProperties = {
   ["--color-svc-accent" as string]: "#1f5fbf", ["--color-svc-accent-text" as string]: "#1f5fbf", ["--color-svc-warn" as string]: "#8a5a14", ["--color-svc-success" as string]: "#1f7a52", ["--color-svc-danger" as string]: "#b03a3a",
 };
 
+import FinanceHistoryList from "@/components/service-finance-history";
+import type { FinanceHistoryResult } from "@/server/service-finance-history-data";
+
 export default function InvoiceDetailClient({
   detail,
   invoicePrefix,
+  history,
 }: {
   detail: InvoiceDetail;
   invoicePrefix: string;
+  /** Null when the signed-in user may not see finance. */
+  history: FinanceHistoryResult | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -363,6 +369,12 @@ export default function InvoiceDetailClient({
           )}
         </div>
       </SectionCard>
+
+      {history ? (
+        <SectionCard title="History" action={<span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>Changes to this invoice, its lines and payments</span>}>
+          <FinanceHistoryList items={history.items} tableMissing={history.tableMissing} />
+        </SectionCard>
+      ) : null}
 
       <EditInvoiceModal
         open={editOpen}

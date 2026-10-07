@@ -11,6 +11,7 @@
     "test:domain": "node tests/run-tests.mjs",
     "test:service": "tsx tests/service-money.ts",
     "test:finance-audit": "tsx tests/service-finance-audit.ts",
+    "test:finance-history": "tsx tests/service-finance-history.ts",
     "test:service-mock": "tsx tests/service-mock.ts",
     "test:documents": "tsx tests/service-documents.ts",
     "test:integration": "node tests/task-flow.cjs",

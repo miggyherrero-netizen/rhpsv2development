@@ -686,6 +686,31 @@ export const serviceExpenses = pgTable("service_expenses", {
   pianoIdx: index("service_expenses_piano_idx").on(t.pianoId),
 }));
 
+/**
+ * Permanent, insert-only history of money edits ("what it was before -> what it is now").
+ * No foreign keys on purpose: rows must survive when the invoice / payment / expense is deleted.
+ */
+export const serviceFinanceHistory = pgTable("service_finance_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  entityType: text("entity_type").$type<"invoice" | "invoice_item" | "payment" | "expense">().notNull(),
+  entityId: uuid("entity_id").notNull(),
+  /** Groups an invoice with its lines and payments. */
+  invoiceId: uuid("invoice_id"),
+  jobId: uuid("job_id"),
+  action: text("action").$type<"create" | "update" | "delete" | "status">().notNull(),
+  summary: text("summary").notNull(),
+  /** { field: { from, to } }, money as whole centavos. */
+  changes: jsonb("changes").$type<Record<string, { from: unknown; to: unknown }>>(),
+  /** Reserved for phase 3 (required reason when editing paid records). */
+  reason: text("reason"),
+  actorName: text("actor_name"),
+}, (t) => ({
+  entityIdx: index("service_finance_history_entity_idx").on(t.entityType, t.entityId),
+  invoiceIdx: index("service_finance_history_invoice_idx").on(t.invoiceId),
+  createdIdx: index("service_finance_history_created_idx").on(t.createdAt),
+}));
+
 /** One row per owner — invoice numbering, tax, terms, travel defaults, dispatch hours. */
 export const serviceSettings = pgTable("service_settings", {
   id: serial("id").primaryKey(),
@@ -756,6 +781,7 @@ export type ServiceInvoiceItem = typeof serviceInvoiceItems.$inferSelect;
 export type ServicePayment = typeof servicePayments.$inferSelect;
 export type ServiceDocumentShare = typeof serviceDocumentShares.$inferSelect;
 export type ServiceExpense = typeof serviceExpenses.$inferSelect;
+export type ServiceFinanceHistory = typeof serviceFinanceHistory.$inferSelect;
 export type ServiceSetting = typeof serviceSettings.$inferSelect;
 
 /* ============ WAITLIST BY AREA ============ */
