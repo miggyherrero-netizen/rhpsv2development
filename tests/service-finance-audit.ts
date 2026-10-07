@@ -69,6 +69,7 @@ const unpaid = { amountPaidCents: 0 };
 check("(e) paid but balance > 0", codes({ ...clean(), invoices: [inv({ amountPaidCents: 100_000 })], payments: [pay({ amountCents: 100_000 })] }), ["status_paid_with_balance"]);
 check("(e) paid with amountPaid 0", codes({ ...clean(), invoices: [inv(unpaid)], payments: [] }).includes("status_paid_no_payment"), true);
 check("(e) partial with amountPaid 0", codes({ ...clean(), invoices: [inv({ status: "partial", ...unpaid })], payments: [] }), ["status_partial_mismatch"]);
+check("(e) zero-total invoice with a payment is partial by design", codes({ ...clean(), invoices: [inv({ status: "partial", subtotalCents: 0, taxCents: 0, totalCents: 0, amountPaidCents: 5_000 })], invoiceItems: [], payments: [pay({ amountCents: 5_000 })] }).filter((c) => c === "status_partial_mismatch"), []);
 check("(e) partial but fully paid", codes({ ...clean(), invoices: [inv({ status: "partial" })] }), ["status_partial_mismatch"]);
 check("(e) sent holding payments", codes({ ...clean(), invoices: [inv({ status: "sent" })] }), ["status_unpaid_holds_payment"]);
 check("(e) draft holding payments", codes({ ...clean(), invoices: [inv({ status: "draft", sentAt: null })] }), ["status_unpaid_holds_payment"]);
@@ -84,6 +85,7 @@ check("(f) overpaid", codes({ ...clean(), invoices: [inv({ amountPaidCents: 120_
 console.log("\npayments");
 check("(g) zero-amount payment", codes({ ...clean(), payments: [pay(), pay({ id: "p2", amountCents: 0 })] }), ["payment_non_positive"]);
 check("(g) negative payment", codes({ ...clean(), invoices: [inv({ amountPaidCents: 109_000 })], payments: [pay({ amountCents: 110_000 }), pay({ id: "p2", amountCents: -1_000 })] }).includes("payment_non_positive"), true);
+check("(g) backdated issue date is not flagged", codes({ ...clean(), invoices: [inv({ issueDate: D("2026-08-15T02:00:00Z") })], payments: [pay({ receivedAt: D("2026-08-20T02:00:00Z") })] }), []);
 check("(g) dated before the invoice was created", codes({ ...clean(), payments: [pay({ receivedAt: D("2026-08-20T02:00:00Z") })] }), ["payment_before_invoice"]);
 check("(g) same-day payment earlier than creation time is fine", codes({ ...clean(), payments: [pay({ receivedAt: D("2026-08-31T16:00:00Z") })] }), []);
 
@@ -112,8 +114,8 @@ check("(i) small expense without receipt is ignored", codes({ ...clean(), expens
 console.log("\nsummary");
 {
   const r = auditFinance({ ...clean(), invoices: [inv({ subtotalCents: 90_000 })], expenses: [exp({ kind: null })] });
-  check("counts per severity and code, dispute in absolute cents", [r.summary.errors, r.summary.warnings, r.summary.info, r.summary.disputeCents, r.summary.byCode.invoice_subtotal], [2, 1, 0, 20_000, { severity: "error", count: 1, disputeCents: 10_000 }]);
-  check("errors sort before warnings", r.findings.map((f) => f.severity), ["error", "error", "warn"]);
+  check("counts per severity and code, dispute in absolute cents", [r.summary.errors, r.summary.warnings, r.summary.info, r.summary.disputeCents, r.summary.byCode.invoice_subtotal], [2, 0, 1, 20_000, { severity: "error", count: 1, disputeCents: 10_000 }]);
+  check("errors sort before info", r.findings.map((f) => f.severity), ["error", "error", "info"]);
 }
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }

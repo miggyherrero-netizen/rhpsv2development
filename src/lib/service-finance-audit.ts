@@ -5,7 +5,7 @@
  * Amounts are integer centavos.
  */
 
-import { balanceCents, computeTotals, lineTotalCents } from "@/lib/service";
+import { balanceCents, computeTotals, isOverdue, lineTotalCents } from "@/lib/service";
 import { partsCostFromLines } from "@/lib/service-lines";
 import { startOfManilaDayUTC } from "@/lib/dates";
 
@@ -29,6 +29,8 @@ export type AuditInvoice = {
   subtotalCents: number; discountCents: number; taxCents: number; totalCents: number;
   amountPaidCents: number; taxRateBps: number;
   createdAt: Date; dueDate: Date | null; sentAt: Date | null; voidedAt: Date | null;
+  /** Editable by the owner, so a backdated invoice is not flagged for payments before its created-at. */
+  issueDate?: Date | null;
 };
 export type AuditInvoiceItem = { invoiceId: string; qty: number; unitPriceCents: number; taxable: boolean };
 export type AuditPayment = { id: string; invoiceId: string; amountCents: number; receivedAt: Date };
@@ -130,12 +132,13 @@ function checkStatus(inv: AuditInvoice, pays: AuditPayment[], now: Date): Findin
   const balance = balanceCents(inv);
   if (inv.status === "paid" && balance > 0) add("status_paid_with_balance", "Marked paid but a balance is still owing.", 0, balance);
   if (inv.status === "paid" && inv.amountPaidCents === 0) add("status_paid_no_payment", "Marked paid but no payment is recorded.", inv.totalCents, 0);
-  if (inv.status === "partial" && (inv.amountPaidCents === 0 || inv.amountPaidCents >= inv.totalCents)) {
+  // The app marks a zero-total invoice that holds a payment "partial" (recalcInvoice), so that is not a mismatch.
+  if (inv.status === "partial" && (inv.amountPaidCents === 0 || (inv.totalCents > 0 && inv.amountPaidCents >= inv.totalCents))) {
     add("status_partial_mismatch", inv.amountPaidCents === 0 ? "Marked part paid but nothing has been paid." : "Marked part paid but it is fully paid.");
   }
   if ((inv.status === "draft" || inv.status === "sent") && held > 0) add("status_unpaid_holds_payment", `Marked ${inv.status} but it holds payments.`, 0, held);
   if (inv.status === "void" && held > 0) add("status_void_holds_payment", "Voided but it still holds payments.", 0, held);
-  if (inv.status === "sent" && inv.amountPaidCents === 0 && inv.dueDate && !inv.voidedAt && balance > 0 && inv.dueDate < now) {
+  if (inv.status === "sent" && inv.amountPaidCents === 0 && isOverdue(inv, now)) {
     out.push(make("invoice_overdue", "info", "invoice", inv.id, inv.label, "Sent, unpaid and past its due date."));
   }
   return out;
@@ -152,7 +155,8 @@ function checkOverpaid(inv: AuditInvoice, pays: AuditPayment[]): Finding[] {
 function checkPayment(p: AuditPayment, inv: AuditInvoice): Finding[] {
   const out: Finding[] = [];
   if (p.amountCents <= 0) out.push(make("payment_non_positive", "error", "payment", p.id, `Payment on ${inv.label}`, "Payment amount is zero or negative.", undefined, p.amountCents));
-  if (day(p.receivedAt) < day(inv.createdAt)) {
+  const existedFrom = inv.issueDate && inv.issueDate < inv.createdAt ? inv.issueDate : inv.createdAt;
+  if (day(p.receivedAt) < day(existedFrom)) {
     out.push(make("payment_before_invoice", "warn", "payment", p.id, `Payment on ${inv.label}`, "Payment is dated before the invoice was created."));
   }
   return out.map((f) => ({ ...f, invoiceId: inv.id }));
@@ -181,7 +185,7 @@ function checkExpense(e: AuditExpense): Finding[] {
   const out: Finding[] = [];
   const label = e.description;
   if (e.amountCents <= 0) out.push(make("expense_amount", "error", "expense", e.id, label, "Expense amount is zero or negative.", undefined, e.amountCents));
-  if (!e.kind) out.push(make("expense_no_kind", "warn", "expense", e.id, label, "Expense has no kind (job, stock or overhead) yet."));
+  if (!e.kind) out.push(make("expense_no_kind", "info", "expense", e.id, label, "Not classified yet (job, stock or overhead). Use Review expenses to sort it."));
   if (e.kind === "job" && !e.jobId) out.push(make("expense_job_no_job", "warn", "expense", e.id, label, "Marked as a job cost but not linked to a job."));
   if (e.kind === "stock" && !e.pianoId) out.push(make("expense_stock_no_piano", "warn", "expense", e.id, label, "Marked as piano stock but not linked to a piano."));
   if (!e.hasReceipt && e.amountCents >= RECEIPT_EXPECTED_FROM_CENTS) out.push(make("expense_no_receipt", "info", "expense", e.id, label, "No receipt photo on a large expense."));
