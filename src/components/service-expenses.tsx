@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Wallet, Search, Trash2, Paperclip } from "lucide-react";
+import { Plus, Wallet, Search, Trash2, Pencil, Paperclip } from "lucide-react";
 import { RANGES, type RangeKey } from "@/lib/service-reports";
 import { ExpenseFormModal } from "@/components/service-forms";
 import { EXPENSE_KIND_LABEL } from "@/lib/service-finance-split";
@@ -11,7 +11,8 @@ import {
   EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, PAYMENT_METHODS, PAYMENT_METHOD_LABEL,
 } from "@/lib/service";
 import type { ExpenseRow } from "@/server/service-data";
-import { createExpense, deleteExpense, getExpenseReceipt } from "@/server/service";
+import { expenseToFormInitial, buildExpensePatch } from "@/lib/service-expense-edit";
+import { createExpense, deleteExpense, updateExpense, getExpenseReceipt } from "@/server/service";
 import {
   Bar, Chip, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton,
   RangePicker, SectionCard, Select, StatCard, SvcModal, TextInput, TONE_BAR,
@@ -41,6 +42,7 @@ export default function ExpensesClient({
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [receiptView, setReceiptView] = useState<{ url: string | null; title: string; error?: string } | null>(null);
   const openReceipt = async (id: string, title: string) => {
     setReceiptView({ url: null, title });
@@ -225,6 +227,14 @@ export default function ExpensesClient({
                       <td className="px-5 py-2.5 whitespace-nowrap"><Money cents={e.amountCents} className="text-[14px]" /></td>
                       <td className="px-5 py-2.5 text-right">
                         <button
+                          onClick={() => setEditing(e)}
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
+                          style={{ color: "var(--color-svc-text-faint)" }}
+                          aria-label="Edit expense"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
                           onClick={() => run(() => deleteExpense(e.id))}
                           className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
                           style={{ color: "var(--color-svc-text-faint)" }}
@@ -287,6 +297,17 @@ export default function ExpensesClient({
         jobOptions={jobOptions}
         pianoOptions={pianoOptions}
         onSubmit={(values) => run(() => createExpense(values))}
+      />
+      <ExpenseFormModal
+        open={!!editing}
+        mode="edit"
+        onClose={() => setEditing(null)}
+        pending={pending}
+        jobOptions={jobOptions}
+        pianoOptions={pianoOptions}
+        initial={editing ? expenseToFormInitial(editing) : undefined}
+        hasReceipt={editing?.hasReceipt}
+        onSubmit={(values) => { const id = editing?.id; if (id) run(() => updateExpense(id, buildExpensePatch(values))); }}
       />
     </div>
   );

@@ -1549,6 +1549,13 @@ export async function getExpenseReceipt(id: string): Promise<Result<{ url: strin
 export async function updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Result> {
   if (!(await requireFinance())) return FINANCE_DENIED;
   if (!id) return fail("Missing expense.");
+  // A receipt is only replaced when a new photo is supplied; omitted/empty leaves the stored one alone.
+  let newReceipt: string | undefined;
+  if (patch.receiptUrl !== undefined && patch.receiptUrl !== null && patch.receiptUrl !== "") {
+    const receipt = validReceipt(patch.receiptUrl);
+    if (!receipt.ok) return fail("Receipt must be a JPG, PNG or WebP photo under 3MB.");
+    newReceipt = receipt.url ?? undefined;
+  }
   let kindPatch: { kind: ExpenseKind; pianoId: string | null } | null = null;
   if (patch.kind !== undefined || patch.pianoId !== undefined) {
     const [cur] = await db.select().from(serviceExpenses).where(eq(serviceExpenses.id, id)).limit(1);
@@ -1573,6 +1580,7 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
       method: patch.method ? oneOf(patch.method, PAYMENT_METHODS.map((m) => m.key), "cash") : undefined,
       reimbursable: patch.reimbursable !== undefined ? boolOr(patch.reimbursable, false) : undefined,
       note: patch.note !== undefined ? str(patch.note, 1_000) : undefined,
+      receiptUrl: newReceipt,
       updatedAt: new Date(),
     })
     .where(eq(serviceExpenses.id, id));

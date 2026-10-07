@@ -31,6 +31,7 @@ const testFiles = [
   { name: "service-lines", file: "tests/service-lines.ts" },
   { name: "service-today", file: "tests/service-today.ts" },
   { name: "service-finance-split", file: "tests/service-finance-split.ts" },
+  { name: "service-expense-edit", file: "tests/service-expense-edit.ts" },
   { name: "service-finance-audit", file: "tests/service-finance-audit.ts" },
   { name: "service-time-events", file: "tests/service-time-events.ts" },
   { name: "service-sale", file: "tests/service-sale.ts" },
