@@ -382,26 +382,32 @@ export function ExpenseFormModal(props: {
   /** Showroom pianos for "Piano stock" expenses. Without it the stock kind isn't offered. */
   pianoOptions?: { id: string; label: string; status: string }[];
   onSubmit: (values: ExpenseFormValues) => void;
+  /** Edit mode only: values to pre-fill (and the expense id). */
+  initial?: Partial<ExpenseFormValues> & { id?: string };
+  /** Edit mode only: the expense already has a stored receipt (kept unless a new photo is chosen). */
+  hasReceipt?: boolean;
+  mode?: "create" | "edit";
 }) {
   return (
-    <SvcModal open={props.open} onClose={props.onClose} title="Add expense">
+    <SvcModal open={props.open} onClose={props.onClose} title={props.mode === "edit" ? "Edit expense" : "Add expense"}>
       {props.open && <ExpenseFormBody {...props} />}
     </SvcModal>
   );
 }
 
-function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoOptions, onSubmit }: Parameters<typeof ExpenseFormModal>[0]) {
-  const [category, setCategory] = useState("fuel");
+function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoOptions, onSubmit, initial, hasReceipt, mode }: Parameters<typeof ExpenseFormModal>[0]) {
+  const editing = mode === "edit";
+  const [category, setCategory] = useState(initial?.category ?? "fuel");
   // The kind follows the category (Fuel → Job cost, Rent → Overhead) until the owner picks one themselves.
-  const [kindPicked, setKindPicked] = useState<string | null>(null);
-  const [pianoId, setPianoId] = useState("");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [spentAt, setSpentAt] = useState(() => manilaDateTimeLocal(new Date()));
-  const [vendor, setVendor] = useState("");
-  const [method, setMethod] = useState("cash");
-  const [reimbursable, setReimbursable] = useState(false);
-  const [jobId, setJobId] = useState(fixedJobId ?? "");
+  const [kindPicked, setKindPicked] = useState<string | null>(initial?.kind ?? null);
+  const [pianoId, setPianoId] = useState(initial?.pianoId ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [amount, setAmount] = useState(initial?.amount !== undefined ? String(initial.amount) : "");
+  const [spentAt, setSpentAt] = useState(() => manilaDateTimeLocal(initial?.spentAt ? new Date(initial.spentAt) : new Date()));
+  const [vendor, setVendor] = useState(initial?.vendor ?? "");
+  const [method, setMethod] = useState(initial?.method ?? "cash");
+  const [reimbursable, setReimbursable] = useState(initial?.reimbursable ?? false);
+  const [jobId, setJobId] = useState(fixedJobId ?? initial?.jobId ?? "");
   const effectiveKind = kindPicked ?? (fixedJobId || jobId ? "job" : defaultKindForCategory(category));
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptErr, setReceiptErr] = useState<string | null>(null);
@@ -487,6 +493,9 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
             <Camera size={15} /> {reading ? "Preparing photo…" : "Take or choose a photo"}
           </GhostButton>
         )}
+        {editing && hasReceipt && !receipt && (
+          <p className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>A receipt is already saved. Choosing a new photo replaces it.</p>
+        )}
         {receiptErr && <p role="alert" className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-danger)" }}>{receiptErr}</p>}
       </div>
 
@@ -503,7 +512,7 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
             onClose();
           }}
         >
-          Add expense
+          {editing ? "Save changes" : "Add expense"}
         </PrimaryButton>
       </div>
     </div>
