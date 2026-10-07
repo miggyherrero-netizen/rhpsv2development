@@ -6,6 +6,7 @@ import { QUOTE_STATUS_LABEL, quoteCode, quoteLines, quoteStatus } from "@/lib/se
 import { jobHeading } from "@/lib/service-reports";
 import type { JobDetail, ServiceSettings } from "@/server/service-data";
 import QuoteActions from "@/components/service-quote-actions";
+import { SVC_FONT_VARS } from "@/lib/service-fonts";
 import styles from "./service-document.module.css";
 
 /** A quote is the job's own line items on white paper: Quote → Accepted → Convert to invoice. */
@@ -22,7 +23,7 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
   const pianoLabel = piano ? [piano.brand, piano.model].filter(Boolean).join(" ") || piano.type : null;
 
   return (
-    <main className={styles.studio}>
+    <main className={`${styles.studio} ${SVC_FONT_VARS}`}>
       <div className={styles.inner}>
         <div className={styles.toolbar} data-print-hide>
           <div>
@@ -35,19 +36,19 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
         </div>
 
         <article className={styles.paper} aria-label="Quote" data-print-surface>
-          {status === "draft" ? <span className={styles.void}>DRAFT</span> : null}
           <div className={styles.sheet}>
-            <div className={styles.top}>
+            <header className={styles.top}>
               <div className={styles.identity}>
-                <span className={styles.monogram}>H</span>
+                <span className={styles.monogram} aria-hidden="true">H</span>
                 <div><div className={styles.company}>{settings.businessName}</div><div className={styles.companySub}>Home piano service · Davao City</div></div>
               </div>
               <div className={styles.title}>
                 <div className={styles.kind}>QUOTE</div>
                 <div className={styles.code}>{code}</div>
                 <div className={styles.small}>{heading}</div>
+                {status === "draft" ? <span className={`${styles.stamp} ${styles.alert}`}>DRAFT</span> : null}
               </div>
-            </div>
+            </header>
 
             <h2 className={styles.intro}>A clear estimate for the work ahead.</h2>
             <p className={styles.introSub}>This is a quotation, not an invoice. Nothing is due until you accept it and the work is done.</p>
@@ -63,14 +64,15 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
             ) : (
               <>
                 <table className={styles.table}>
-                  <thead><tr><th style={{ width: "50%" }}>Description</th><th className={styles.number} style={{ width: "12%" }}>Qty</th><th className={styles.number} style={{ width: "20%" }}>Rate</th><th className={styles.number} style={{ width: "18%" }}>Amount</th></tr></thead>
+                  <colgroup><col className={styles.colDesc} /><col className={styles.colQty} /><col className={styles.colRate} /><col className={styles.colAmount} /></colgroup>
+                  <thead><tr><th scope="col">Description</th><th scope="col" className={styles.number}>Qty</th><th scope="col" className={styles.number}>Rate</th><th scope="col" className={styles.number}>Amount</th></tr></thead>
                   <tbody>
                     {lines.map((item, i) => (
                       <tr key={item.id ?? `l${i}`}>
-                        <td><span className={styles.itemName}>{item.description}</span>{item.details ? <span className={styles.itemDetails}>{item.details}</span> : null}{vatOn && !item.taxable ? <span className={styles.exempt}>VAT exempt</span> : null}</td>
-                        <td className={styles.number}>{item.qty}</td>
-                        <td className={styles.number}>{documentMoney(item.unitPriceCents)}</td>
-                        <td className={styles.number}>{documentMoney(item.qty * item.unitPriceCents)}</td>
+                        <td className={styles.desc}><span className={styles.itemName}>{item.description}</span>{item.details ? <span className={styles.itemDetails}>{item.details}</span> : null}{vatOn && !item.taxable ? <span className={styles.exempt}>VAT exempt</span> : null}</td>
+                        <td className={styles.number} data-label="Qty">{item.qty}</td>
+                        <td className={styles.number} data-label="Rate">{documentMoney(item.unitPriceCents)}</td>
+                        <td className={`${styles.number} ${styles.amount}`} data-label="Amount">{documentMoney(item.qty * item.unitPriceCents)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -86,7 +88,7 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
             {accepted ? <div className={styles.callout}><strong>Accepted</strong><p>This quote was accepted on {fmtDateLong(accepted.at)}.</p></div> : null}
             {job.notes ? <div className={styles.callout}><strong>Notes</strong><p>{job.notes}</p></div> : null}
 
-            <div className={styles.footer}><p>Thank you for considering us for your piano.<br />Prices are an estimate until the work is complete.</p><span className={styles.thanks}>With care, {settings.businessName}</span></div>
+            <footer className={styles.footer}><p>Thank you for considering us for your piano.<br />Prices are an estimate until the work is complete.</p><span className={styles.thanks}>With care, {settings.businessName}</span></footer>
           </div>
         </article>
         <p className={styles.note} data-print-hide>Customer copy · a quotation, not a tax document.</p>
