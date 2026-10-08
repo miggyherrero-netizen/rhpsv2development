@@ -9,6 +9,8 @@
 import { db } from "@/db";
 import { serviceFinanceHistory } from "@/db/schema";
 import type { FinanceAction, FinanceChanges, FinanceEntityType } from "@/lib/service-finance-history";
+import { EditRejected, historyRowOf } from "@/lib/service-finance-edit";
+import type { Tx } from "@/server/service-invoice-core";
 
 export type FinanceHistoryEntry = {
   entityType: FinanceEntityType;
@@ -31,15 +33,31 @@ export async function recordFinanceHistory(entry: FinanceHistoryEntry | FinanceH
   const rows = Array.isArray(entry) ? entry : [entry];
   if (!rows.length) return;
   try {
-    await db.insert(serviceFinanceHistory).values(rows.map((r) => ({
-      entityType: r.entityType, entityId: r.entityId, action: r.action,
-      summary: r.summary.slice(0, 500),
-      changes: r.changes && Object.keys(r.changes).length ? r.changes : null,
-      invoiceId: r.invoiceId ?? null, jobId: r.jobId ?? null,
-      reason: r.reason ?? null, actorName: r.actorName ?? null,
-    })));
+    await db.insert(serviceFinanceHistory).values(rows.map(historyRowOf));
   } catch (e) {
     if (pgErrorCode(e) === "42P01") console.error("[finance-history] table service_finance_history is missing — run drizzle/manual/09_finance_history.sql. History not recorded.");
     else console.error("[finance-history] could not record history:", e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * STRICT variant for edits of paid / part-paid records. Runs on the caller's transaction and THROWS, so a
+ * failure (including a missing table) rolls back the money edit it belongs to: no change is ever saved
+ * without its history row. Never swallows errors.
+ */
+export async function recordFinanceHistoryStrict(tx: Tx, entry: FinanceHistoryEntry | FinanceHistoryEntry[]): Promise<void> {
+  const rows = Array.isArray(entry) ? entry : [entry];
+  if (!rows.length) return;
+  try {
+    // A savepoint keeps the outer transaction usable long enough to report a clear message.
+    await tx.transaction(async (sp) => {
+      await sp.insert(serviceFinanceHistory).values(rows.map(historyRowOf));
+    });
+  } catch (e) {
+    if (pgErrorCode(e) === "42P01") {
+      throw new EditRejected("The change history is not switched on yet, so this edit was not saved. Ask your developer to run drizzle/manual/09_finance_history.sql.");
+    }
+    console.error("[finance-history] strict write failed, edit rolled back:", e instanceof Error ? e.message : e);
+    throw new EditRejected("Could not record the change history, so the edit was not saved. Nothing was changed. Try again.");
   }
 }

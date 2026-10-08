@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { fieldLabel, formatValue } from "@/lib/service-finance-history";
+import { describeReason } from "@/lib/service-finance-edit";
 import type { FinanceHistoryItem } from "@/server/service-finance-history-data";
 
 const when = new Intl.DateTimeFormat("en-PH", {
@@ -36,12 +37,16 @@ function HistoryRow({ item }: { item: FinanceHistoryItem }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const entries = Object.entries(item.changes ?? {});
+  const reasonText = describeReason(item.reason);
   const text = (
     <>
       <span className="block text-[12px] tnum" style={{ color: "var(--color-svc-text-dim)" }}>
         {when.format(new Date(item.at))} · {ACTION_LABEL[item.action]}{item.actorName ? ` · ${item.actorName}` : ""}
       </span>
       <span className="block text-[14px] mt-0.5" style={{ color: "var(--color-svc-text)" }}>{item.summary}</span>
+      {reasonText ? (
+        <span className="block text-[13px] mt-0.5 break-words" style={{ color: "var(--color-svc-text-dim)" }}>{reasonText}</span>
+      ) : null}
     </>
   );
   return (
@@ -63,9 +68,6 @@ function HistoryRow({ item }: { item: FinanceHistoryItem }) {
       )}
       {open && entries.length ? (
         <dl id={panelId} className="pb-3 grid grid-cols-1 gap-1.5">
-          {item.reason ? (
-            <div className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>Reason: {item.reason}</div>
-          ) : null}
           {entries.map(([field, c]) => (
             <div key={field} className="grid grid-cols-[7.5rem_1fr] gap-x-3 text-[13px]">
               <dt style={{ color: "var(--color-svc-text-dim)" }}>{fieldLabel(field)}</dt>

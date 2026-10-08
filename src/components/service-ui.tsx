@@ -397,7 +397,7 @@ export type MoreItem = {
 };
 
 /** "⋯ More": a disclosure list for secondary and dangerous actions. Esc / outside click / focus-out close it. */
-export function MoreMenu({ items, label = "More" }: { items: MoreItem[]; label?: string }) {
+export function MoreMenu({ items, label = "More", startOnMobile = false }: { items: MoreItem[]; label?: string; startOnMobile?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -420,7 +420,7 @@ export function MoreMenu({ items, label = "More" }: { items: MoreItem[]; label?:
         <Ellipsis size={15} /> {label}
       </button>
       {open && (
-        <div id={id} className="absolute right-0 top-full mt-2 z-30 w-60 overflow-hidden rounded-xl border bg-[var(--color-svc-surface-2)]" style={{ borderColor: "var(--color-svc-border-strong)", boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }}>
+        <div id={id} className={`absolute ${startOnMobile ? "left-0 sm:left-auto sm:right-0" : "right-0"} top-full mt-2 z-30 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border bg-[var(--color-svc-surface-2)]`} style={{ borderColor: "var(--color-svc-border-strong)", boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }}>
           {items.map((it) => {
             const style = { color: it.danger ? TONE_TEXT.danger : "var(--color-svc-text)", borderTop: it.separated ? "1px solid var(--color-svc-border)" : undefined };
             return it.href ? (

@@ -16,6 +16,7 @@
     "backfill:job-parts-cost": "tsx scripts/backfill-job-parts-cost.ts",
     "test:finance-audit": "tsx tests/service-finance-audit.ts",
     "test:finance-history": "tsx tests/service-finance-history.ts",
+    "test:finance-edit": "tsx tests/service-finance-edit.ts",
     "test:dashboard": "tsx tests/service-dashboard.ts",
     "test:invoiced-split": "tsx tests/service-invoiced-split.ts",
     "test:service-mock": "tsx tests/service-mock.ts",
