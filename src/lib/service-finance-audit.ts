@@ -6,7 +6,8 @@
  */
 
 import { balanceCents, computeTotals, isOverdue, lineTotalCents } from "@/lib/service";
-import { partsCostFromLines } from "@/lib/service-lines";
+import { lineCostCents, partsCostFromLines } from "@/lib/service-lines";
+import { pesoExact } from "@/lib/service-finance-history";
 import { startOfManilaDayUTC } from "@/lib/dates";
 
 export type Severity = "error" | "warn" | "info";
@@ -46,6 +47,8 @@ export type AuditTimeLog = {
 export type AuditExpense = {
   id: string; description: string; vendor: string | null; amountCents: number; spentAt: Date;
   kind: string | null; jobId: string | null; pianoId: string | null; hasReceipt: boolean;
+  /** Expense category key (fuel, materials, parts...). Optional so older callers still work. */
+  category?: string | null;
 };
 
 export type AuditInput = {
@@ -204,6 +207,28 @@ function checkDuplicates(expenses: AuditExpense[]): Finding[] {
   return out;
 }
 
+/**
+ * (k) Parts priced at their selling price (no explicit cost) AND expenses linked to the same job: the job cost may
+ * be counted twice. Limit: only flagged when the part cost is derived from the price; with an explicit cost we cannot
+ * know whether the expense is the same purchase.
+ */
+function checkPartsDoubled(job: AuditJob, items: AuditJobItem[], allExpenses: AuditExpense[]): Finding[] {
+  // Only a purchase of materials/parts can be the same thing as a part line; fuel, meals, fares etc. cannot.
+  const expenses = allExpenses.filter((e) => e.category === "materials" || e.category === "parts");
+  const derived = items.filter((i) => i.kind === "part" && !(i.costCents > 0));
+  if (derived.length === 0 || expenses.length === 0) return [];
+  const parts = sum(derived.map(lineCostCents));
+  const linked = sum(expenses.map((e) => e.amountCents));
+  return [make("job_part_cost_maybe_doubled", "warn", "job", job.id, job.label,
+    `Parts are costed at their selling price and a materials/parts expense is also linked to this job, so the job cost may be counted twice. Parts at selling price ${pesoExact(parts)} plus linked materials/parts expenses ${pesoExact(linked)}.`)];
+}
+
+/** (l) Linked to a job but not kind "job": job margin counts it, Finance profit does not. */
+function checkExpenseKindMismatch(e: AuditExpense): Finding[] {
+  if (!e.jobId || !e.kind || e.kind === "job") return [];
+  return [make("expense_job_kind_mismatch", "warn", "expense", e.id, e.description, `Linked to a job but marked ${e.kind}; the job margin counts it, the Finance profit does not.`)];
+}
+
 /** Rolls findings up into counts per severity and code, plus the cents in dispute. */
 export function summarize(findings: Finding[]): AuditSummary {
   const summary: AuditSummary = { errors: 0, warnings: 0, info: 0, total: findings.length, disputeCents: 0, byCode: {} };
@@ -229,6 +254,7 @@ export function auditFinance(input: AuditInput): { findings: Finding[]; summary:
   const paysBy = groupBy(input.payments, (p) => p.invoiceId);
   const jobItemsBy = groupBy(input.jobItems, (i) => i.jobId);
   const logsBy = groupBy(input.timeLogs, (l) => l.jobId);
+  const expensesByJob = groupBy(input.expenses.filter((e) => e.jobId), (e) => e.jobId!);
   const findings: Finding[] = [];
 
   for (const inv of input.invoices) {
@@ -241,7 +267,8 @@ export function auditFinance(input: AuditInput): { findings: Finding[]; summary:
     );
   }
   for (const job of input.jobs) findings.push(...checkJob(job, jobItemsBy.get(job.id) ?? [], logsBy.get(job.id) ?? []));
-  for (const e of input.expenses) findings.push(...checkExpense(e));
+  for (const job of input.jobs) findings.push(...checkPartsDoubled(job, jobItemsBy.get(job.id) ?? [], expensesByJob.get(job.id) ?? []));
+  for (const e of input.expenses) findings.push(...checkExpense(e), ...checkExpenseKindMismatch(e));
   findings.push(...checkDuplicates(input.expenses));
 
   findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.code.localeCompare(b.code));
