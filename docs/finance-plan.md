@@ -55,7 +55,7 @@ Asia/Manila timezone, invoice statuses `draft | sent | partial | paid | void`.
 ## Job cost rules (R1 + R2 + F, owner decision 2026-10-08)
 The job page margin and the Finance per-job margin both use `jobCostBasis` (`src/lib/service-job-cost.ts`) and then `jobMargin`.
 1. **R1** - a part line with no explicit cost costs 0 (it used to cost its selling price). An explicit cost still wins (qty x cost).
-2. **R2** - if a counted expense on the job is Materials or Parts, the part-line cost is ignored and the expenses win (no double counting). The job page then shows "Parts cost comes from the linked materials/parts expenses."
+2. **R2** - if a counted expense on the job is Materials or Parts, the cost of PART lines is ignored and the expenses win (no double counting). Fee/service line costs always count. The job page then shows "Parts cost comes from the linked materials/parts expenses."
 3. **F** - only expenses of kind `job` (or not yet sorted, kind empty) count in job margin. Overhead and stock expenses linked to a job do not (Finance health shows this as an info note).
 
 Part cost is computed from the job lines at read time, not from the stored `service_jobs.parts_cost_cents` (still kept up to date on every write, with the new rule). Old rows hold the old selling-price value: run `drizzle/manual/10_recalc_job_parts_cost.sql` (optional, idempotent, derived column only) to clear the Finance health "Job parts cost differs from its lines" warnings. The old check "Parts and expenses may be counted twice" is removed.

@@ -64,8 +64,19 @@ export function lineCostCents(l: { kind: string; qty: number; unitPriceCents: nu
   return cost > 0 ? Math.round(l.qty * cost) : 0;
 }
 
-export const partsCostFromLines = (lines: { kind: string; qty: number; unitPriceCents: number; costCents?: number | null }[]): number =>
+type CostLine = { kind: string; qty: number; unitPriceCents: number; costCents?: number | null };
+
+/** Cost of every line (the stored `parts_cost_cents` column). */
+export const partsCostFromLines = (lines: CostLine[]): number =>
   lines.reduce((sum, l) => sum + lineCostCents(l), 0);
+
+/** Cost of "part" lines only: the part a linked materials/parts expense can replace. */
+export const partLinesCostFromLines = (lines: CostLine[]): number =>
+  lines.reduce((sum, l) => sum + (l.kind === "part" ? lineCostCents(l) : 0), 0);
+
+/** Cost of fee / service / other lines: always counted, never replaced by an expense. */
+export const otherLinesCostFromLines = (lines: CostLine[]): number =>
+  lines.reduce((sum, l) => sum + (l.kind === "part" ? 0 : lineCostCents(l)), 0);
 
 /* ------------------------------------------------------------ details + packages */
 

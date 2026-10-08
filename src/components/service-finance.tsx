@@ -286,7 +286,7 @@ export default function FinanceClient({ report, waitlist }: { report: FinanceRep
         </SectionCard>
 
         {options.showJobMargins ? (
-          <SectionCard title="Job margins" action={<span className="text-[12px]" style={FAINT}>completed in {range.label.toLowerCase()}</span>}>
+          <SectionCard title="Job margins" action={<span className="text-[12px]" style={FAINT}>latest 25 completed in {range.label.toLowerCase()}</span>}>
             {jobMargins.length === 0 ? (
               <p className="px-5 py-6 text-[13px]" style={FAINT}>
                 Complete and invoice a job in this range to see its margin.
