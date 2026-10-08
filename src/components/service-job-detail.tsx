@@ -18,7 +18,7 @@ import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
 import { ExpenseFormModal, JobFormModal, TimeEditModal, type ShowroomPiano } from "@/components/service-forms";
 import { timeSourceLabel } from "@/lib/service-time-events";
 import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
-import { partsCostFromLines, type CatalogEntry, type EditorLine } from "@/lib/service-lines";
+import { partLinesCostFromLines, otherLinesCostFromLines, partsCostFromLines, type CatalogEntry, type EditorLine } from "@/lib/service-lines";
 import { jobCostBasis } from "@/lib/service-job-cost";
 import type { JobDetail } from "@/server/service-data";
 import {
@@ -95,7 +95,7 @@ export default function JobDetailClient({
   const listedExpenseCents = detail.expenses.reduce((s, e) => s + e.amountCents, 0);
   // Same cost rules as Finance (jobCostBasis): part cost from the lines at read time, job-kind expenses only,
   // and linked materials/parts expenses replace the part-line cost instead of adding to it.
-  const basis = jobCostBasis({ partLinesCostCents: partsCostFromLines(liveLines), expenses: detail.expenses });
+  const basis = jobCostBasis({ partLinesCostCents: partLinesCostFromLines(liveLines), otherLinesCostCents: otherLinesCostFromLines(liveLines), expenses: detail.expenses });
   // Drafts never count as invoiced — same rule as Finance job margins.
   const liveInvoices = countable(detail.invoices);
   const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
@@ -556,7 +556,7 @@ export default function JobDetailClient({
                 <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
                 {basis.partsFromExpenses ? (
                   <p className="mt-1.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                    Line costs are ignored because materials/parts expenses are linked to this job.
+                    Part-line costs are ignored because materials/parts expenses are linked to this job.
                   </p>
                 ) : null}
               </div>

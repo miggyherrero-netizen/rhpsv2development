@@ -22,7 +22,7 @@ import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/
 import { messengerHandle } from "@/lib/service-flow";
 import { effectiveKind, financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
 import { jobCostBasis } from "@/lib/service-job-cost";
-import { partsCostFromLines } from "@/lib/service-lines";
+import { partLinesCostFromLines, otherLinesCostFromLines } from "@/lib/service-lines";
 import { saleBalanceCents, salePianoProfit } from "@/lib/service-sale";
 import {
   avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
@@ -1153,7 +1153,8 @@ export async function getFinanceReport(
     const invoiced = money?.invoiced ?? 0;
     const tax = money?.tax ?? 0;
     const basis = jobCostBasis({
-      partLinesCostCents: partsCostFromLines(itemsByJobId.get(j.jobId) ?? []),
+      partLinesCostCents: partLinesCostFromLines(itemsByJobId.get(j.jobId) ?? []),
+      otherLinesCostCents: otherLinesCostFromLines(itemsByJobId.get(j.jobId) ?? []),
       expenses: expensesByJobId.get(j.jobId) ?? [],
     });
     const m = jobMargin(
