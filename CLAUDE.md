@@ -153,6 +153,8 @@ Dark, premium theme — deliberately different from the rest of the app. Tokens 
 
 ## Workflow notes
 - User prefers me to test changes live (Docker rebuild + browser pane) rather than just asserting they work — always verify before reporting done.
-- Git repo exists (GitHub). Cloud sessions develop on `claude/*` branches; don't open PRs unless asked.
+- Git repo exists (GitHub). Cloud sessions develop on `claude/*` branches.
+- **Owner standing instruction (2026-10-08): do not ask "merge?" each time.** Once a change is verified (typecheck, eslint, tests, plus screenshots for UI), open the PR and merge it to `main` yourself, then report briefly. Stop and ask once ONLY for: changes to existing money calculations that alter current numbers, destructive or data-deleting changes, auth/security changes. Schema changes may be merged, but say clearly which `drizzle/manual/*.sql` file the owner must paste first.
+- **Reply style for the owner:** Bisaya/English mix, short, tables instead of paragraphs, state what is done, what to check, and the next step; no repeated confirmation questions.
 - `docs/ARCHITECTURE.md` is the up-to-date map of areas, tables, data flow and complexity hotspots. Older briefs are in `docs/archive/`.
 - When large/ambiguous feature requests come in, ask scoping questions before implementing (esp. for anything touching money/payroll or auth) rather than guessing.
