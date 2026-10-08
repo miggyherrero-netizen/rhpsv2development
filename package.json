@@ -10,6 +10,7 @@
     "test": "npm run lint && npm run typecheck && node tests/run-tests.mjs",
     "test:domain": "node tests/run-tests.mjs",
     "test:service": "tsx tests/service-money.ts",
+    "test:job-cost": "tsx tests/service-job-cost.ts",
     "test:finance-audit": "tsx tests/service-finance-audit.ts",
     "test:finance-history": "tsx tests/service-finance-history.ts",
     "test:dashboard": "tsx tests/service-dashboard.ts",

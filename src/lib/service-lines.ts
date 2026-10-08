@@ -55,13 +55,13 @@ export function isRowSavable(draft: { description: string; qty: string; price: s
 /* ----------------------------------------------------------------- cost */
 
 /**
- * Cost of one line for margin. An explicit per-unit cost wins; otherwise a "part" line costs what it is priced
- * at (the long-standing rule); anything else has no cost until the owner enters one.
+ * Cost of one line for margin. Only an explicit per-unit cost counts (qty * cost). A line with no cost entered
+ * costs 0 - including a "part" line: its selling price is NOT its cost (the purchase is recorded as a linked
+ * Materials/Parts expense, see `jobCostBasis`).
  */
 export function lineCostCents(l: { kind: string; qty: number; unitPriceCents: number; costCents?: number | null }): number {
   const cost = l.costCents ?? 0;
-  if (cost > 0) return Math.round(l.qty * cost);
-  return l.kind === "part" ? Math.round(l.qty * l.unitPriceCents) : 0;
+  return cost > 0 ? Math.round(l.qty * cost) : 0;
 }
 
 export const partsCostFromLines = (lines: { kind: string; qty: number; unitPriceCents: number; costCents?: number | null }[]): number =>
