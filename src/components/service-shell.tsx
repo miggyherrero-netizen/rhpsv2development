@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun, CalendarDays, ClipboardList, Timer, Receipt, Wallet, LineChart, Users,
-  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp,
+  Settings, Menu, X, LayoutDashboard, Calendar, LogOut, Home, Ellipsis, ListChecks, Bell, TrendingUp, Gauge,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
 
@@ -13,7 +13,7 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
   {
     label: "Operations",
     items: [
-      { href: "/service/today", label: "Today", icon: Sun },
+      { href: "/service/today", label: "Dashboard", icon: Gauge },
       { href: "/service/reminders", label: "Reminders", icon: Bell },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
@@ -41,7 +41,7 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
 
 /** The tabs on a phone. "More" opens the full menu with every section. */
 const TABS = [
-  { href: "/service/today", label: "Today", icon: Sun },
+  { href: "/service/today", label: "Dashboard", icon: Gauge },
   { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
   { href: "/service/invoices", label: "Invoices", icon: Receipt },
