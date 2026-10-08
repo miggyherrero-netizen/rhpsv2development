@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Printer, Send, Ban, FileX2, Pencil, Check, FileText, Trash2 } from "lucide-react";
@@ -15,8 +15,10 @@ import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
 import type { InvoiceDetail } from "@/server/service-data";
 import {
   updateInvoice, addInvoiceItems, updateInvoiceItem, deleteInvoiceItem, setInvoiceStatus, createCatalogItem,
-  recordPayment, deletePayment, deleteInvoice,
+  recordPayment, deletePayment, editPayment, deleteInvoice,
 } from "@/server/service";
+import { needsReason, validateReason } from "@/lib/service-finance-edit";
+import { EditPaymentModal, ReasonDialog, ReasonField, type EditablePayment, type SaveResult } from "@/components/service-reason-ui";
 import {
   Chip, ConfirmTypeDialog, DateField, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PesoInput,
   PrimaryButton, SectionCard, Select, SvcModal, TextArea, TextInput, TONE_TEXT, UnitInput, type MoreItem,
@@ -57,8 +59,17 @@ export default function InvoiceDetailClient({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [reference, setReference] = useState("");
+  /** The reason prompt (one at a time) and the reason the current line-editing session was started with. */
+  const [ask, setAsk] = useState<{ title: string; message?: string; confirmLabel: string; danger?: boolean; run: (reason: string) => Promise<SaveResult> } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<EditablePayment | null>(null);
+  const [lineReason, setLineReason] = useState<string | null>(null);
+  const lineReasonRef = useRef<string | null>(null);
 
   const { invoice, items, payments, customer, settings } = detail;
+  // Once money is on the invoice, every change is owner-only and carries a written reason (the server checks too).
+  const guarded = needsReason({ status: invoice.status, amountPaidCents: Math.max(invoice.amountPaidCents, payments.reduce((a, p) => a + p.amountCents, 0)) });
+  const hasPayments = payments.length > 0 || invoice.amountPaidCents > 0;
+  const canFinance = history !== null; // the page only loads History for the owner
   // The editor owns the lines while it is open; totals follow what it shows, saved or still saving.
   const editorLines = useMemo<EditorLine[]>(() => items.map((i) => ({
     id: i.id, kind: "service", description: i.description, qty: i.qty, unitPriceCents: i.unitPriceCents, taxable: i.taxable,
@@ -67,11 +78,11 @@ export default function InvoiceDetailClient({
   const [liveLines, setLiveLines] = useState<EditorLine[] | null>(null);
   const lineAdapter = useMemo<LineAdapter>(() => ({
     addMany: async (lines, position) => {
-      const res = await addInvoiceItems(invoice.id, lines.map((l) => ({ ...toServerLine(l), position })));
+      const res = await addInvoiceItems(invoice.id, lines.map((l) => ({ ...toServerLine(l), position })), lineReasonRef.current ?? undefined);
       return res.ok ? { ok: true, ids: res.data!.ids, positions: res.data!.positions } : res;
     },
-    update: (id, patch) => updateInvoiceItem(id, patch),
-    remove: (id) => deleteInvoiceItem(id),
+    update: (id, patch) => updateInvoiceItem(id, patch, lineReasonRef.current ?? undefined),
+    remove: (id) => deleteInvoiceItem(id, lineReasonRef.current ?? undefined),
     saveToPriceBook: async (l) => {
       const res = await createCatalogItem({ name: l.description, description: l.details ?? null, kind: "service", unitPrice: l.unitPriceCents / 100, taxable: l.taxable, estimatedMinutes: 60 });
       if (!res.ok) return res;
@@ -91,10 +102,35 @@ export default function InvoiceDetailClient({
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
     startTransition(async () => {
-      const res = await fn();
-      if (res && !res.ok) setError(res.error ?? "Something went wrong.");
+      try {
+        const res = await fn();
+        if (res && !res.ok) setError(res.error ?? "Something went wrong.");
+      } catch {
+        setError("Could not save. Try again.");
+      }
     });
   };
+
+  /** Runs an action and returns the message to show inline (null when it worked). */
+  const attempt = async (fn: () => Promise<{ ok: boolean; error?: string }>): Promise<SaveResult> => {
+    try {
+      const res = await fn();
+      return res.ok ? null : (res.error ?? "Something went wrong.");
+    } catch {
+      return "Could not save. Try again.";
+    }
+  };
+
+  const startEditingLines = () => {
+    if (!guarded) { setUnlocked(true); return; }
+    setAsk({
+      title: "Edit lines on an invoice with payments",
+      message: "This invoice already has payments. Your reason is saved with every line change you make until you press Done editing.",
+      confirmLabel: "Start editing",
+      run: async (reason) => { lineReasonRef.current = reason; setLineReason(reason); setUnlocked(true); setAsk(null); return null; },
+    });
+  };
+  const stopEditingLines = () => { setUnlocked(false); lineReasonRef.current = null; setLineReason(null); };
 
   const code = invoiceCode(invoicePrefix, invoice.invoiceNumber, invoice.issueDate);
   const tone = INVOICE_STATUS_TONE[invoice.status] ?? "slate";
@@ -103,13 +139,28 @@ export default function InvoiceDetailClient({
   // Draft invoices are always live; a sent/paid one stays read-only until "Edit lines" (a void one never edits).
   const live = invoice.status !== "void" && (isDraft || unlocked);
 
+  const askThen = (title: string, message: string, confirmLabel: string, fn: (reason: string) => Promise<{ ok: boolean; error?: string }>, danger = false) =>
+    setAsk({ title, message, confirmLabel, danger, run: async (reason) => { const msg = await attempt(() => fn(reason)); if (!msg) { setAsk(null); router.refresh(); } return msg; } });
+
   const moreItems: MoreItem[] = [
     ...(isDraft ? [{ label: "Mark as sent", icon: <Send size={14} />, onSelect: () => run(() => setInvoiceStatus(invoice.id, "sent")) }] : []),
-    { label: "Edit invoice details…", icon: <FileText size={14} />, onSelect: () => setEditOpen(true) },
+    { label: "Edit invoice details…", icon: <FileText size={14} />, onSelect: () => setEditOpen(true), disabled: invoice.status === "void" },
     invoice.status !== "void"
-      ? { label: "Void invoice", icon: <Ban size={14} />, onSelect: () => run(() => setInvoiceStatus(invoice.id, "void")) }
-      : { label: "Reopen as draft", onSelect: () => run(() => setInvoiceStatus(invoice.id, "draft")) },
-    { label: "Delete invoice…", danger: true, separated: true, icon: <FileX2 size={14} />, onSelect: () => { setDeleteError(null); setConfirmDelete(true); } },
+      ? {
+          label: "Void invoice", icon: <Ban size={14} />,
+          onSelect: () => guarded
+            ? askThen("Void this invoice?", "It has payments. Voiding keeps them on record but takes the invoice out of your totals.", "Void invoice", (reason) => setInvoiceStatus(invoice.id, "void", reason), true)
+            : run(() => setInvoiceStatus(invoice.id, "void")),
+        }
+      : {
+          label: "Reopen as draft",
+          onSelect: () => guarded
+            ? askThen("Reopen this invoice?", "Its payments count again and the status is recalculated from them.", "Reopen", (reason) => setInvoiceStatus(invoice.id, "draft", reason))
+            : run(() => setInvoiceStatus(invoice.id, "draft")),
+        },
+    hasPayments
+      ? { label: "Can't delete — void it instead", danger: false, separated: true, icon: <FileX2 size={14} />, disabled: true }
+      : { label: "Delete invoice…", danger: true, separated: true, icon: <FileX2 size={14} />, onSelect: () => { setDeleteError(null); setConfirmDelete(true); } },
   ];
 
   return (
@@ -135,9 +186,9 @@ export default function InvoiceDetailClient({
           </Link>
           {!isDraft && invoice.status !== "void" && (
             unlocked ? (
-              <PrimaryButton onClick={() => setUnlocked(false)} className="!min-h-11 !text-white"><Check size={14} /> Done editing</PrimaryButton>
+              <PrimaryButton onClick={stopEditingLines} className="!min-h-11 !text-white"><Check size={14} /> Done editing</PrimaryButton>
             ) : (
-              <GhostButton onClick={() => setUnlocked(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit lines</GhostButton>
+              <GhostButton onClick={startEditingLines} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit lines</GhostButton>
             )
           )}
           {isDraft && (
@@ -145,7 +196,7 @@ export default function InvoiceDetailClient({
               <Send size={13} /> Mark sent
             </PrimaryButton>
           )}
-          <MoreMenu items={moreItems} />
+          <MoreMenu items={moreItems} startOnMobile />
         </div>
       </div>
 
@@ -211,6 +262,21 @@ export default function InvoiceDetailClient({
             {!isDraft ? (
               <p className="px-5 pt-2 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                 This invoice was already sent — changes save as you type and update the balance.
+              </p>
+            ) : null}
+            {lineReason ? (
+              <p className="mx-5 mt-2 rounded-lg px-3 py-2 text-[13px] flex flex-wrap items-center gap-x-3 gap-y-1" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)", color: "var(--color-svc-text)" }}>
+                <span className="min-w-0 break-words"><b className="font-medium">Reason saved with each change:</b> {lineReason}</span>
+                <button
+                  type="button" className="min-h-11 underline" style={{ color: "var(--color-svc-accent-text, var(--color-svc-accent))" }}
+                  onClick={() => setAsk({
+                    title: "Change the reason", confirmLabel: "Use this reason",
+                    message: "The next changes will be saved with the new reason.",
+                    run: async (reason) => { lineReasonRef.current = reason; setLineReason(reason); setAsk(null); return null; },
+                  })}
+                >
+                  Change reason
+                </button>
               </p>
             ) : null}
           </div>
@@ -305,14 +371,28 @@ export default function InvoiceDetailClient({
                   <Link href={`/service/invoices/${invoice.id}/receipts/${p.id}`} className="text-[12px] hover:underline" style={{ color: "var(--color-svc-accent)" }}>
                     Receipt / PDF / Share
                   </Link>
-                  <button
-                    onClick={() => run(() => deletePayment(p.id))}
-                    className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:bg-white/[0.06]"
-                    style={{ color: "var(--color-svc-text-faint)" }}
-                    aria-label="Delete payment"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {canFinance && invoice.status !== "void" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPayment(p)}
+                        className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+                        style={{ color: "var(--color-svc-text-dim)" }}
+                        aria-label={`Edit payment of ${peso(p.amountCents)}`}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => askThen("Delete this payment?", `${peso(p.amountCents)} on ${fmtDate(new Date(p.receivedAt))}. The invoice is recalculated and the payment stays in History.`, "Delete payment", (reason) => deletePayment(p.id, reason), true)}
+                        className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+                        style={{ color: "var(--color-svc-text-dim)" }}
+                        aria-label={`Delete payment of ${peso(p.amountCents)}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -381,14 +461,34 @@ export default function InvoiceDetailClient({
         open={editOpen}
         onClose={() => setEditOpen(false)}
         invoice={invoice}
-        pending={pending}
-        onSave={(patch) => run(() => updateInvoice(invoice.id, patch))}
+        needsReason={guarded}
+        onSave={(patch, reason) => attempt(() => updateInvoice(invoice.id, patch, reason))}
+      />
+
+      <EditPaymentModal
+        payment={editingPayment}
+        onClose={() => setEditingPayment(null)}
+        onSave={async (patch) => {
+          const msg = await attempt(() => editPayment(editingPayment!.id, patch));
+          if (!msg) router.refresh();
+          return msg;
+        }}
+      />
+
+      <ReasonDialog
+        open={!!ask}
+        title={ask?.title ?? ""}
+        message={ask?.message}
+        confirmLabel={ask?.confirmLabel}
+        danger={ask?.danger}
+        onCancel={() => setAsk(null)}
+        onConfirm={(reason) => ask!.run(reason)}
       />
 
       <ConfirmTypeDialog
         open={confirmDelete}
         title="Delete this invoice?"
-        message="Payments recorded against it are removed too. The linked job keeps its history."
+        message="Only invoices with no payments can be deleted. The linked job keeps its history."
         code={code}
         error={deleteError}
         pending={pending}
@@ -418,17 +518,18 @@ function EditInvoiceModal({
   open,
   onClose,
   invoice,
-  pending,
+  needsReason: reasonNeeded,
   onSave,
 }: {
   open: boolean;
   onClose: () => void;
   invoice: InvoiceDetail["invoice"];
-  pending: boolean;
+  /** True once the invoice has payments: the save then asks for a written reason. */
+  needsReason: boolean;
   onSave: (patch: {
     issueDate: string; dueDate: string | null; taxRateBps: number; discount: number;
     terms: string; notes: string; kind: "service" | "sale";
-  }) => void;
+  }, reason?: string) => Promise<SaveResult>;
 }) {
   const [issueDate, setIssueDate] = useState(invoice.issueDate ? toLocalInput(new Date(invoice.issueDate)).slice(0, 16) : "");
   const [dueDate, setDueDate] = useState(invoice.dueDate ? toLocalInput(new Date(invoice.dueDate)).slice(0, 16) : "");
@@ -437,6 +538,9 @@ function EditInvoiceModal({
   const [terms, setTerms] = useState(invoice.terms ?? "");
   const [notes, setNotes] = useState(invoice.notes ?? "");
   const [isSale, setIsSale] = useState(invoice.kind === "sale");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   return (
     <SvcModal open={open} onClose={onClose} title="Invoice details">
@@ -479,12 +583,18 @@ function EditInvoiceModal({
             <span className="block text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>Counts under Piano sales on the dashboard, not Service.</span>
           </span>
         </label>
+        {reasonNeeded ? <ReasonField value={reason} onChange={setReason} /> : null}
+        <ErrorLine>{error}</ErrorLine>
         <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
           <PrimaryButton
-            pending={pending}
-            onClick={() => {
-              onSave({
+            pending={busy}
+            disabled={reasonNeeded && !validateReason(reason).ok}
+            className="!min-h-11"
+            onClick={async () => {
+              setBusy(true); setError(null);
+              let msg: SaveResult;
+              try { msg = await onSave({
                 kind: isSale ? "sale" : "service",
                 issueDate,
                 dueDate: dueDate || null,
@@ -492,8 +602,9 @@ function EditInvoiceModal({
                 discount: parsePesoInput(discount) ?? 0,
                 terms,
                 notes,
-              });
-              onClose();
+              }, reasonNeeded ? reason : undefined); } catch { msg = "Could not save. Try again."; }
+              setBusy(false);
+              if (msg) setError(msg); else { setReason(""); onClose(); }
             }}
           >
             Save changes

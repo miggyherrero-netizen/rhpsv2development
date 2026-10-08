@@ -33,8 +33,15 @@ import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } fro
 import { isBatchCustomer } from "@/lib/service-reports";
 import { completeEntriesForJob, ensureRecallEntry, releaseEntriesForJob } from "@/server/service-waitlist-core";
 import { getServiceSettings } from "@/server/service-data";
-import { recordFinanceHistory, type FinanceHistoryEntry } from "@/server/service-finance-history";
+import { recordFinanceHistory } from "@/server/service-finance-history";
 import { describeChange, diffFields, dropSameDay, pesoExact, type FinanceChanges } from "@/lib/service-finance-history";
+import { actorOf, nameRefs, recalcInvoice, safeHistory } from "@/server/service-invoice-core";
+import {
+  addInvoiceItemsOp, deleteInvoiceItemOp, deleteInvoiceOp, deletePaymentOp, editPaymentOp, recordPaymentOp,
+  setInvoiceStatusOp, updateInvoiceItemOp, updateInvoiceOp, type EditPaymentInput,
+  type InvoiceItemInput as OpInvoiceItemInput,
+} from "@/server/service-invoice-ops";
+import { discountMessage, discountTooLarge } from "@/lib/service-finance-edit";
 import { invoiceCode, jobCode } from "@/lib/service";
 import { isInvoiceKind } from "@/lib/service-dashboard";
 
@@ -65,42 +72,13 @@ function touch() {
   revalidatePath("/service", "layout");
 }
 
-/* ---- Finance history helpers (best-effort: they can never fail a money action) ---- */
-
-/** Runs a history write; any error (missing table, lookup failure) is logged and swallowed. */
-async function safeHistory(fn: () => Promise<void>): Promise<void> {
-  try { await fn(); } catch (e) { console.error("[finance-history] skipped:", e instanceof Error ? e.message : e); }
-}
-const actorOf = (user: { name?: string | null }) => user.name || "Owner";
+/* ---- Finance history helpers (best-effort: they can never fail a money action) ----
+ * `safeHistory`, `actorOf` and `nameRefs` live in service-invoice-core.ts (shared with the invoice ops). */
 const invoiceRow = async (id: string) => (await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, id)).limit(1))[0] ?? null;
 type InvoiceHead = { invoiceNumber: number; issueDate: Date };
 async function invLabel(userId: string, inv: InvoiceHead): Promise<string> {
   const settings = await getServiceSettings(userId);
   return invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate);
-}
-/** Swaps customer / job / piano ids in a diff for readable names (falls back to the raw id). */
-async function nameRefs(changes: FinanceChanges): Promise<FinanceChanges> {
-  const name = async (key: string, id: unknown): Promise<unknown> => {
-    if (typeof id !== "string") return id;
-    if (key === "customerId") {
-      const [r] = await db.select({ n: serviceCustomers.name }).from(serviceCustomers).where(eq(serviceCustomers.id, id)).limit(1);
-      return r?.n ?? id;
-    }
-    if (key === "jobId") {
-      const [r] = await db.select({ n: serviceJobs.jobNumber, t: serviceJobs.title, d: serviceJobs.createdAt }).from(serviceJobs).where(eq(serviceJobs.id, id)).limit(1);
-      return r ? `${jobCode("WO", r.n, r.d)} ${r.t}` : id;
-    }
-    if (key === "pianoId") {
-      const [r] = await db.select({ b: pianos.brand, m: pianos.model }).from(pianos).where(eq(pianos.id, id)).limit(1);
-      return r ? `${r.b} ${r.m}` : id;
-    }
-    return id;
-  };
-  const out: FinanceChanges = {};
-  for (const [k, c] of Object.entries(changes)) {
-    out[k] = ["customerId", "jobId", "pianoId"].includes(k) ? { from: await name(k, c.from), to: await name(k, c.to) } : c;
-  }
-  return out;
 }
 
 /* ============================================================
@@ -1143,54 +1121,10 @@ export async function deleteTimeLog(id: string): Promise<Result> {
 
 /* ============================================================
  * Invoices
+ *
+ * Money writes on an existing invoice live in `service-invoice-ops.ts` (one lock, one recalculation, reason
+ * rules, strict history). The actions below only authenticate, call them, and revalidate.
  * ============================================================ */
-
-/** Recomputes an invoice's totals from its line items and payments. Single source of truth. */
-async function recalcInvoice(invoiceId: string): Promise<void> {
-  const [invoice] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, invoiceId)).limit(1);
-  if (!invoice) return;
-  const [items, payments] = await Promise.all([
-    db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.invoiceId, invoiceId)),
-    db.select().from(servicePayments).where(eq(servicePayments.invoiceId, invoiceId)),
-  ]);
-  const totals = computeTotals(items, {
-    discountCents: invoice.discountCents,
-    taxRateBps: invoice.taxRateBps,
-  });
-  const amountPaidCents = payments.reduce((s, p) => s + p.amountCents, 0);
-  const balance = Math.max(0, totals.totalCents - amountPaidCents);
-
-  const status = invoice.voidedAt
-    ? "void"
-    : totals.totalCents > 0 && balance <= 0
-      ? "paid"
-      : amountPaidCents > 0
-        ? "partial"
-        : invoice.sentAt
-          ? "sent"
-          : "draft";
-
-  await db
-    .update(serviceInvoices)
-    .set({
-      subtotalCents: totals.subtotalCents,
-      taxCents: totals.taxCents,
-      totalCents: totals.totalCents,
-      amountPaidCents,
-      status,
-      paidAt: status === "paid" ? invoice.paidAt ?? new Date() : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(serviceInvoices.id, invoiceId));
-
-  // Keep the linked job's status in step with its money.
-  if (invoice.jobId && status === "paid") {
-    const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, invoice.jobId)).limit(1);
-    if (job && job.status === "invoiced") {
-      await db.update(serviceJobs).set({ status: "paid", updatedAt: new Date() }).where(eq(serviceJobs.id, job.id));
-    }
-  }
-}
 
 async function createInvoiceRows(input: {
   customerId: string; jobId?: string | null; items: { description: string; details?: string | null; qty: number; unitPriceCents: number; taxable: boolean; jobItemId?: string | null }[];
@@ -1208,40 +1142,60 @@ async function createInvoiceRows(input: {
   const issueDate = new Date();
   const dueDate = input.dueDate ?? addDays(issueDate, settings?.defaultTermsDays ?? 15);
 
-  const [invoice] = await db
-    .insert(serviceInvoices)
-    .values({
-      customerId: input.customerId,
-      jobId: input.jobId ?? null,
-      issueDate,
-      dueDate,
-      // Snapshot the effective rate: with VAT off the invoice is saved at 0% and stays that
-      // way; later settings changes never re-price an existing invoice.
-      taxRateBps: (settings?.vatEnabled ?? true) ? (settings?.taxRateBps ?? 1200) : 0,
-      discountCents: Math.max(0, Math.round(input.discountCents ?? 0)),
-      notes: str(input.notes, 2_000),
-      terms: str(terms, 1_000),
-      status: "draft",
-    })
-    .returning({ id: serviceInvoices.id });
+  const discountCents = Math.max(0, Math.round(input.discountCents ?? 0));
+  const subtotalCents = computeTotals(input.items.map((i) => ({ qty: Math.max(1, Math.round(i.qty)), unitPriceCents: Math.round(i.unitPriceCents), taxable: i.taxable })), {}).subtotalCents;
+  if (discountTooLarge(discountCents, subtotalCents)) return fail(discountMessage(discountCents, subtotalCents));
 
-  await db.insert(serviceInvoiceItems).values(
-    input.items.map((item, index) => ({
-      invoiceId: invoice!.id,
-      jobItemId: item.jobItemId ?? null,
-      description: item.description,
-      details: cleanDetails(item.details),
-      qty: Math.max(1, Math.round(item.qty)),
-      unitPriceCents: Math.round(item.unitPriceCents),
-      taxable: item.taxable,
-      position: index,
-    })),
-  );
+  // One transaction: the new invoice, its lines, the recalculation and the job step commit together.
+  // (A brand-new row is invisible to every other session until commit, so it needs no separate lock.)
+  const invoice = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(serviceInvoices)
+      .values({
+        customerId: input.customerId,
+        jobId: input.jobId ?? null,
+        issueDate,
+        dueDate,
+        // Snapshot the effective rate: with VAT off the invoice is saved at 0% and stays that
+        // way; later settings changes never re-price an existing invoice.
+        taxRateBps: (settings?.vatEnabled ?? true) ? (settings?.taxRateBps ?? 1200) : 0,
+        discountCents,
+        notes: str(input.notes, 2_000),
+        terms: str(terms, 1_000),
+        status: "draft",
+      })
+      .returning({ id: serviceInvoices.id });
 
-  await recalcInvoice(invoice!.id);
+    await tx.insert(serviceInvoiceItems).values(
+      input.items.map((item, index) => ({
+        invoiceId: created!.id,
+        jobItemId: item.jobItemId ?? null,
+        description: item.description,
+        details: cleanDetails(item.details),
+        qty: Math.max(1, Math.round(item.qty)),
+        unitPriceCents: Math.round(item.unitPriceCents),
+        taxable: item.taxable,
+        position: index,
+      })),
+    );
+
+    await recalcInvoice(tx, created!.id);
+
+    if (input.jobId) {
+      // Only a finished job becomes "invoiced"; billing a lead/quote/scheduled job early leaves its status alone.
+      await tx
+        .update(serviceJobs)
+        .set({ status: "invoiced", invoicedAt: issueDate, updatedAt: new Date() })
+        .where(and(eq(serviceJobs.id, input.jobId), eq(serviceJobs.status, "completed")));
+      await tx.insert(serviceJobEvents).values({
+        jobId: input.jobId, type: "invoiced", message: "Invoice created", actorName: "Owner",
+      });
+    }
+    return created!;
+  });
 
   await safeHistory(async () => {
-    const fresh = await invoiceRow(invoice!.id);
+    const fresh = await invoiceRow(invoice.id);
     if (!fresh) return;
     const changes: FinanceChanges = { totalCents: { from: null, to: fresh.totalCents }, itemCount: { from: null, to: input.items.length } };
     if (fresh.discountCents > 0) changes.discountCents = { from: null, to: fresh.discountCents };
@@ -1251,17 +1205,6 @@ async function createInvoiceRows(input: {
       summary: `${describeChange("invoice", "create", label)} (total ${pesoExact(fresh.totalCents)})`, changes, actorName: actorOf(user),
     });
   });
-
-  if (input.jobId) {
-    // Only a finished job becomes "invoiced"; billing a lead/quote/scheduled job early leaves its status alone.
-    await db
-      .update(serviceJobs)
-      .set({ status: "invoiced", invoicedAt: issueDate, updatedAt: new Date() })
-      .where(and(eq(serviceJobs.id, input.jobId), eq(serviceJobs.status, "completed")));
-    await db.insert(serviceJobEvents).values({
-      jobId: input.jobId, type: "invoiced", message: "Invoice created", actorName: "Owner",
-    });
-  }
   touch();
   return ok({ id: invoice!.id });
 }
@@ -1344,189 +1287,54 @@ export async function updateInvoice(
     issueDate?: string; dueDate?: string | null; notes?: string | null; terms?: string | null;
     taxRateBps?: number; discount?: number; customerId?: string; kind?: string;
   },
+  /** Required (3-500 characters) once the invoice has a payment or is paid / part-paid. */
+  reason?: string,
 ): Promise<Result> {
   const user = await requireUser();
-  if (patch.kind !== undefined && !isInvoiceKind(patch.kind)) return fail("Invoice type must be service or piano sale.");
-  const issue = patch.issueDate !== undefined ? optionalDate(patch.issueDate) : undefined;
-  if (patch.issueDate !== undefined && !issue) return fail("Pick a valid issue date.");
-  const before = await invoiceRow(id).catch(() => null);
-  await db
-    .update(serviceInvoices)
-    .set({
-      issueDate: issue ?? undefined,
-      dueDate: patch.dueDate !== undefined ? optionalDate(patch.dueDate) : undefined,
-      notes: patch.notes !== undefined ? str(patch.notes, 2_000) : undefined,
-      terms: patch.terms !== undefined ? str(patch.terms, 1_000) : undefined,
-      taxRateBps: patch.taxRateBps !== undefined ? Math.max(0, intOr(patch.taxRateBps, 0)) : undefined,
-      discountCents: patch.discount !== undefined ? Math.max(0, moneyToCents(patch.discount)) : undefined,
-      customerId: patch.customerId || undefined,
-      kind: patch.kind,
-      updatedAt: new Date(),
-    })
-    .where(eq(serviceInvoices.id, id));
-  await recalcInvoice(id);
-  await safeHistory(async () => {
-    const after = await invoiceRow(id);
-    if (!before || !after) return;
-    const changes = dropSameDay(diffFields(before, after, ["discountCents", "taxRateBps", "dueDate", "issueDate", "customerId", "notes", "terms", "totalCents", "kind"]), ["issueDate", "dueDate"]);
-    if (!Object.keys(changes).length) return;
-    const named = await nameRefs(changes);
-    await recordFinanceHistory({
-      entityType: "invoice", entityId: id, invoiceId: id, jobId: after.jobId, action: "update",
-      summary: describeChange("invoice", "update", await invLabel(user.id, after), named), changes: named, actorName: actorOf(user),
-    });
-  });
-  touch();
-  return ok();
+  const res = await updateInvoiceOp(user, id, patch, reason);
+  if (res.ok) touch();
+  return res;
 }
 
-export type InvoiceItemInput = { description: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean; position?: number };
+export type InvoiceItemInput = OpInvoiceItemInput;
 
 /** Adds one or more invoice lines in one transaction. Returns the new ids, in order. */
-export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInput[]): Promise<Result<{ ids: string[]; positions: number[] }>> {
+export async function addInvoiceItems(invoiceId: string, inputs: InvoiceItemInput[], reason?: string): Promise<Result<{ ids: string[]; positions: number[] }>> {
   const user = await requireUser();
-  if (!Array.isArray(inputs) || inputs.length === 0) return fail("Nothing to add.");
-  if (inputs.length > MAX_LINES_PER_BATCH) return fail("Too many lines at once.");
-  if (inputs.some((i) => !str(i.description, 300))) return fail("Describe the line item.");
-  const [inv] = await db.select({ id: serviceInvoices.id, voidedAt: serviceInvoices.voidedAt }).from(serviceInvoices).where(eq(serviceInvoices.id, invoiceId)).limit(1);
-  if (!inv) return fail("Invoice not found.");
-  if (inv.voidedAt) return fail("This invoice is void — reopen it before changing lines.");
-  const totalBefore = await invoiceRow(invoiceId).catch(() => null);
-  const ids = await db.transaction(async (tx) => {
-    const [{ max }] = await tx
-      .select({ max: sql<number>`coalesce(max(${serviceInvoiceItems.position}), 0)::int` })
-      .from(serviceInvoiceItems)
-      .where(eq(serviceInvoiceItems.invoiceId, invoiceId));
-    const out: { id: string; position: number }[] = [];
-    let next = (max ?? 0) + 1;
-    for (const input of inputs) {
-      const position = typeof input.position === "number" && inputs.length === 1 ? Math.max(0, Math.round(input.position)) : next++;
-      const [row] = await tx.insert(serviceInvoiceItems).values({
-        invoiceId,
-        description: str(input.description, 300) ?? "",
-        details: cleanDetails(input.details),
-        qty: Math.min(9_999, Math.max(1, intOr(input.qty, 1))),
-        unitPriceCents: moneyToCents(input.unitPrice),
-        taxable: boolOr(input.taxable, true),
-        position,
-      }).returning({ id: serviceInvoiceItems.id });
-      out.push({ id: row!.id, position });
-    }
-    return out;
-  });
-  await recalcInvoice(invoiceId);
-  await safeHistory(async () => {
-    const after = await invoiceRow(invoiceId);
-    if (!after) return;
-    const label = await invLabel(user.id, after);
-    const found = await db.select().from(serviceInvoiceItems).where(inArray(serviceInvoiceItems.id, ids.map((r) => r.id)));
-    await recordFinanceHistory(found.map((it) => {
-      const changes: FinanceChanges = {
-        description: { from: null, to: it.description }, qty: { from: null, to: it.qty },
-        unitPriceCents: { from: null, to: it.unitPriceCents }, taxable: { from: null, to: it.taxable },
-      };
-      if (found.length === 1 && totalBefore) changes.totalCents = { from: totalBefore.totalCents, to: after.totalCents };
-      return {
-        entityType: "invoice_item" as const, entityId: it.id, invoiceId, jobId: after.jobId, action: "create" as const,
-        summary: `${describeChange("invoice_item", "create", `"${it.description}" on ${label}`)} (${it.qty} x ${pesoExact(it.unitPriceCents)})`,
-        changes, actorName: actorOf(user),
-      };
-    }));
-  });
-  touch();
-  return ok({ ids: ids.map((r) => r.id), positions: ids.map((r) => r.position) });
+  const res = await addInvoiceItemsOp(user, invoiceId, inputs, reason);
+  if (res.ok) touch();
+  return res;
 }
 
-export async function addInvoiceItem(invoiceId: string, input: InvoiceItemInput): Promise<Result<{ id: string }>> {
-  const res = await addInvoiceItems(invoiceId, [input]);
+export async function addInvoiceItem(invoiceId: string, input: InvoiceItemInput, reason?: string): Promise<Result<{ id: string }>> {
+  const res = await addInvoiceItems(invoiceId, [input], reason);
   return res.ok ? ok({ id: res.data!.ids[0]! }) : res;
 }
 
 export async function updateInvoiceItem(
   id: string,
   patch: { description?: string; details?: string | null; qty?: number; unitPrice?: number; taxable?: boolean },
+  reason?: string,
 ): Promise<Result> {
   const user = await requireUser();
-  const [item] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
-  if (!item) return fail("Line item not found.");
-  const invBefore = await invoiceRow(item.invoiceId).catch(() => null);
-  await db
-    .update(serviceInvoiceItems)
-    .set({
-      description: patch.description !== undefined ? str(patch.description, 300) || item.description : undefined,
-      details: patch.details !== undefined ? cleanDetails(patch.details) : undefined,
-      qty: patch.qty !== undefined ? Math.max(1, intOr(patch.qty, 1)) : undefined,
-      unitPriceCents: patch.unitPrice !== undefined ? moneyToCents(patch.unitPrice) : undefined,
-      taxable: patch.taxable !== undefined ? boolOr(patch.taxable, true) : undefined,
-    })
-    .where(eq(serviceInvoiceItems.id, id));
-  await recalcInvoice(item.invoiceId);
-  await safeHistory(async () => {
-    const [now] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
-    const invAfter = await invoiceRow(item.invoiceId);
-    if (!now || !invAfter) return;
-    const changes = diffFields(item, now, ["description", "details", "qty", "unitPriceCents", "taxable"]);
-    if (!Object.keys(changes).length) return;
-    if (invBefore && invBefore.totalCents !== invAfter.totalCents) changes.totalCents = { from: invBefore.totalCents, to: invAfter.totalCents };
-    await recordFinanceHistory({
-      entityType: "invoice_item", entityId: id, invoiceId: item.invoiceId, jobId: invAfter.jobId, action: "update",
-      summary: describeChange("invoice_item", "update", `"${now.description}" on ${await invLabel(user.id, invAfter)}`, changes), changes, actorName: actorOf(user),
-    });
-  });
-  touch();
-  return ok();
+  const res = await updateInvoiceItemOp(user, id, patch, reason);
+  if (res.ok) touch();
+  return res;
 }
 
-export async function deleteInvoiceItem(id: string): Promise<Result> {
+export async function deleteInvoiceItem(id: string, reason?: string): Promise<Result> {
   const user = await requireUser();
-  const [item] = await db.select().from(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id)).limit(1);
-  if (!item) return fail("Line item not found.");
-  const invBefore = await invoiceRow(item.invoiceId).catch(() => null);
-  await db.delete(serviceInvoiceItems).where(eq(serviceInvoiceItems.id, id));
-  await recalcInvoice(item.invoiceId);
-  await safeHistory(async () => {
-    const invAfter = await invoiceRow(item.invoiceId);
-    if (!invAfter) return;
-    const changes: FinanceChanges = {
-      description: { from: item.description, to: null }, qty: { from: item.qty, to: null },
-      unitPriceCents: { from: item.unitPriceCents, to: null }, taxable: { from: item.taxable, to: null },
-    };
-    if (invBefore && invBefore.totalCents !== invAfter.totalCents) changes.totalCents = { from: invBefore.totalCents, to: invAfter.totalCents };
-    await recordFinanceHistory({
-      entityType: "invoice_item", entityId: id, invoiceId: item.invoiceId, jobId: invAfter.jobId, action: "delete",
-      summary: `${describeChange("invoice_item", "delete", `"${item.description}" on ${await invLabel(user.id, invAfter)}`)} (${item.qty} x ${pesoExact(item.unitPriceCents)})`,
-      changes, actorName: actorOf(user),
-    });
-  });
-  touch();
-  return ok();
+  const res = await deleteInvoiceItemOp(user, id, reason);
+  if (res.ok) touch();
+  return res;
 }
 
-export async function setInvoiceStatus(id: string, status: string): Promise<Result> {
+/** Sent / draft / void. Voiding or reopening an invoice that has payments needs the owner and a reason. */
+export async function setInvoiceStatus(id: string, status: string, reason?: string): Promise<Result> {
   const user = await requireUser();
-  const next = oneOf(status, ["draft", "sent", "void"], "draft");
-  const before = await invoiceRow(id).catch(() => null);
-  await db
-    .update(serviceInvoices)
-    .set({
-      sentAt: next === "sent" ? new Date() : next === "draft" ? null : undefined,
-      voidedAt: next === "void" ? new Date() : next === "draft" ? null : undefined,
-      updatedAt: new Date(),
-    })
-    .where(eq(serviceInvoices.id, id));
-  await recalcInvoice(id);
-  await safeHistory(async () => {
-    const after = await invoiceRow(id);
-    if (!before || !after) return;
-    const changes = diffFields(before, after, ["status"]);
-    if (!changes.status) return;
-    await recordFinanceHistory({
-      entityType: "invoice", entityId: id, invoiceId: id, jobId: after.jobId, action: "status",
-      summary: describeChange("invoice", "status", await invLabel(user.id, after), changes), changes, actorName: actorOf(user),
-    });
-  });
-  touch();
-  return ok();
+  const res = await setInvoiceStatusOp(user, id, status, reason);
+  if (res.ok) touch();
+  return res;
 }
 
 export async function recordPayment(input: {
@@ -1536,123 +1344,35 @@ export async function recordPayment(input: {
   markSent?: boolean;
 }): Promise<Result> {
   const user = await requireUser();
-  const amountCents = moneyToCents(input.amount);
-  if (amountCents <= 0) return fail("Enter a payment amount above zero.");
-  const [target] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, input.invoiceId)).limit(1);
-  if (!target) return fail("Invoice not found.");
-  if (target.voidedAt) return fail("This invoice is void — reopen it before recording a payment.");
-  if (!target.sentAt && target.amountPaidCents <= 0) {
-    if (!input.markSent) return fail("This invoice is still a draft. Mark it as sent first, or choose “Mark as sent and record payment”.");
-    await db.update(serviceInvoices).set({ sentAt: new Date(), updatedAt: new Date() }).where(eq(serviceInvoices.id, input.invoiceId));
-  }
-  const receivedAt = optionalDate(input.receivedAt) ?? new Date();
-  const [paymentRow] = await db.insert(servicePayments).values({
-    invoiceId: input.invoiceId,
-    amountCents,
-    method: oneOf(input.method, PAYMENT_METHODS.map((m) => m.key), "cash"),
-    reference: str(input.reference, 120),
-    receivedAt,
-    note: str(input.note, 500),
-  }).returning();
-  await recalcInvoice(input.invoiceId);
-
-  const [invoice] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, input.invoiceId)).limit(1);
-  await safeHistory(async () => {
-    if (!paymentRow || !invoice) return;
-    const label = await invLabel(user.id, invoice);
-    const changes: FinanceChanges = {
-      amountCents: { from: null, to: paymentRow.amountCents }, method: { from: null, to: paymentRow.method },
-      receivedAt: { from: null, to: paymentRow.receivedAt.toISOString() },
-    };
-    if (paymentRow.reference) changes.reference = { from: null, to: paymentRow.reference };
-    const rows: FinanceHistoryEntry[] = [{
-      entityType: "payment", entityId: paymentRow.id, invoiceId: invoice.id, jobId: invoice.jobId, action: "create",
-      summary: `${describeChange("payment", "create", `${pesoExact(paymentRow.amountCents)} on ${label}`)} (${paymentRow.method})`, changes, actorName: actorOf(user),
-    }];
-    if (invoice.status !== target.status) {
-      const sc = { status: { from: target.status, to: invoice.status } };
-      rows.push({
-        entityType: "invoice", entityId: invoice.id, invoiceId: invoice.id, jobId: invoice.jobId, action: "status",
-        summary: describeChange("invoice", "status", label, sc), changes: sc, actorName: actorOf(user),
-      });
-    }
-    await recordFinanceHistory(rows);
-  });
-  if (invoice?.jobId) {
-    await db.insert(serviceJobEvents).values({
-      jobId: invoice.jobId,
-      type: "payment",
-      message: `Payment received — ${(amountCents / 100).toFixed(2)}`,
-      actorName: "Owner",
-      at: receivedAt,
-    });
-  }
-  touch();
-  return ok();
+  const res = await recordPaymentOp(user, input);
+  if (res.ok) touch();
+  return res;
 }
 
-export async function deletePayment(id: string): Promise<Result> {
-  const user = await requireUser();
-  const [payment] = await db.select().from(servicePayments).where(eq(servicePayments.id, id)).limit(1);
-  if (!payment) return fail("Payment not found.");
-  const invBefore = await invoiceRow(payment.invoiceId).catch(() => null);
-  await db.delete(servicePayments).where(eq(servicePayments.id, id));
-  await recalcInvoice(payment.invoiceId);
-  await safeHistory(async () => {
-    const inv = await invoiceRow(payment.invoiceId);
-    if (!inv) return;
-    const label = await invLabel(user.id, inv);
-    const changes: FinanceChanges = {
-      amountCents: { from: payment.amountCents, to: null }, method: { from: payment.method, to: null },
-      receivedAt: { from: payment.receivedAt.toISOString(), to: null },
-    };
-    if (payment.reference) changes.reference = { from: payment.reference, to: null };
-    const rows: FinanceHistoryEntry[] = [{
-      entityType: "payment", entityId: id, invoiceId: inv.id, jobId: inv.jobId, action: "delete",
-      summary: `${describeChange("payment", "delete", `${pesoExact(payment.amountCents)} on ${label}`)} (${payment.method})`, changes, actorName: actorOf(user),
-    }];
-    if (invBefore && invBefore.status !== inv.status) {
-      const sc = { status: { from: invBefore.status, to: inv.status } };
-      rows.push({
-        entityType: "invoice", entityId: inv.id, invoiceId: inv.id, jobId: inv.jobId, action: "status",
-        summary: describeChange("invoice", "status", label, sc), changes: sc, actorName: actorOf(user),
-      });
-    }
-    await recordFinanceHistory(rows);
-  });
-  touch();
-  return ok();
+/** Owner only. Edits one payment in place (amount, date, method, reference, note); a reason is required. */
+export async function editPayment(paymentId: string, input: EditPaymentInput): Promise<Result> {
+  const user = await requireFinance();
+  if (!user) return FINANCE_DENIED;
+  const res = await editPaymentOp(user, paymentId, input);
+  if (res.ok) touch();
+  return res;
 }
 
+/** Owner only. Removes a payment (the correction path); a reason is required and the full payment is kept in History. */
+export async function deletePayment(id: string, reason?: string): Promise<Result> {
+  const user = await requireFinance();
+  if (!user) return FINANCE_DENIED;
+  const res = await deletePaymentOp(user, id, reason);
+  if (res.ok) touch();
+  return res;
+}
+
+/** Refused when the invoice has any payment or is paid / part-paid: void it instead. */
 export async function deleteInvoice(id: string, confirmCode: string): Promise<Result> {
   const user = await requireUser();
-  const [inv] = await db.select().from(serviceInvoices).where(eq(serviceInvoices.id, id)).limit(1);
-  if (!inv) return ok();
-  const settings = await getServiceSettings(user.id);
-  if (!confirmMatches(confirmCode ?? "", invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate))) {
-    return fail("Type the invoice number exactly to confirm.");
-  }
-  const [nItems, nPayments] = await Promise.all([
-    db.select({ id: serviceInvoiceItems.id }).from(serviceInvoiceItems).where(eq(serviceInvoiceItems.invoiceId, id)).then((r) => r.length).catch(() => 0),
-    db.select({ id: servicePayments.id }).from(servicePayments).where(eq(servicePayments.invoiceId, id)).then((r) => r.length).catch(() => 0),
-  ]);
-  await db.delete(serviceInvoices).where(eq(serviceInvoices.id, id));
-  await safeHistory(async () => {
-    const changes: FinanceChanges = {
-      status: { from: inv.status, to: null }, subtotalCents: { from: inv.subtotalCents, to: null },
-      discountCents: { from: inv.discountCents, to: null }, taxCents: { from: inv.taxCents, to: null },
-      totalCents: { from: inv.totalCents, to: null }, amountPaidCents: { from: inv.amountPaidCents, to: null },
-      itemCount: { from: nItems, to: null }, paymentCount: { from: nPayments, to: null },
-    };
-    const label = invoiceCode(settings.invoicePrefix, inv.invoiceNumber, inv.issueDate);
-    await recordFinanceHistory({
-      entityType: "invoice", entityId: id, invoiceId: id, jobId: inv.jobId, action: "delete",
-      summary: `${describeChange("invoice", "delete", label)} (total ${pesoExact(inv.totalCents)}, paid ${pesoExact(inv.amountPaidCents)}, ${nItems} lines, ${nPayments} payments)`,
-      changes, actorName: actorOf(user),
-    });
-  });
-  touch();
-  return ok();
+  const res = await deleteInvoiceOp(user, id, confirmCode);
+  if (res.ok) touch();
+  return res;
 }
 
 /* ============================================================

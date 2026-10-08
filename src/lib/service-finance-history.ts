@@ -53,7 +53,7 @@ const FIELD_LABEL: Record<string, string> = {
   customerId: "customer", notes: "notes", terms: "terms", status: "status",
   description: "description", qty: "quantity", unitPriceCents: "unit price", taxable: "taxable",
   amountCents: "amount", method: "method", receivedAt: "date received", reference: "reference",
-  category: "category", kind: "kind", vendor: "vendor", spentAt: "date spent", jobId: "job",
+  category: "category", kind: "type", vendor: "vendor", spentAt: "date spent", jobId: "job",
   pianoId: "piano", reimbursable: "reimbursable", note: "note", receiptReplaced: "receipt photo",
   totalCents: "invoice total", subtotalCents: "subtotal", taxCents: "tax", amountPaidCents: "paid so far",
   itemCount: "line items", paymentCount: "payments", details: "details",
