@@ -59,3 +59,5 @@ The job page margin and the Finance per-job margin both use `jobCostBasis` (`src
 3. **F** - only expenses of kind `job` (or not yet sorted, kind empty) count in job margin. Overhead and stock expenses linked to a job do not (Finance health shows this as an info note).
 
 Part cost is computed from the job lines at read time, not from the stored `service_jobs.parts_cost_cents` (still kept up to date on every write, with the new rule). Old rows hold the old selling-price value: run `drizzle/manual/10_recalc_job_parts_cost.sql` (optional, idempotent, derived column only) to clear the Finance health "Job parts cost differs from its lines" warnings. The old check "Parts and expenses may be counted twice" is removed.
+
+Backfill alternative to the SQL file: `npm run backfill:job-parts-cost -- --dry-run` prints job no., old value and new value; `-- --apply` writes (one transaction, only `parts_cost_cents`, idempotent). It uses the same `partsCostFromLines` as the save path and the Finance health check.

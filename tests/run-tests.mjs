@@ -33,6 +33,7 @@ const testFiles = [
   { name: "service-finance-split", file: "tests/service-finance-split.ts" },
   { name: "service-expense-edit", file: "tests/service-expense-edit.ts" },
   { name: "service-job-cost", file: "tests/service-job-cost.ts" },
+  { name: "service-parts-backfill", file: "tests/service-parts-backfill.ts" },
   { name: "service-finance-audit", file: "tests/service-finance-audit.ts" },
   { name: "service-finance-history", file: "tests/service-finance-history.ts" },
   { name: "service-dashboard", file: "tests/service-dashboard.ts" },
