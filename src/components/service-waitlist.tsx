@@ -158,7 +158,7 @@ export default function WaitlistClient({
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page app-page-mid [--page-w:1200px] space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>

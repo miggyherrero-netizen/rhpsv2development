@@ -39,7 +39,7 @@ export default function GosShell({ userName, overdue = 0, children }: { userName
         })}
         <p className="mt-auto pt-4 text-sm text-[var(--gos-ink-dim)]">Signed in: {userName}</p>
       </aside>
-      <main id="gos-main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-4 lg:px-8 lg:pb-8">
+      <main id="gos-main" className="app-page w-full [--page-w:1440px] flex-1 px-4 pb-28 pt-4 lg:px-8 lg:pb-8">
           <div className="flex justify-end"><AddInquiry /></div>
           {children}
         </main>

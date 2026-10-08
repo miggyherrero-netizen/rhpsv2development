@@ -572,6 +572,41 @@ textarea.input-svc { min-height: 88px; }
 .svc-tiles { display: flex; flex-wrap: wrap; gap: 12px; }
 .svc-tiles > * { flex: 1 1 calc(50% - 6px); min-width: 0; }
 @media (min-width: 768px) { .svc-tiles > * { flex-basis: 200px; } }
+/* Page width for the logged-in areas (Home Service, Shop/admin, My Desk/owner, Growth OS).
+   Layout only, no colour tokens, so it is safe to share. Up to 1440px viewports each page keeps its own
+   cap (--page-w, set per page); wider screens only ADD steps so tables and dashboards use the room:
+   >= 1800: 1760 | >= 2400: 2200 | >= 3200: 2800 (content width, centred).
+   Variants: .app-page (wide: tables, dashboards) | -mid (detail pages: 1560/1760/2000) |
+   -list (task/inbox lists: 960/1100/1200) | -narrow (forms, documents: never grows).
+   List and narrow pages are left-aligned with the page header from 1800px up instead of floating mid-screen. */
+.app-page { max-width: var(--page-w, 1400px); margin-inline: auto; }
+@media (min-width: 1800px) { .app-page { max-width: max(var(--page-w, 1400px), var(--page-w1, 1760px)); } }
+@media (min-width: 2400px) { .app-page { max-width: max(var(--page-w, 1400px), var(--page-w2, 2200px)); } }
+@media (min-width: 3200px) { .app-page { max-width: max(var(--page-w, 1400px), var(--page-w3, 2800px)); } }
+.app-page-mid { --page-w1: 1560px; --page-w2: 1760px; --page-w3: 2000px; }
+.app-page-list { --page-w1: 960px; --page-w2: 1100px; --page-w3: 1200px; }
+.app-page-narrow { --page-w1: 0px; --page-w2: 0px; --page-w3: 0px; }
+@media (min-width: 1800px) { .app-page-list, .app-page-narrow { margin-left: 0; margin-right: auto; } }
+
+/* Dashboard on wide screens (>= 1800px): KPI strip in one row, main area in three equal columns.
+   The long left group (visits, reminders, money, follow-ups ...) flows into two balanced columns
+   (CSS multicol, whole cards never split); the trend widgets stack in the third. Plain CSS (not Tailwind
+   variants) so it reliably wins over the xl:/lg: utilities it replaces. */
+@media (min-width: 1800px) {
+  .svc-kpi { grid-template-columns: 1fr 1fr 2fr 1fr 1fr 1fr; }
+  .svc-kpi > * { grid-column: span 1 / span 1; }
+  .svc-dash-l { display: block; grid-column: span 8 / span 8; column-count: 2; column-gap: 1.5rem; }
+  .svc-dash-l > * { break-inside: avoid; margin-bottom: 1.5rem; }
+  .svc-dash-l > *:last-child { margin-bottom: 0; }
+  .svc-dash-r { display: flex; flex-direction: column; gap: 1.5rem; grid-column: span 4 / span 4; }
+  .svc-dash-a, .svc-dash-b { display: contents; }
+}
+@media (min-width: 3200px) {
+  .svc-dash { gap: 2rem; }
+  .svc-dash-l { column-gap: 2rem; }
+  .svc-dash-l > * { margin-bottom: 2rem; }
+  .svc-dash-r { gap: 2rem; }
+}
 .svc-divide > * + * { border-top: 1px solid var(--color-svc-border); }
 
 /* Dispatch grid lines */

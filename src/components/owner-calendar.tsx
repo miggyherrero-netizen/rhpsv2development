@@ -345,7 +345,7 @@ export default function CalendarClient({ bundle: rawBundle, now: nowIso }: { bun
 
   /* ============ layout ============ */
   return (
-    <div className="p-4 sm:p-6 max-w-[1500px] mx-auto">
+    <div className="p-4 sm:p-6 app-page [--page-w:1500px]">
       {/* toolbar */}
       <div className="flex flex-wrap items-center gap-2.5 mb-5">
         <div className="flex items-center gap-1 mr-1">

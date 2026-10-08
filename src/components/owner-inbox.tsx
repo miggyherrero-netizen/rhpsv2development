@@ -26,7 +26,7 @@ export default function OwnerInboxClient({ bundle: rawBundle }: { bundle: OwnerB
   }
 
   return (
-    <div className="p-4 sm:p-7 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-list [--page-w:768px]">
       <div className="mb-6">
         <h1 className="font-serif text-2xl sm:text-3xl text-[var(--color-ow-text)]">Inbox</h1>
         <p className="text-[var(--color-ow-text-dim)] text-[13px] mt-1">Catch it now, decide later. Nothing here forces its way into the shop system.</p>

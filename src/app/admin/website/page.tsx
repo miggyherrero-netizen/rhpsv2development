@@ -8,7 +8,7 @@ export default async function WebsiteEditorPage() {
   const content = await getWebsiteContent();
 
   return (
-    <div className="p-4 sm:p-7 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-mid [--page-w:1600px]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl text-white">Website editor</h1>

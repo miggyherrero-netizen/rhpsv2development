@@ -60,7 +60,7 @@ export default function FinanceHealthView({ health }: { health: FinanceHealth })
   const { findings, summary } = health;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page app-page-narrow [--page-w:1100px] space-y-5">
       <header className="space-y-3">
         <Link
           href="/service/finance"

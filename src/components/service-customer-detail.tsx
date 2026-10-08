@@ -74,7 +74,7 @@ export default function CustomerDetailClient({
   } as Parameters<typeof CustomerSheet>[0]["customer"];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page app-page-mid [--page-w:1200px] space-y-5">
       <div>
         <Link href="/service/customers" className={`inline-flex items-center gap-1.5 text-[13px] hover:underline rounded-sm ${FOCUS}`} style={FAINT}>
           <ArrowLeft size={13} /> Customers

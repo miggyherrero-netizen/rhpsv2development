@@ -111,7 +111,7 @@ export default function TodayClient({ bundle: rawBundle }: { bundle: OwnerBundle
   const loadState = workload.minutes <= 240 ? "Light day" : workload.minutes <= 480 ? "Normal day" : "Busy day";
 
   return (
-    <div className="p-4 sm:p-7 max-w-[1400px] mx-auto">
+    <div className="p-4 sm:p-7 app-page [--page-w:1400px]">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>

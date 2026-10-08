@@ -60,7 +60,7 @@ export default function OwnerSettingsClient({ categories, prefs }: { categories:
   const sel = `${inp} !w-auto`;
 
   return (
-    <div className="p-4 sm:p-7 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-narrow [--page-w:672px]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl text-[var(--color-ow-text)]">Workspace settings</h1>

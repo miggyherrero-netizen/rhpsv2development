@@ -39,7 +39,7 @@ export default function ExpenseReviewClient({
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page app-page-narrow [--page-w:1100px] space-y-5">
       <header>
         <Link href="/service/expenses" className="inline-flex items-center gap-1.5 min-h-11 text-[12px] hover:underline" style={{ color: "var(--color-svc-text-faint)" }}>
           <ArrowLeft size={13} aria-hidden="true" /> Expenses
