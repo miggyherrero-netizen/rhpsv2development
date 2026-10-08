@@ -21,6 +21,8 @@ import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
 import { effectiveKind, financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
+import { jobCostBasis } from "@/lib/service-job-cost";
+import { partsCostFromLines } from "@/lib/service-lines";
 import { saleBalanceCents, salePianoProfit } from "@/lib/service-sale";
 import {
   avgInvoiceCents, balanceCents, computeTotals, daysOverdue, invoiceCode, invoiceStatus, jobCode,
@@ -1012,7 +1014,7 @@ export async function getFinanceReport(
       ? db
           .select({
             jobId: serviceJobs.id, title: serviceJobs.title, customerName: serviceCustomers.name,
-            laborCostCents: serviceJobs.laborCostCents, partsCostCents: serviceJobs.partsCostCents,
+            laborCostCents: serviceJobs.laborCostCents,
             completedAt: serviceJobs.completedAt,
           })
           .from(serviceJobs)
@@ -1102,7 +1104,7 @@ export async function getFinanceReport(
   const nameMap = new Map(nameRows.map((r) => [r.id, r.name]));
 
   const jobIds = jobRows.map((j) => j.jobId);
-  const [invoiceByJob, expenseByJob] = await Promise.all([
+  const [invoiceByJob, expenseByJob, itemRows] = await Promise.all([
     jobIds.length
       ? db
           .select({
@@ -1117,15 +1119,32 @@ export async function getFinanceReport(
       : Promise.resolve([] as { jobId: string | null; invoiced: number; tax: number }[]),
     jobIds.length
       ? db
-          .select({ jobId: serviceExpenses.jobId, amount: sql<number>`coalesce(sum(${serviceExpenses.amountCents}), 0)::int` })
+          .select({ jobId: serviceExpenses.jobId, amountCents: serviceExpenses.amountCents, kind: serviceExpenses.kind, category: serviceExpenses.category })
           .from(serviceExpenses)
           .where(inArray(serviceExpenses.jobId, jobIds))
-          .groupBy(serviceExpenses.jobId)
-      : Promise.resolve([] as { jobId: string | null; amount: number }[]),
+      : Promise.resolve([] as { jobId: string | null; amountCents: number; kind: string | null; category: string }[]),
+    // One batched read of the lines: part cost is computed from them now, not from the stored column.
+    jobIds.length
+      ? db
+          .select({ jobId: serviceJobItems.jobId, kind: serviceJobItems.kind, qty: serviceJobItems.qty, unitPriceCents: serviceJobItems.unitPriceCents, costCents: serviceJobItems.costCents })
+          .from(serviceJobItems)
+          .where(inArray(serviceJobItems.jobId, jobIds))
+      : Promise.resolve([] as { jobId: string; kind: string; qty: number; unitPriceCents: number; costCents: number }[]),
   ]);
 
   const invoicedMap = new Map(invoiceByJob.map((r) => [r.jobId!, r]));
-  const expenseMap = new Map(expenseByJob.map((r) => [r.jobId!, r.amount]));
+  const expensesByJobId = new Map<string, { amountCents: number; kind: string | null; category: string }[]>();
+  for (const e of expenseByJob) {
+    const list = expensesByJobId.get(e.jobId!) ?? [];
+    list.push(e);
+    expensesByJobId.set(e.jobId!, list);
+  }
+  const itemsByJobId = new Map<string, typeof itemRows>();
+  for (const it of itemRows) {
+    const list = itemsByJobId.get(it.jobId) ?? [];
+    list.push(it);
+    itemsByJobId.set(it.jobId, list);
+  }
 
   const avgDenominator = options.avgInvoiceBasis === "job" ? completedJobs[0]?.count ?? 0 : rollup.invoiceCount;
 
@@ -1133,11 +1152,15 @@ export async function getFinanceReport(
     const money = invoicedMap.get(j.jobId);
     const invoiced = money?.invoiced ?? 0;
     const tax = money?.tax ?? 0;
+    const basis = jobCostBasis({
+      partLinesCostCents: partsCostFromLines(itemsByJobId.get(j.jobId) ?? []),
+      expenses: expensesByJobId.get(j.jobId) ?? [],
+    });
     const m = jobMargin(
       {
         laborCostCents: j.laborCostCents,
-        partsCostCents: j.partsCostCents,
-        expenseCents: expenseMap.get(j.jobId) ?? 0,
+        partsCostCents: basis.partsCostCents,
+        expenseCents: basis.expenseCents,
         invoicedCents: invoiced,
         taxCents: tax,
       },

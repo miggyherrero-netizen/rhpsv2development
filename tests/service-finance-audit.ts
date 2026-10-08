@@ -34,7 +34,7 @@ const clean = (): AuditInput => ({
   jobs: [job()],
   jobItems: [
     { jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 },
-    { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 10_000 }, // explicit cost: (k) only flags price-derived part cost
+    { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 10_000 }, // explicit cost
   ],
   timeLogs: [
     { jobId: "j1", kind: "work", minutes: 60, hourlyRateCents: 25_000, endedAt: D("2026-09-02T05:00:00Z") },
@@ -93,6 +93,10 @@ console.log("\njob derived columns");
 check("(h) quotedCents drift", codes({ ...clean(), jobs: [job({ quotedCents: 99_000 })] }), ["job_quoted_drift"]);
 check("(h) partsCostCents drift", codes({ ...clean(), jobs: [job({ partsCostCents: 0 })] }), ["job_parts_drift"]);
 check("(h) laborCostCents drift", codes({ ...clean(), jobs: [job({ laborCostCents: 10_000 })] }), ["job_labor_drift"]);
+check("(h) a part with no cost is expected to cost 0 (stored selling-price value drifts)", codes({
+  ...clean(), jobs: [job({ partsCostCents: 20_000 })],
+  jobItems: [{ jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 0 }],
+}).filter((c) => c === "job_parts_drift"), ["job_parts_drift"]);
 check("(h) an explicit line cost wins over the priced amount", codes({
   ...clean(), jobs: [job({ partsCostCents: 15_000 })],
   jobItems: [{ jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 }, { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 7_500 }],
@@ -111,18 +115,10 @@ check("(i) small expense without receipt is ignored", codes({ ...clean(), expens
   check("(i) different amount is not a duplicate", codes({ ...clean(), expenses: [exp(), exp({ id: "e2", amountCents: 50_100 })] }), []);
 }
 
-console.log("\npossible double counting");
+console.log("\nexpense linked to a job with another kind");
 {
-  const derived = [{ jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 }, { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 0 }];
-  const r = auditFinance({ ...clean(), jobItems: derived, expenses: [exp({ category: "materials" })] });
-  check("(k) price-derived part cost + linked materials expense is flagged (warn, no dispute)", r.findings.map((f) => [f.code, f.severity, f.entity.type, f.entity.id]), [["job_part_cost_maybe_doubled", "warn", "job", "j1"]]);
-  check("(k) message shows both amounts", r.findings[0]?.message.includes("P200.00") && r.findings[0]?.message.includes("P500.00"), true);
-  check("(k) adds nothing to dispute", r.summary.disputeCents, 0);
-  check("(k) fuel/meals expense linked to the job is not a parts purchase => no finding", codes({ ...clean(), jobItems: derived }), []);
-  check("(k) no linked expense => no finding", codes({ ...clean(), jobItems: derived, expenses: [] }), []);
-  check("(k) explicit part cost + linked expense => no finding", codes(clean()), []);
-  check("(k) linked expenses but only service lines => no finding", codes({ ...clean(), jobItems: [{ jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 }], jobs: [job({ partsCostCents: 0, quotedCents: 80_000 })] }), []);
-  check("(l) linked expense with kind overhead is flagged", auditFinance({ ...clean(), expenses: [exp({ kind: "overhead" })] }).findings.map((f) => [f.code, f.severity, f.entity.id]), [["expense_job_kind_mismatch", "warn", "e1"]]);
+  check("(l) linked expense with kind overhead is flagged (info)", auditFinance({ ...clean(), expenses: [exp({ kind: "overhead" })] }).findings.map((f) => [f.code, f.severity, f.entity.id]), [["expense_job_kind_mismatch", "info", "e1"]]);
+  check("(l) message says it is not counted in the job margin", auditFinance({ ...clean(), expenses: [exp({ kind: "overhead" })] }).findings[0]?.message, "Linked to a job but marked overhead; it is not counted in the job margin.");
   check("(l) stock expense linked to a job (with piano) is flagged", codes({ ...clean(), expenses: [exp({ kind: "stock", pianoId: "pi1" })] }), ["expense_job_kind_mismatch"]);
   check("(l) overhead without a job link is fine", codes({ ...clean(), expenses: [exp({ kind: "overhead", jobId: null })] }), []);
   check("(l) unsorted (null kind) linked expense is left to expense_no_kind", codes({ ...clean(), expenses: [exp({ kind: null })] }), ["expense_no_kind"]);

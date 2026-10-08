@@ -30,14 +30,14 @@ check("bad qty is not savable", isRowSavable({ description: "Tuning", qty: "0", 
 
 console.log("\nper-line cost");
 check("explicit cost wins", lineCostCents({ kind: "service", qty: 2, unitPriceCents: 100_000, costCents: 30_000 }), 60_000);
-check("part with no cost keeps legacy rule (priced amount)", lineCostCents({ kind: "part", qty: 2, unitPriceCents: 50_000 }), 100_000);
+check("part with no cost costs 0 (selling price is not its cost)", lineCostCents({ kind: "part", qty: 2, unitPriceCents: 50_000 }), 0);
 check("service with no cost has no cost", lineCostCents({ kind: "service", qty: 1, unitPriceCents: 250_000 }), 0);
 check("part with explicit cost uses it, not the price", lineCostCents({ kind: "part", qty: 1, unitPriceCents: 800_000, costCents: 500_000 }), 500_000);
 check("sum over lines", partsCostFromLines([
   { kind: "part", qty: 1, unitPriceCents: 800_000, costCents: 500_000 },
   { kind: "service", qty: 1, unitPriceCents: 250_000 },
   { kind: "part", qty: 2, unitPriceCents: 10_000 },
-]), 520_000);
+]), 500_000);
 
 console.log("\nprice-book type-ahead");
 check("matches by words, any order", filterCatalog(catalog, "tun std").map((c) => c.id), []);

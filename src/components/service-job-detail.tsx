@@ -18,7 +18,8 @@ import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
 import { ExpenseFormModal, JobFormModal, TimeEditModal, type ShowroomPiano } from "@/components/service-forms";
 import { timeSourceLabel } from "@/lib/service-time-events";
 import LineEditor, { toServerLine, type LineAdapter } from "@/components/service-line-editor";
-import type { CatalogEntry, EditorLine } from "@/lib/service-lines";
+import { partsCostFromLines, type CatalogEntry, type EditorLine } from "@/lib/service-lines";
+import { jobCostBasis } from "@/lib/service-job-cost";
 import type { JobDetail } from "@/server/service-data";
 import {
   advanceJob, updateJob, setJobStatus, addJobItems, updateJobItem, deleteJobItem, addJobNote, createCatalogItem,
@@ -91,7 +92,10 @@ export default function JobDetailClient({
   );
   const workMinutes = detail.timeLogs.filter((l) => l.kind === "work").reduce((s, l) => s + (l.minutes ?? 0), 0);
   const travelMinutes = detail.timeLogs.filter((l) => l.kind === "travel").reduce((s, l) => s + (l.minutes ?? 0), 0);
-  const expenseCents = detail.expenses.reduce((s, e) => s + e.amountCents, 0);
+  const listedExpenseCents = detail.expenses.reduce((s, e) => s + e.amountCents, 0);
+  // Same cost rules as Finance (jobCostBasis): part cost from the lines at read time, job-kind expenses only,
+  // and linked materials/parts expenses replace the part-line cost instead of adding to it.
+  const basis = jobCostBasis({ partLinesCostCents: partsCostFromLines(liveLines), expenses: detail.expenses });
   // Drafts never count as invoiced — same rule as Finance job margins.
   const liveInvoices = countable(detail.invoices);
   const invoicedCents = liveInvoices.reduce((s, i) => s + i.totalCents, 0);
@@ -100,8 +104,8 @@ export default function JobDetailClient({
   const margin = jobMargin(
     {
       laborCostCents: job.laborCostCents,
-      partsCostCents: job.partsCostCents,
-      expenseCents,
+      partsCostCents: basis.partsCostCents,
+      expenseCents: basis.expenseCents,
       invoicedCents,
       taxCents: invoicedTaxCents,
     },
@@ -490,7 +494,7 @@ export default function JobDetailClient({
                   </div>
                 ))}
                 <div className="px-5 py-2.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                  Total expenses {peso(expenseCents)}
+                  Total expenses {peso(listedExpenseCents)}
                 </div>
               </div>
             )}
@@ -547,7 +551,14 @@ export default function JobDetailClient({
 
           {showJobMargins && !isSale ? (
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
+              <div>
+                <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
+                {basis.partsFromExpenses ? (
+                  <p className="mt-1.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
+                    Parts cost comes from the linked materials/parts expenses.
+                  </p>
+                ) : null}
+              </div>
               <StatCard
                 label="Margin"
                 value={`${margin.marginPct}%`}

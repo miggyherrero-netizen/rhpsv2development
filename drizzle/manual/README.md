@@ -19,6 +19,7 @@ Run them **in order**. Each one is additive (`ADD COLUMN IF NOT EXISTS`, default
 | 8 | `08_line_details.sql` | Quote / invoice lines get an optional **Details** text (small print under the item name); packages become one price + an "includes" list |
 | 9 | `09_finance_history.sql` | Finance history: `service_finance_history` table (what every money edit was before -> after). The app works without it, but nothing is recorded until it is run |
 | 7 | `07_reminders.sql` | Client follow-up reminders: `service_reminders` table (+ status enum) |
+| 10 | `10_recalc_job_parts_cost.sql` | Job cost rules: refreshes the derived `service_jobs.parts_cost_cents` (part lines with no cost now cost 0). Optional, no schema change; clears Finance health parts-drift warnings on old jobs |
 
 Phase 2 (Today command center) needs no schema change.
 
