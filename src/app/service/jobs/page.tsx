@@ -12,7 +12,7 @@ export default async function ServiceJobsPage({
   await requireUser();
   const { new: isNew, filter } = await searchParams;
   const [jobs, customers, technicians, showroomPianos] = await Promise.all([
-    getJobs({ limit: 300 }),
+    getJobs({ limit: 300, newestFirst: true }),
     getCustomerOptions(),
     getTechnicians(),
     getPianoOptions(),
