@@ -90,6 +90,102 @@ export function deltaOf(current: number, previous: number, periodLabel = "last m
     : { direction: "down", pct: Math.abs(pct), text: `Down ${Math.abs(pct)}% on ${periodLabel}` };
 }
 
+/* ------------------------------------------------- like-for-like (this month so far) */
+
+export const INVOICE_KINDS = ["service", "sale"] as const;
+export type InvoiceKind = (typeof INVOICE_KINDS)[number];
+/** Only 'service' and 'sale' may be saved on an invoice. */
+export const isInvoiceKind = (v: unknown): v is InvoiceKind => v === "service" || v === "sale";
+
+export type LikeForLikeRange = {
+  current: { from: Date; to: Date };
+  previous: { from: Date; to: Date };
+  /** e.g. "Oct 1–8" */
+  label: string;
+  /** e.g. "Sep 1–8" */
+  previousLabel: string;
+};
+
+const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+const spanLabel = (m: number, endDay: number) => (endDay <= 1 ? `${MONTHS[m]} 1` : `${MONTHS[m]} 1–${endDay}`);
+
+/**
+ * This Manila month so far (1st .. end of today) against the same day-span of the previous month,
+ * clamped to that month's length (Mar 31 -> Feb 1-28/29). `to` is exclusive.
+ */
+export function likeForLikeRange(now: Date): LikeForLikeRange {
+  const { y, m } = manilaYM(now);
+  const day = new Date(now.getTime() + MANILA_OFFSET_MS).getUTCDate();
+  const py = m === 0 ? y - 1 : y;
+  const pm = m === 0 ? 11 : m - 1;
+  const prevEnd = Math.min(day, daysInMonth(py, pm));
+  const prevFrom = manilaMonthStart(py, pm);
+  return {
+    current: { from: manilaMonthStart(y, m), to: new Date(manilaMonthStart(y, m).getTime() + day * 86_400_000) },
+    previous: { from: prevFrom, to: new Date(prevFrom.getTime() + prevEnd * 86_400_000) },
+    label: spanLabel(m, day),
+    previousLabel: spanLabel(pm, prevEnd),
+  };
+}
+
+export type PeriodDelta = {
+  direction: "up" | "down" | "flat" | "new";
+  /** Whole percent, absolute. Null for "new" (nothing before to divide by). */
+  pct: number | null;
+  /** Stands on its own, e.g. "Up 12% vs Sep 1–8", "New". */
+  text: string;
+};
+
+/** Change between two periods. Never divides by zero: from nothing to something is "New". */
+export function periodDelta(current: number, previous: number, periodLabel?: string): PeriodDelta {
+  const vs = periodLabel ? ` vs ${periodLabel}` : "";
+  if (previous <= 0) {
+    return current > 0
+      ? { direction: "new", pct: null, text: "New" }
+      : { direction: "flat", pct: 0, text: periodLabel ? `Same as ${periodLabel}` : "Same" };
+  }
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return { direction: "flat", pct: 0, text: periodLabel ? `Same as ${periodLabel}` : "Same" };
+  return pct > 0
+    ? { direction: "up", pct, text: `Up ${pct}%${vs}` }
+    : { direction: "down", pct: Math.abs(pct), text: `Down ${Math.abs(pct)}%${vs}` };
+}
+
+export type KindInvoice = FinInvoice & { totalCents: number; kind: string };
+export type KindSplit = { currentCents: number; previousCents: number; delta: PeriodDelta };
+export type InvoicedByKind = {
+  service: KindSplit;
+  sales: KindSplit;
+  totalCents: number;
+  previousTotalCents: number;
+  rangeLabel: string;
+  previousLabel: string;
+};
+
+/**
+ * Invoiced so far this month vs the same days last month, split into service and piano sales.
+ * Same rule as the Finance page: countable() (no void, no draft) by issue date. Unknown kinds count as service.
+ */
+export function invoicedByKind(invoices: KindInvoice[], now: Date): InvoicedByKind {
+  const r = likeForLikeRange(now);
+  const sum = { service: [0, 0], sales: [0, 0] };
+  for (const i of countable(invoices, now)) {
+    const t = new Date(i.issueDate).getTime();
+    const bucket = i.kind === "sale" ? sum.sales : sum.service;
+    if (t >= r.current.from.getTime() && t < r.current.to.getTime()) bucket[0] += i.totalCents ?? 0;
+    else if (t >= r.previous.from.getTime() && t < r.previous.to.getTime()) bucket[1] += i.totalCents ?? 0;
+  }
+  const split = ([c, p]: number[]): KindSplit => ({ currentCents: c!, previousCents: p!, delta: periodDelta(c!, p!, r.previousLabel) });
+  return {
+    service: split(sum.service),
+    sales: split(sum.sales),
+    totalCents: sum.service[0]! + sum.sales[0]!,
+    previousTotalCents: sum.service[1]! + sum.sales[1]!,
+    rangeLabel: r.label,
+    previousLabel: r.previousLabel,
+  };
+}
+
 /** Profit ÷ money in, whole percent; null when nothing came in (no margin to show). */
 export function marginPct(profitCents: number, revenueCents: number): number | null {
   return revenueCents > 0 ? Math.round((profitCents / revenueCents) * 100) : null;

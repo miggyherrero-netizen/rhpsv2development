@@ -122,6 +122,7 @@ export default function InvoiceDetailClient({
           <div className="flex items-center gap-3 mt-2">
             <h1 className="font-serif text-2xl" style={{ color: "var(--color-svc-text)" }}>{code}</h1>
             <Chip tone={tone}>{INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}</Chip>
+            {invoice.kind === "sale" && <Chip tone="azure">Piano sale</Chip>}
           </div>
           <p className="text-[13px] mt-1" style={{ color: "var(--color-svc-text-dim)" }}>
             {customer.name}
@@ -426,7 +427,7 @@ function EditInvoiceModal({
   pending: boolean;
   onSave: (patch: {
     issueDate: string; dueDate: string | null; taxRateBps: number; discount: number;
-    terms: string; notes: string;
+    terms: string; notes: string; kind: "service" | "sale";
   }) => void;
 }) {
   const [issueDate, setIssueDate] = useState(invoice.issueDate ? toLocalInput(new Date(invoice.issueDate)).slice(0, 16) : "");
@@ -435,6 +436,7 @@ function EditInvoiceModal({
   const [discount, setDiscount] = useState(String(invoice.discountCents / 100));
   const [terms, setTerms] = useState(invoice.terms ?? "");
   const [notes, setNotes] = useState(invoice.notes ?? "");
+  const [isSale, setIsSale] = useState(invoice.kind === "sale");
 
   return (
     <SvcModal open={open} onClose={onClose} title="Invoice details">
@@ -461,12 +463,29 @@ function EditInvoiceModal({
         <Field label="Notes">
           <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+        <label
+          className="flex items-start gap-3 rounded-xl px-3.5 py-3 min-h-11 cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-svc-accent)]"
+          style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}
+        >
+          <input
+            type="checkbox"
+            checked={isSale}
+            onChange={(e) => setIsSale(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer"
+            style={{ accentColor: "var(--color-svc-accent)" }}
+          />
+          <span className="min-w-0">
+            <span className="block text-[14px]" style={{ color: "var(--color-svc-text)" }}>This invoice is a piano sale</span>
+            <span className="block text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>Counts under Piano sales on the dashboard, not Service.</span>
+          </span>
+        </label>
         <div className="flex justify-end gap-2 pt-2">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
           <PrimaryButton
             pending={pending}
             onClick={() => {
               onSave({
+                kind: isSale ? "sale" : "service",
                 issueDate,
                 dueDate: dueDate || null,
                 taxRateBps: Math.round(Number(taxRate) * 100),

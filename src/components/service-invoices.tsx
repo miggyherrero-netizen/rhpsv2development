@@ -203,9 +203,12 @@ export default function InvoicesClient({
                           : <Money cents={inv.balanceCents} className="text-[14px]" />}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>
-                          {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
-                        </Chip>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Chip tone={INVOICE_STATUS_TONE[inv.status] ?? "slate"}>
+                            {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
+                          </Chip>
+                          {inv.kind === "sale" && <Chip tone="azure">Piano sale</Chip>}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">

@@ -36,6 +36,7 @@ import { getServiceSettings } from "@/server/service-data";
 import { recordFinanceHistory, type FinanceHistoryEntry } from "@/server/service-finance-history";
 import { describeChange, diffFields, dropSameDay, pesoExact, type FinanceChanges } from "@/lib/service-finance-history";
 import { invoiceCode, jobCode } from "@/lib/service";
+import { isInvoiceKind } from "@/lib/service-dashboard";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -1341,10 +1342,11 @@ export async function updateInvoice(
   id: string,
   patch: {
     issueDate?: string; dueDate?: string | null; notes?: string | null; terms?: string | null;
-    taxRateBps?: number; discount?: number; customerId?: string;
+    taxRateBps?: number; discount?: number; customerId?: string; kind?: string;
   },
 ): Promise<Result> {
   const user = await requireUser();
+  if (patch.kind !== undefined && !isInvoiceKind(patch.kind)) return fail("Invoice type must be service or piano sale.");
   const issue = patch.issueDate !== undefined ? optionalDate(patch.issueDate) : undefined;
   if (patch.issueDate !== undefined && !issue) return fail("Pick a valid issue date.");
   const before = await invoiceRow(id).catch(() => null);
@@ -1358,6 +1360,7 @@ export async function updateInvoice(
       taxRateBps: patch.taxRateBps !== undefined ? Math.max(0, intOr(patch.taxRateBps, 0)) : undefined,
       discountCents: patch.discount !== undefined ? Math.max(0, moneyToCents(patch.discount)) : undefined,
       customerId: patch.customerId || undefined,
+      kind: patch.kind,
       updatedAt: new Date(),
     })
     .where(eq(serviceInvoices.id, id));
@@ -1365,7 +1368,7 @@ export async function updateInvoice(
   await safeHistory(async () => {
     const after = await invoiceRow(id);
     if (!before || !after) return;
-    const changes = dropSameDay(diffFields(before, after, ["discountCents", "taxRateBps", "dueDate", "issueDate", "customerId", "notes", "terms", "totalCents"]), ["issueDate", "dueDate"]);
+    const changes = dropSameDay(diffFields(before, after, ["discountCents", "taxRateBps", "dueDate", "issueDate", "customerId", "notes", "terms", "totalCents", "kind"]), ["issueDate", "dueDate"]);
     if (!Object.keys(changes).length) return;
     const named = await nameRefs(changes);
     await recordFinanceHistory({

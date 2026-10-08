@@ -38,6 +38,7 @@ const testFiles = [
   { name: "service-finance-audit", file: "tests/service-finance-audit.ts" },
   { name: "service-finance-history", file: "tests/service-finance-history.ts" },
   { name: "service-dashboard", file: "tests/service-dashboard.ts" },
+  { name: "service-invoiced-split", file: "tests/service-invoiced-split.ts" },
   { name: "service-time-events", file: "tests/service-time-events.ts" },
   { name: "service-sale", file: "tests/service-sale.ts" },
   { name: "service-waitlist", file: "tests/service-waitlist.ts" },
