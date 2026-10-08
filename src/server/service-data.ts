@@ -277,6 +277,8 @@ export type JobFilter = {
   to?: Date;
   search?: string;
   limit?: number;
+  /** Newest visit first (unscheduled jobs first), so `limit` keeps the most recent jobs. Default is oldest first. */
+  newestFirst?: boolean;
 };
 
 export async function getJobs(filter: JobFilter = {}): Promise<JobRow[]> {
@@ -307,7 +309,11 @@ export async function getJobs(filter: JobFilter = {}): Promise<JobRow[]> {
     .leftJoin(serviceTechnicians, eq(serviceTechnicians.id, serviceJobs.technicianId))
     .leftJoin(servicePianos, eq(servicePianos.id, serviceJobs.pianoId))
     .where(where)
-    .orderBy(asc(serviceJobs.scheduledStart), desc(serviceJobs.createdAt))
+    .orderBy(
+      ...(filter.newestFirst
+        ? [sql`${serviceJobs.scheduledStart} desc nulls first`, desc(serviceJobs.createdAt)]
+        : [asc(serviceJobs.scheduledStart), desc(serviceJobs.createdAt)]),
+    )
     .limit(filter.limit ?? 200);
 
   const running = await runningTimersByJob();
