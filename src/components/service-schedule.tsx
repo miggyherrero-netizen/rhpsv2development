@@ -13,8 +13,8 @@ import {
   Chip, Dot, EmptyState, ErrorLine, GhostButton, SectionCard, Select, TONE_BAR, TONE_TEXT,
 } from "@/components/service-ui";
 
-const DAY_START = 7 * 60; // 07:00
-const DAY_END = 20 * 60; // 20:00
+const DEFAULT_DAY_START = 7 * 60; // 07:00
+const DEFAULT_DAY_END = 20 * 60; // 20:00
 const HOUR_PX = 56;
 const SNAP = 15; // minutes
 
@@ -39,9 +39,25 @@ export default function ScheduleClient({
     [board.scheduled, technician],
   );
 
+  // The grid shows 07:00-20:00, and grows by whole hours when a visit falls outside it, so nothing is
+  // drawn past the card and the card never needs a scrollbar of its own.
+  const { dayStart, dayEnd } = useMemo(() => {
+    let lo = DEFAULT_DAY_START;
+    let hi = DEFAULT_DAY_END;
+    for (const j of board.scheduled) {
+      if (!j.scheduledStart) continue;
+      const parts = manilaParts(new Date(j.scheduledStart));
+      const startMin = parts.hour * 60 + parts.minute;
+      const endMin = startMin + Math.max(20, j.estimatedMinutes || 60);
+      lo = Math.min(lo, Math.floor(startMin / 60) * 60);
+      hi = Math.max(hi, Math.ceil(endMin / 60) * 60);
+    }
+    return { dayStart: Math.max(0, lo), dayEnd: Math.min(24 * 60, hi) };
+  }, [board.scheduled]);
+
   const move = (jobId: string, dayIndex: number, minutes: number) => {
     const day = days[dayIndex]!;
-    const snapped = Math.max(DAY_START, Math.min(DAY_END - 15, Math.round(minutes / SNAP) * SNAP));
+    const snapped = Math.max(dayStart, Math.min(dayEnd - 15, Math.round(minutes / SNAP) * SNAP));
     // Build a Manila wall-clock string; the server parses it back to a UTC instant.
     const p = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
@@ -61,7 +77,7 @@ export default function ScheduleClient({
     if (!jobId) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
-    move(jobId, dayIndex, DAY_START + (offsetY / HOUR_PX) * 60);
+    move(jobId, dayIndex, dayStart + (offsetY / HOUR_PX) * 60);
     setDragging(null);
   };
 
@@ -106,8 +122,8 @@ export default function ScheduleClient({
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-5">
         <SectionCard className="overflow-hidden">
-          <div className="overflow-x-auto thin-scroll">
-            <div className="min-w-[860px]">
+          <div className="overflow-x-auto overflow-y-hidden thin-scroll">
+            <div className="min-w-[860px] pb-3">
               {/* Day header */}
               <div className="grid" style={{ gridTemplateColumns: `60px repeat(7, minmax(0, 1fr))` }}>
                 <div style={{ borderBottom: "1px solid var(--color-svc-border)" }} />
@@ -142,14 +158,14 @@ export default function ScheduleClient({
               {/* Grid body */}
               <div className="grid relative" style={{ gridTemplateColumns: `60px repeat(7, minmax(0, 1fr))` }}>
                 {/* Hour gutter */}
-                <div className="relative" style={{ height: ((DAY_END - DAY_START) / 60) * HOUR_PX }}>
-                  {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
+                <div className="relative" style={{ height: ((dayEnd - dayStart) / 60) * HOUR_PX }}>
+                  {Array.from({ length: (dayEnd - dayStart) / 60 + 1 }, (_, i) => (
                     <div
                       key={i}
                       className="absolute right-2 text-[12px] svc-num whitespace-nowrap -translate-y-1/2"
                       style={{ top: i * HOUR_PX, color: "var(--color-svc-text-faint)" }}
                     >
-                      {i === 0 ? "" : fmtHourShort(DAY_START + i * 60)}
+                      {i === 0 ? "" : fmtHourShort(dayStart + i * 60)}
                     </div>
                   ))}
                 </div>
@@ -163,13 +179,13 @@ export default function ScheduleClient({
                       key={key}
                       className="relative svc-col-line"
                       style={{
-                        height: ((DAY_END - DAY_START) / 60) * HOUR_PX,
+                        height: ((dayEnd - dayStart) / 60) * HOUR_PX,
                         background: ymd(day) === today ? "rgba(77,141,240,0.03)" : undefined,
                       }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => onDrop(e, dayIndex)}
                     >
-                      {Array.from({ length: (DAY_END - DAY_START) / 60 }, (_, i) => (
+                      {Array.from({ length: (dayEnd - dayStart) / 60 }, (_, i) => (
                         <div key={i} className="svc-grid-line absolute inset-x-0" style={{ top: i * HOUR_PX }} />
                       ))}
                       {dayJobs.map((job) => {
@@ -191,7 +207,7 @@ export default function ScheduleClient({
                             onDragEnd={() => setDragging(null)}
                             className="absolute rounded-xl px-2 py-1.5 overflow-hidden cursor-grab active:cursor-grabbing group"
                             style={{
-                              top: ((startMin - DAY_START) / 60) * HOUR_PX,
+                              top: ((startMin - dayStart) / 60) * HOUR_PX,
                               height: Math.max(30, (duration / 60) * HOUR_PX - 3),
                               left: `calc(${lane.index * width}% + 3px)`,
                               width: `calc(${width}% - 6px)`,
