@@ -494,7 +494,8 @@ export default function JobDetailClient({
                   </div>
                 ))}
                 <div className="px-5 py-2.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                  Total expenses {peso(listedExpenseCents)}
+                  Total linked expenses {peso(listedExpenseCents)}
+                  {basis.expenseCents !== listedExpenseCents && <> · counted in margin {peso(basis.expenseCents)}</>}
                 </div>
               </div>
             )}
