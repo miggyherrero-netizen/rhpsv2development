@@ -42,3 +42,10 @@ export function buildExpensePatch(values: ExpenseEditValues): ExpenseUpdatePatch
   const { receiptUrl, ...rest } = values;
   return receiptUrl ? { ...rest, receiptUrl } : rest;
 }
+
+/**
+ * Picking a job for an expense that had none: the kind becomes "Job cost" (null = follow the job) unless the owner
+ * chose "stock". An old "Overhead" fuel/meals/materials row therefore counts in the job margin once it is linked.
+ */
+export const kindAfterJobLink = (prevJobId: string, nextJobId: string, kindPicked: string | null): string | null =>
+  !prevJobId && nextJobId && kindPicked !== "stock" ? null : kindPicked;

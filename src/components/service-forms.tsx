@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Plus, X } from "lucide-react";
+import { kindAfterJobLink } from "@/lib/service-expense-edit";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
 import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
@@ -409,10 +410,9 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
   const [reimbursable, setReimbursable] = useState(initial?.reimbursable ?? false);
   const [jobId, setJobId] = useState(fixedJobId ?? initial?.jobId ?? "");
   const effectiveKind = kindPicked ?? (fixedJobId || jobId ? "job" : defaultKindForCategory(category));
-  // Linking an expense to a job turns a still-default kind (e.g. an old "Overhead" materials row) into Job cost,
-  // so it counts in the job margin. A kind the owner chose on purpose (stock, or a non-default overhead) is kept.
+  // Linking an expense to a job makes it Job cost (so an old "Overhead" row counts in the margin); stock is kept.
   const pickJob = (next: string) => {
-    if (!jobId && next && kindPicked === defaultKindForCategory(category)) setKindPicked(null);
+    setKindPicked(kindAfterJobLink(jobId, next, kindPicked));
     setJobId(next);
   };
   const [receipt, setReceipt] = useState<string | null>(null);
