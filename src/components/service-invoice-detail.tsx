@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useId, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Printer, Send, Ban, FileX2, Pencil, Check, FileText, Trash2 } from "lucide-react";
@@ -17,7 +17,7 @@ import {
   updateInvoice, addInvoiceItems, updateInvoiceItem, deleteInvoiceItem, setInvoiceStatus, createCatalogItem,
   recordPayment, deletePayment, editPayment, deleteInvoice,
 } from "@/server/service";
-import { needsReason, validateReason } from "@/lib/service-finance-edit";
+import { fmtPesoExact, needsReason, validateReason } from "@/lib/service-finance-edit";
 import { EditPaymentModal, ReasonDialog, ReasonField, type EditablePayment, type SaveResult } from "@/components/service-reason-ui";
 import {
   Chip, ConfirmTypeDialog, DateField, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PesoInput,
@@ -59,6 +59,7 @@ export default function InvoiceDetailClient({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [reference, setReference] = useState("");
+  const paymentAmountErrorId = useId();
   /** The reason prompt (one at a time) and the reason the current line-editing session was started with. */
   const [ask, setAsk] = useState<{ title: string; message?: string; confirmLabel: string; danger?: boolean; run: (reason: string) => Promise<SaveResult> } | null>(null);
   const [editingPayment, setEditingPayment] = useState<EditablePayment | null>(null);
@@ -98,6 +99,19 @@ export default function InvoiceDetailClient({
   // Driven by the invoice's own saved rate, not today's settings: an invoice issued with
   // VAT keeps its tax line; one issued with VAT off (0%) shows no VAT wording at all.
   const hasVat = invoice.taxRateBps > 0 || totals.taxCents > 0;
+  // Payment guards use saved lines, not optimistic edits that may still fail to save.
+  const paymentTotalCents = computeTotals(items, {
+    discountCents: invoice.discountCents,
+    taxRateBps: invoice.taxRateBps,
+  }).totalCents;
+  const paidCents = payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+  const paymentBalanceCents = Math.max(0, paymentTotalCents - paidCents);
+  const paymentAmount = parsePesoInput(amount);
+  const paymentAmountCents = paymentAmount === null ? 0 : Math.round(paymentAmount * 100);
+  const paymentAmountError = paymentAmountCents > paymentBalanceCents
+    ? `Enter ${fmtPesoExact(paymentBalanceCents)} or less; this payment exceeds the balance.`
+    : null;
+  const paymentAmountOk = paymentAmountCents > 0 && !paymentAmountError;
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -398,7 +412,7 @@ export default function InvoiceDetailClient({
             </div>
           )}
 
-          {invoice.balanceCents > 0 && invoice.status !== "void" && (
+          {paymentBalanceCents > 0 && invoice.status !== "void" && (
             <div
               className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_130px_1fr_auto] gap-2 items-end pt-3"
               style={{ borderTop: "1px solid var(--color-svc-border)" }}
@@ -409,7 +423,8 @@ export default function InvoiceDetailClient({
                 </p>
               )}
               <Field label="Amount">
-                <PesoInput value={amount} onChange={setAmount} placeholder={`e.g. ${(invoice.balanceCents / 100).toLocaleString("en-PH")}`} />
+                <PesoInput value={amount} onChange={setAmount} placeholder={`e.g. ${(paymentBalanceCents / 100).toLocaleString("en-PH")}`} aria-invalid={!!paymentAmountError || undefined} aria-describedby={paymentAmountError ? paymentAmountErrorId : undefined} />
+                <div id={paymentAmountErrorId}><ErrorLine>{paymentAmountError}</ErrorLine></div>
               </Field>
               <Field label="Method">
                 <Select value={method} onChange={(e) => setMethod(e.target.value)}>
@@ -426,12 +441,13 @@ export default function InvoiceDetailClient({
                 <TextInput value={reference} onChange={(e) => setReference(e.target.value)} />
               </Field>
               <div className="flex gap-2">
-                <GhostButton onClick={() => setAmount(String(invoice.balanceCents / 100))} className="!min-h-11">Full</GhostButton>
+                <GhostButton onClick={() => setAmount(String(paymentBalanceCents / 100))} className="!min-h-11">Full</GhostButton>
                 <PrimaryButton
                   pending={pending}
-                  disabled={!parsePesoInput(amount)}
+                  disabled={!paymentAmountOk}
                   className="!min-h-11"
                   onClick={() => {
+                    if (!paymentAmountOk) return;
                     run(() => recordPayment({
                       invoiceId: invoice.id,
                       amount: parsePesoInput(amount) ?? 0,
@@ -467,6 +483,7 @@ export default function InvoiceDetailClient({
 
       <EditPaymentModal
         payment={editingPayment}
+        invoiceState={{ totalCents: paymentTotalCents, paidCents }}
         onClose={() => setEditingPayment(null)}
         onSave={async (patch) => {
           const msg = await attempt(() => editPayment(editingPayment!.id, patch));

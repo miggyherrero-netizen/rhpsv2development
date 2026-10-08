@@ -449,7 +449,7 @@ export function PesoInput({
   return (
     <UnitInput
       {...rest} type="text" inputMode="decimal" autoComplete="off" prefix="₱" suffix={suffix}
-      value={value} placeholder={placeholder} aria-invalid={bad || undefined}
+      value={value} placeholder={placeholder} aria-invalid={bad || rest["aria-invalid"] || undefined}
       onChange={(e) => onChange(e.target.value)}
     />
   );

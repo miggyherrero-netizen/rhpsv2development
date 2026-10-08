@@ -8,7 +8,7 @@
 import { useEffect, useId, useState } from "react";
 import { toLocalInput } from "@/lib/format";
 import { parsePesoInput } from "@/lib/service-flow";
-import { validateReason, REASON_MAX } from "@/lib/service-finance-edit";
+import { overpayError, validateReason, REASON_MAX } from "@/lib/service-finance-edit";
 import { PAYMENT_METHODS } from "@/lib/service";
 import {
   ErrorLine, Field, GhostButton, PesoInput, PrimaryButton, Select, SvcModal, TextArea, TextInput, TONE_SOFT, TONE_TEXT, DateField,
@@ -112,17 +112,21 @@ export type EditablePayment = {
 export type PaymentPatch = { amount?: number; receivedAt?: string; method?: string; reference?: string | null; note?: string | null; reason: string };
 
 /** Edit one payment in place. Only the fields that really changed are sent. */
-export function EditPaymentModal({ payment, onClose, onSave }: {
+type PaymentInvoiceState = { totalCents: number; paidCents: number };
+
+export function EditPaymentModal({ payment, invoiceState, onClose, onSave }: {
+  invoiceState: PaymentInvoiceState;
   payment: EditablePayment | null; onClose: () => void; onSave: (patch: PaymentPatch) => Promise<SaveResult>;
 }) {
   return (
     <SvcModal open={!!payment} onClose={onClose} title="Edit payment" subtitle="The totals and status are recalculated for you.">
-      {payment ? <EditPaymentForm key={payment.id} payment={payment} onClose={onClose} onSave={onSave} /> : null}
+      {payment ? <EditPaymentForm key={payment.id} payment={payment} invoiceState={invoiceState} onClose={onClose} onSave={onSave} /> : null}
     </SvcModal>
   );
 }
 
-function EditPaymentForm({ payment, onClose, onSave }: { payment: EditablePayment; onClose: () => void; onSave: (p: PaymentPatch) => Promise<SaveResult> }) {
+function EditPaymentForm({ payment, invoiceState, onClose, onSave }: { payment: EditablePayment; invoiceState: PaymentInvoiceState; onClose: () => void; onSave: (p: PaymentPatch) => Promise<SaveResult> }) {
+  const amountErrorId = useId();
   const initial = {
     amount: String(payment.amountCents / 100),
     receivedAt: toLocalInput(new Date(payment.receivedAt)).slice(0, 16),
@@ -149,6 +153,10 @@ function EditPaymentForm({ payment, onClose, onSave }: { payment: EditablePaymen
   const changed = Object.keys(patch).length > 0;
   const reasonOk = validateReason(reason).ok;
   const amountOk = cents !== null && cents > 0;
+  const amountError = amountOk ? overpayError(invoiceState, {
+    totalCents: invoiceState.totalCents,
+    paidCents: invoiceState.paidCents - payment.amountCents + Math.round(cents * 100),
+  }) : null;
 
   return (
     <form
@@ -158,6 +166,7 @@ function EditPaymentForm({ payment, onClose, onSave }: { payment: EditablePaymen
         const r = validateReason(reason);
         if (!r.ok) { setError(r.error); return; }
         if (!amountOk) { setError("Enter a payment amount above zero."); return; }
+        if (amountError) { setError(amountError); return; }
         if (!changed) { setError("Nothing was changed."); return; }
         setBusy(true); setError(null);
         try {
@@ -172,7 +181,8 @@ function EditPaymentForm({ payment, onClose, onSave }: { payment: EditablePaymen
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Amount">
-          <PesoInput value={amount} onChange={setAmount} autoFocus />
+          <PesoInput value={amount} onChange={setAmount} autoFocus aria-invalid={!!amountError || undefined} aria-describedby={amountError ? amountErrorId : undefined} />
+          <div id={amountErrorId}><ErrorLine>{amountError}</ErrorLine></div>
         </Field>
         <Field label="Date received">
           <DateField kind="datetime-local" value={receivedAt} onChange={setReceivedAt} />
@@ -195,7 +205,7 @@ function EditPaymentForm({ payment, onClose, onSave }: { payment: EditablePaymen
       <ErrorLine>{error}</ErrorLine>
       <div className="flex justify-end gap-2 pt-1">
         <GhostButton type="button" onClick={onClose} className="!min-h-11">Cancel</GhostButton>
-        <PrimaryButton type="submit" pending={busy} disabled={!reasonOk || !amountOk || !changed} className="!min-h-11">Save changes</PrimaryButton>
+        <PrimaryButton type="submit" pending={busy} disabled={!reasonOk || !amountOk || !!amountError || !changed} className="!min-h-11">Save changes</PrimaryButton>
       </div>
     </form>
   );
