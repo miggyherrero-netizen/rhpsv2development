@@ -11,6 +11,8 @@
     "test:domain": "node tests/run-tests.mjs",
     "test:service": "tsx tests/service-money.ts",
     "test:job-cost": "tsx tests/service-job-cost.ts",
+    "test:parts-backfill": "tsx tests/service-parts-backfill.ts",
+    "backfill:job-parts-cost": "tsx scripts/backfill-job-parts-cost.ts",
     "test:finance-audit": "tsx tests/service-finance-audit.ts",
     "test:finance-history": "tsx tests/service-finance-history.ts",
     "test:dashboard": "tsx tests/service-dashboard.ts",
