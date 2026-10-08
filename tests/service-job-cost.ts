@@ -36,6 +36,7 @@ check("overhead and stock are excluded", jobCostBasis({ partLinesCostCents: 0, e
 check("materials expense overrides an explicit part cost", jobCostBasis({ partLinesCostCents: P(1500), expenses: [ex(1200, "materials")] }), { partsCostCents: 0, expenseCents: P(1200), partsFromExpenses: true });
 check("parts category also overrides", jobCostBasis({ partLinesCostCents: P(900), expenses: [ex(10, "parts")] }).partsFromExpenses, true);
 check("legacy null-kind materials expense overrides too", jobCostBasis({ partLinesCostCents: P(900), expenses: [ex(10, "materials", null)] }).partsCostCents, 0);
+check("a zero-amount materials row does not override the part cost", jobCostBasis({ partLinesCostCents: P(900), expenses: [ex(0, "materials")] }).partsCostCents, P(900));
 check("materials expense that is overhead/stock does NOT override the part cost", jobCostBasis({ partLinesCostCents: P(900), expenses: [ex(10, "materials", "stock")] }), { partsCostCents: P(900), expenseCents: 0, partsFromExpenses: false });
 check("no materials expense keeps the part-line cost", jobCostBasis({ partLinesCostCents: P(900), expenses: [ex(40, "fuel")] }), { partsCostCents: P(900), expenseCents: P(40), partsFromExpenses: false });
 check("no expenses at all", jobCostBasis({ partLinesCostCents: P(5), expenses: [] }), { partsCostCents: P(5), expenseCents: 0, partsFromExpenses: false });

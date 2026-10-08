@@ -555,7 +555,7 @@ export default function JobDetailClient({
                 <StatCard label="Job cost" value={peso(margin.costCents)} sub={costBreakdown} />
                 {basis.partsFromExpenses ? (
                   <p className="mt-1.5 text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
-                    Parts cost comes from the linked materials/parts expenses.
+                    Line costs are ignored because materials/parts expenses are linked to this job.
                   </p>
                 ) : null}
               </div>

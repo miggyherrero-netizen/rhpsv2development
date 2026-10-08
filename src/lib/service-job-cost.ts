@@ -25,6 +25,6 @@ export const countsInJobMargin = (e: { kind?: string | null }): boolean => e.kin
 export function jobCostBasis(input: { partLinesCostCents: number; expenses: CostBasisExpense[] }): JobCostBasis {
   const counted = input.expenses.filter(countsInJobMargin);
   const expenseCents = counted.reduce((s, e) => s + e.amountCents, 0);
-  const partsFromExpenses = counted.some((e) => e.category === "materials" || e.category === "parts");
+  const partsFromExpenses = counted.some((e) => e.amountCents > 0 && (e.category === "materials" || e.category === "parts"));
   return { partsCostCents: partsFromExpenses ? 0 : input.partLinesCostCents, expenseCents, partsFromExpenses };
 }

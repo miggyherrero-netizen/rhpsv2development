@@ -852,7 +852,7 @@ export async function deleteJob(id: string, confirmCode: string): Promise<Result
 async function recalcJobMoney(jobId: string): Promise<void> {
   const items = await db.select().from(serviceJobItems).where(eq(serviceJobItems.jobId, jobId));
   const quotedCents = items.reduce((sum, i) => sum + lineTotalCents(i), 0);
-  // Explicit per-line costs win; a part line without one keeps costing what it is priced at.
+  // Only lines with an explicit cost count (a part line without one costs 0).
   const partsCostCents = partsCostFromLines(items);
   await db
     .update(serviceJobs)
