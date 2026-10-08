@@ -9,7 +9,7 @@ export default async function SettingsPage() {
   const rows = await db.select().from(settings);
   const staleDays = Number(rows.find((s) => s.key === "staleUpdateDays")?.value ?? 10);
   return (
-    <div className="p-4 sm:p-7 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-mid [--page-w:1600px]">
       <div className="mb-6">
         <h1 className="font-serif text-2xl sm:text-3xl text-white">Settings</h1>
         <p className="text-mist text-[12.5px] mt-1">Shop preferences and quick links.</p>

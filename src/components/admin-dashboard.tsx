@@ -131,7 +131,7 @@ export default function AdminDashboard({ data, firstName }: { data: Dashboard; f
   if (completions.length === 0) quiet.push("no completed tasks yet");
 
   return (
-    <div className="p-4 sm:p-7 max-w-[1500px] mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-mid [--page-w:1500px]">
       {/* header */}
       <div className="mb-5 anim-fade-up">
         <h1 className="font-serif text-2xl sm:text-3xl text-white">{greeting}, {firstName}.</h1>

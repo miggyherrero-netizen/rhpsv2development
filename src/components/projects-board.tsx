@@ -114,7 +114,7 @@ export default function ProjectsBoard({ projects: initial, workers }: { projects
   const inp = "input-dark";
 
   return (
-    <div className="p-4 sm:p-7 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-7 app-page [--page-w:1600px]">
       {/* header + toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>

@@ -43,7 +43,7 @@ export default function InventoryClient({ items }: { items: InventoryItem[] }) {
   const inp = "input-dark";
 
   return (
-    <div className="p-4 sm:p-7 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-7 app-page [--page-w:1600px]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl text-white">Inventory</h1>

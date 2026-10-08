@@ -151,7 +151,7 @@ export default function DashboardClient({
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1200px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page [--page-w:1200px] space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[12px] uppercase tracking-[0.2em]" style={FAINT}>Home Service</p>
@@ -168,7 +168,7 @@ export default function DashboardClient({
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Reminder copied to the clipboard" : ""}</p>
 
       {/* KPI strip: every tile opens the page its number comes from */}
-      <section aria-label="Key numbers" className={`grid grid-cols-2 gap-3 ${finance ? "md:grid-cols-6 xl:grid-cols-12" : "md:grid-cols-4"}`}>
+      <section aria-label="Key numbers" className={`grid grid-cols-2 gap-3 ${finance ? "md:grid-cols-6 xl:grid-cols-12 svc-kpi" : "md:grid-cols-4"}`}>
         <StatCard
           label="Visits today" icon={<CalendarClock size={15} aria-hidden="true" />} href="/service/schedule"
           className={finance ? "md:col-span-3" : ""}
@@ -215,8 +215,8 @@ export default function DashboardClient({
         )}
       </section>
 
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
-      <div className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-6">
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start svc-dash">
+      <div className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-6 svc-dash-l">
       {/* 1 · NOW */}
       <SectionCard
         className="order-2 lg:order-none"
@@ -548,12 +548,17 @@ export default function DashboardClient({
       </div>
 
       {/* Right column: what to do next, then the trends */}
-      <div className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-6">
-        <div className="order-1 lg:order-none"><AttentionQueue items={attention} /></div>
-        {finance && <div className="order-6 lg:order-none"><CashflowChart months={finance.series} /></div>}
-        {finance && <div className="order-6 lg:order-none"><AgingChart aging={finance.aging} /></div>}
-        <div className="order-6 lg:order-none"><PipelineChart rows={dash.pipeline} /></div>
-        {finance && <div className="order-9 lg:order-none"><RecentPayments rows={finance.recentPayments} /></div>}
+      <div className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-6 svc-dash-r">
+        <div className="contents lg:flex lg:flex-col lg:gap-6 svc-dash-a">
+          <div className="order-1 lg:order-none"><AttentionQueue items={attention} /></div>
+          {finance && <div className="order-6 lg:order-none"><CashflowChart months={finance.series} /></div>}
+        </div>
+        {/* >= 1800px: the trend widgets get their own third column */}
+        <div className="contents lg:flex lg:flex-col lg:gap-6 svc-dash-b">
+          {finance && <div className="order-6 lg:order-none"><AgingChart aging={finance.aging} /></div>}
+          <div className="order-6 lg:order-none"><PipelineChart rows={dash.pipeline} /></div>
+          {finance && <div className="order-9 lg:order-none"><RecentPayments rows={finance.recentPayments} /></div>}
+        </div>
       </div>
       </div>
 

@@ -153,7 +153,7 @@ export default function SettingsClient({
   };
 
   return (
-    <div className={`px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1100px] mx-auto space-y-6 ${dirty ? "pb-28" : ""}`}>
+    <div className={`px-4 sm:px-6 lg:px-8 py-6 lg:py-8 app-page app-page-narrow [--page-w:1100px] space-y-6 ${dirty ? "pb-28" : ""}`}>
       <header>
         <p className="text-[12px] uppercase tracking-[0.2em]" style={{ color: "var(--color-svc-text-faint)" }}>
           Home Service

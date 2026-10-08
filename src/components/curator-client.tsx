@@ -83,7 +83,7 @@ export default function CuratorClient({ projects }: { projects: Proj[] }) {
   const inp = "input-dark";
 
   return (
-    <div className="p-4 sm:p-7 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-narrow [--page-w:1024px]">
       <div className="mb-6">
         <h1 className="font-serif text-2xl sm:text-3xl text-white">Client Curator</h1>
         <p className="text-mist text-[12.5px] mt-1">Compose each client&apos;s restoration story. Only what you publish appears in their private exhibit.</p>

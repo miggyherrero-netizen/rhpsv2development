@@ -50,7 +50,7 @@ export default function OwnerTasksClient({ bundle: rawBundle }: { bundle: OwnerB
   const inp = "input-ow";
 
   return (
-    <div className="p-4 sm:p-7 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-7 app-page app-page-list [--page-w:768px]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl text-[var(--color-ow-text)]">Tasks</h1>
