@@ -28,6 +28,8 @@ const CHECK_TITLE: Record<string, string> = {
   job_quoted_drift: "Job quote differs from its lines",
   job_parts_drift: "Job parts cost differs from its lines",
   job_labor_drift: "Job labor cost differs from its time logs",
+  job_part_cost_maybe_doubled: "Parts and expenses may be counted twice",
+  expense_job_kind_mismatch: "Job expense with a different kind",
   expense_amount: "Expense of zero or less",
   expense_no_kind: "Expense not yet sorted (job, stock or overhead)",
   expense_job_no_job: "Job expense not linked to a job",

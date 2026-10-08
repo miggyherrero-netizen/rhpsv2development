@@ -48,7 +48,7 @@ export async function getFinanceHealth(): Promise<FinanceHealth | null> {
     db.select({
       id: serviceExpenses.id, description: serviceExpenses.description, vendor: serviceExpenses.vendor,
       amountCents: serviceExpenses.amountCents, spentAt: serviceExpenses.spentAt, kind: serviceExpenses.kind,
-      jobId: serviceExpenses.jobId, pianoId: serviceExpenses.pianoId,
+      jobId: serviceExpenses.jobId, pianoId: serviceExpenses.pianoId, category: serviceExpenses.category,
       // Never ship the receipt image itself, only whether one exists.
       hasReceipt: sql<boolean>`${serviceExpenses.receiptUrl} IS NOT NULL`,
     }).from(serviceExpenses),

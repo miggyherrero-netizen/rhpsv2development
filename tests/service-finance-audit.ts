@@ -27,14 +27,14 @@ const pay = (o: Partial<AuditPayment> = {}): AuditPayment => ({ id: "p1", invoic
 const job = (o: Partial<AuditJob> = {}): AuditJob => ({ id: "j1", label: "WO-2026-0001 · Tuning", quotedCents: 100_000, partsCostCents: 20_000, laborCostCents: 25_000, ...o });
 const exp = (o: Partial<AuditExpense> = {}): AuditExpense => ({
   id: "e1", description: "Fuel", vendor: "Shell", amountCents: 50_000, spentAt: D("2026-09-03T02:00:00Z"),
-  kind: "job", jobId: "j1", pianoId: null, hasReceipt: true, ...o,
+  kind: "job", jobId: "j1", pianoId: null, hasReceipt: true, category: "fuel", ...o,
 });
 const clean = (): AuditInput => ({
   invoices: [inv()], invoiceItems: items(), payments: [pay()], now: NOW,
   jobs: [job()],
   jobItems: [
     { jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 },
-    { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 0 },
+    { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 10_000 }, // explicit cost: (k) only flags price-derived part cost
   ],
   timeLogs: [
     { jobId: "j1", kind: "work", minutes: 60, hourlyRateCents: 25_000, endedAt: D("2026-09-02T05:00:00Z") },
@@ -109,6 +109,23 @@ check("(i) small expense without receipt is ignored", codes({ ...clean(), expens
   const r = auditFinance({ ...clean(), expenses: [exp(), exp({ id: "e2", spentAt: D("2026-09-03T05:00:00Z"), vendor: " shell " })] });
   check("(i) duplicate: same day, amount, vendor flags the later row", r.findings.map((f) => [f.code, f.entity.id, f.diffCents]), [["expense_duplicate", "e2", 50_000]]);
   check("(i) different amount is not a duplicate", codes({ ...clean(), expenses: [exp(), exp({ id: "e2", amountCents: 50_100 })] }), []);
+}
+
+console.log("\npossible double counting");
+{
+  const derived = [{ jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 }, { jobId: "j1", kind: "part", qty: 2, unitPriceCents: 10_000, taxable: true, costCents: 0 }];
+  const r = auditFinance({ ...clean(), jobItems: derived, expenses: [exp({ category: "materials" })] });
+  check("(k) price-derived part cost + linked materials expense is flagged (warn, no dispute)", r.findings.map((f) => [f.code, f.severity, f.entity.type, f.entity.id]), [["job_part_cost_maybe_doubled", "warn", "job", "j1"]]);
+  check("(k) message shows both amounts", r.findings[0]?.message.includes("P200.00") && r.findings[0]?.message.includes("P500.00"), true);
+  check("(k) adds nothing to dispute", r.summary.disputeCents, 0);
+  check("(k) fuel/meals expense linked to the job is not a parts purchase => no finding", codes({ ...clean(), jobItems: derived }), []);
+  check("(k) no linked expense => no finding", codes({ ...clean(), jobItems: derived, expenses: [] }), []);
+  check("(k) explicit part cost + linked expense => no finding", codes(clean()), []);
+  check("(k) linked expenses but only service lines => no finding", codes({ ...clean(), jobItems: [{ jobId: "j1", kind: "service", qty: 1, unitPriceCents: 80_000, taxable: true, costCents: 0 }], jobs: [job({ partsCostCents: 0, quotedCents: 80_000 })] }), []);
+  check("(l) linked expense with kind overhead is flagged", auditFinance({ ...clean(), expenses: [exp({ kind: "overhead" })] }).findings.map((f) => [f.code, f.severity, f.entity.id]), [["expense_job_kind_mismatch", "warn", "e1"]]);
+  check("(l) stock expense linked to a job (with piano) is flagged", codes({ ...clean(), expenses: [exp({ kind: "stock", pianoId: "pi1" })] }), ["expense_job_kind_mismatch"]);
+  check("(l) overhead without a job link is fine", codes({ ...clean(), expenses: [exp({ kind: "overhead", jobId: null })] }), []);
+  check("(l) unsorted (null kind) linked expense is left to expense_no_kind", codes({ ...clean(), expenses: [exp({ kind: null })] }), ["expense_no_kind"]);
 }
 
 console.log("\nsummary");
