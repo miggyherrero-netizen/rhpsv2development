@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Minus, ShieldAlert, Users,
@@ -45,26 +46,37 @@ export function PeriodDeltaLine({ delta }: { delta: PeriodDelta }) {
   );
 }
 
-/** Body of the "Invoiced this month" tile: Service and Piano sales on their own lines, then the total. */
-export function InvoicedSplit({ split }: { split: InvoicedByKind }) {
+/**
+ * "Invoiced this month" tile: Service and Piano sales side by side (amount, then name and change on one line), the total in the header.
+ * Same label / value / sub rhythm as StatCard so values share a baseline with their neighbours. The whole tile is one link.
+ */
+export function InvoicedCard({ split, href, icon, className = "" }: { split: InvoicedByKind; href: string; icon?: ReactNode; className?: string }) {
   const rows = [
     { key: "service", label: "Service", data: split.service },
     { key: "sales", label: "Piano sales", data: split.sales },
   ];
   return (
-    <span className="block text-left">
-      <span className="sr-only">{split.rangeLabel}. </span>
-      {rows.map((r) => (
-        <span key={r.key} className="block mt-3 first:mt-0">
-          <span className="block text-[12px] font-normal" style={DIM}>{r.label}</span>
-          <span className="svc-num block text-[19px] font-semibold leading-tight" style={TEXT}>{peso(r.data.currentCents)}</span>
-          <span className="block text-[12px] font-normal mt-0.5"><PeriodDeltaLine delta={r.data.delta} /></span>
+    <Link href={href} className={`card-svc card-svc-hover block p-4 ${FOCUS} ${className}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12px] uppercase tracking-[0.1em]" style={DIM}>Invoiced this month</p>
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="svc-num text-[12px] whitespace-nowrap" style={DIM}>Total {peso(split.totalCents)}</span>
+          {icon ? <span style={FAINT}>{icon}</span> : null}
         </span>
-      ))}
-      <span className="svc-num block mt-3 pt-2 text-[12px] font-normal" style={{ ...DIM, borderTop: "1px solid var(--color-svc-border)" }}>
-        Total {peso(split.totalCents)}
-      </span>
-    </span>
+      </div>
+      <span className="sr-only">{split.rangeLabel}. </span>
+      <div className="grid grid-cols-2 mt-2">
+        {rows.map((r, i) => (
+          <div key={r.key} className={`min-w-0 ${i === 0 ? "pr-3" : "pl-3 border-l"}`} style={i === 0 ? undefined : { borderColor: "var(--color-svc-border)" }}>
+            <p className="svc-num text-2xl font-semibold" style={TEXT}>{peso(r.data.currentCents)}</p>
+            <p className="text-[12px] mt-1 flex flex-wrap items-start gap-x-1.5">
+              <span style={DIM}>{r.label}</span>
+              <PeriodDeltaLine delta={r.data.delta} />
+            </p>
+          </div>
+        ))}
+      </div>
+    </Link>
   );
 }
 

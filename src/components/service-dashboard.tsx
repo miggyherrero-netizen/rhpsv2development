@@ -13,7 +13,7 @@ import { telHref } from "@/lib/dashboard";
 import { groupByManilaDay, reminderText } from "@/lib/service-today";
 import { attentionQueue, crewStatus, marginPct } from "@/lib/service-dashboard";
 import {
-  AgingChart, AttentionQueue, CashflowChart, CrewStrip, InvoicedSplit, PipelineChart, RecentPayments,
+  AgingChart, AttentionQueue, CashflowChart, CrewStrip, InvoicedCard, PipelineChart, RecentPayments,
 } from "@/components/service-dashboard-widgets";
 import type { DashboardBoard } from "@/server/service-dashboard-data";
 import { ReminderItem } from "@/components/service-reminders";
@@ -168,37 +168,40 @@ export default function DashboardClient({
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Reminder copied to the clipboard" : ""}</p>
 
       {/* KPI strip: every tile opens the page its number comes from */}
-      <section aria-label="Key numbers" className={`grid grid-cols-2 gap-3 ${finance ? "md:grid-cols-3 xl:grid-cols-6" : "md:grid-cols-4"}`}>
+      <section aria-label="Key numbers" className={`grid grid-cols-2 gap-3 ${finance ? "md:grid-cols-6 xl:grid-cols-12" : "md:grid-cols-4"}`}>
         <StatCard
           label="Visits today" icon={<CalendarClock size={15} aria-hidden="true" />} href="/service/schedule"
+          className={finance ? "md:col-span-3" : ""}
           value={`${doneToday}/${live.length}`}
           sub={live.length === 0 ? "Nothing scheduled" : live.length - doneToday === 0 ? "All done" : `${live.length - doneToday} left`}
         />
         <StatCard
           label="Jobs in progress" icon={<Gauge size={15} aria-hidden="true" />} href="/service/jobs?filter=in_progress"
+          className={finance ? "md:col-span-3" : ""}
           value={onSite + enRoute}
           sub={onSite + enRoute === 0 ? "None on the road" : `${onSite} on site · ${enRoute} en route`}
         />
         {finance && thisMonth ? (
           <>
-            <StatCard
-              label="Invoiced this month" icon={<TrendingUp size={15} aria-hidden="true" />} href="/service/finance?range=month"
-              value={<InvoicedSplit split={finance.invoicedByKind} />}
+            <InvoicedCard
+              split={finance.invoicedByKind} href="/service/finance?range=month" icon={<TrendingUp size={15} aria-hidden="true" />}
+              className="col-span-2 md:col-span-6"
             />
             <StatCard
-              label="Unpaid" icon={<Wallet size={15} aria-hidden="true" />} href="/service/invoices?filter=open"
+              label="Unpaid" icon={<Wallet size={15} aria-hidden="true" />} href="/service/invoices?filter=open" className="md:col-span-3 lg:col-span-2 xl:col-span-4"
               value={peso(finance.aging.totalOutstandingCents)}
               sub={finance.aging.overdueCents > 0
                 ? <span style={{ color: "var(--color-svc-danger)" }}>{peso(finance.aging.overdueCents)} overdue</span>
                 : "None overdue"}
             />
             <StatCard
-              label="Collected this month" icon={<Check size={15} aria-hidden="true" />} href="/service/finance?range=month" tone="success"
+              label="Collected this month" icon={<Check size={15} aria-hidden="true" />} href="/service/finance?range=month" tone="success" className="md:col-span-3 lg:col-span-2 xl:col-span-4"
               value={peso(finance.month.collectedCents)}
               sub={`${peso(finance.month.expenseCents)} spent`}
             />
             <StatCard
               label="Profit this month" icon={<TrendingUp size={15} aria-hidden="true" />} href="/service/finance?range=month"
+              className="col-span-2 md:col-span-6 lg:col-span-2 xl:col-span-4"
               tone={finance.month.profitCents >= 0 ? "azure" : "danger"}
               value={<Money cents={finance.month.profitCents} />}
               sub={margin === null ? "No income yet" : `${margin}% margin`}

@@ -115,6 +115,7 @@ export function StatCard({
   tone,
   icon,
   href,
+  className = "",
 }: {
   label: string;
   value: ReactNode;
@@ -123,6 +124,8 @@ export function StatCard({
   icon?: ReactNode;
   /** Makes the whole tile a link (e.g. Outstanding → the filtered invoice list). */
   href?: string;
+  /** Extra classes for the tile (e.g. grid column spans). */
+  className?: string;
 }) {
   const body = (
     <>
@@ -149,13 +152,13 @@ export function StatCard({
     return (
       <Link
         href={href}
-        className="card-svc card-svc-hover block p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+        className={`card-svc card-svc-hover block p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)] ${className}`}
       >
         {body}
       </Link>
     );
   }
-  return <div className="card-svc p-4">{body}</div>;
+  return <div className={`card-svc p-4 ${className}`}>{body}</div>;
 }
 
 export function SectionCard({
