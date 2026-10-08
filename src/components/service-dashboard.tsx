@@ -11,9 +11,9 @@ import { fmtTime, fmtDateLong, fmtDate, peso } from "@/lib/format";
 import { jobHeading } from "@/lib/service-reports";
 import { telHref } from "@/lib/dashboard";
 import { groupByManilaDay, reminderText } from "@/lib/service-today";
-import { attentionQueue, crewStatus, deltaOf, marginPct } from "@/lib/service-dashboard";
+import { attentionQueue, crewStatus, marginPct } from "@/lib/service-dashboard";
 import {
-  AgingChart, AttentionQueue, CashflowChart, CrewStrip, DeltaLine, PipelineChart, RecentPayments,
+  AgingChart, AttentionQueue, CashflowChart, CrewStrip, InvoicedSplit, PipelineChart, RecentPayments,
 } from "@/components/service-dashboard-widgets";
 import type { DashboardBoard } from "@/server/service-dashboard-data";
 import { ReminderItem } from "@/components/service-reminders";
@@ -134,8 +134,6 @@ export default function DashboardClient({
   const attentionTotal = attention.reduce((n, i) => n + i.count, 0);
   const series = finance?.series ?? [];
   const thisMonth = series[series.length - 1];
-  const lastMonth = series[series.length - 2];
-  const invoicedDelta = finance ? deltaOf(finance.month.invoicedCents, lastMonth?.invoicedCents ?? 0) : null;
   const margin = finance ? marginPct(finance.month.profitCents, finance.month.moneyInCents) : null;
 
   const copyReminder = async (inv: TodayBoard["unpaid"][number]) => {
@@ -181,12 +179,11 @@ export default function DashboardClient({
           value={onSite + enRoute}
           sub={onSite + enRoute === 0 ? "None on the road" : `${onSite} on site · ${enRoute} en route`}
         />
-        {finance && thisMonth && invoicedDelta ? (
+        {finance && thisMonth ? (
           <>
             <StatCard
               label="Invoiced this month" icon={<TrendingUp size={15} aria-hidden="true" />} href="/service/finance?range=month"
-              value={peso(finance.month.invoicedCents)}
-              sub={<DeltaLine delta={invoicedDelta} />}
+              value={<InvoicedSplit split={finance.invoicedByKind} />}
             />
             <StatCard
               label="Unpaid" icon={<Wallet size={15} aria-hidden="true" />} href="/service/invoices?filter=open"

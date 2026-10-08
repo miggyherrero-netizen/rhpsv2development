@@ -20,6 +20,7 @@ Run them **in order**. Each one is additive (`ADD COLUMN IF NOT EXISTS`, default
 | 9 | `09_finance_history.sql` | Finance history: `service_finance_history` table (what every money edit was before -> after). The app works without it, but nothing is recorded until it is run |
 | 7 | `07_reminders.sql` | Client follow-up reminders: `service_reminders` table (+ status enum) |
 | 10 | `10_recalc_job_parts_cost.sql` | Job cost rules: refreshes the derived `service_jobs.parts_cost_cents` (part lines with no cost now cost 0). Optional, no schema change; clears Finance health parts-drift warnings on old jobs |
+| 11 | `11_invoice_kind.sql` | Invoice type: `service_invoices.kind` ('service' default, or 'sale' for a piano sale). Run it FIRST: until then invoice pages and the dashboard error because the column is missing. Existing invoices stay 'service' |
 
 Phase 2 (Today command center) needs no schema change.
 

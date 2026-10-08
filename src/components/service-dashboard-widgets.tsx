@@ -6,7 +6,7 @@ import { fmtDate, peso } from "@/lib/format";
 import { compactPeso } from "@/lib/service-reports";
 import { JOB_STATUS_LABEL, JOB_STATUS_TONE } from "@/lib/service";
 import {
-  barPct, type AttentionItem, type CrewStatus, type Delta, type DashboardMonth,
+  barPct, type AttentionItem, type CrewStatus, type Delta, type DashboardMonth, type InvoicedByKind, type PeriodDelta,
 } from "@/lib/service-dashboard";
 import type { DashboardFinance } from "@/server/service-dashboard-data";
 import { Chip, Dot, EmptyState, SectionCard, TONE_BAR, TONE_TEXT } from "@/components/service-ui";
@@ -26,6 +26,44 @@ export function DeltaLine({ delta, higherIsBetter = true }: { delta: Delta; high
   return (
     <span className="inline-flex items-center gap-1" style={{ color }}>
       <Icon size={13} aria-hidden="true" /> {delta.text}
+    </span>
+  );
+}
+
+/**
+ * Period change with a direction that always matches its icon and colour, and always has words.
+ * up = green arrow, down = red arrow, flat = neutral dash, new = azure "New" chip.
+ */
+export function PeriodDeltaLine({ delta }: { delta: PeriodDelta }) {
+  if (delta.direction === "new") return <Chip tone="azure">{delta.text}</Chip>;
+  const Icon = delta.direction === "up" ? ArrowUpRight : delta.direction === "down" ? ArrowDownRight : Minus;
+  const color = delta.direction === "up" ? TONE_TEXT.success : delta.direction === "down" ? TONE_TEXT.danger : "var(--color-svc-text-dim)";
+  return (
+    <span className="inline-flex items-start gap-1" style={{ color }}>
+      <Icon size={13} aria-hidden="true" className="shrink-0 mt-[3px]" /> <span>{delta.text.replace(/–/g, "–\u2060")}</span>
+    </span>
+  );
+}
+
+/** Body of the "Invoiced this month" tile: Service and Piano sales on their own lines, then the total. */
+export function InvoicedSplit({ split }: { split: InvoicedByKind }) {
+  const rows = [
+    { key: "service", label: "Service", data: split.service },
+    { key: "sales", label: "Piano sales", data: split.sales },
+  ];
+  return (
+    <span className="block text-left">
+      <span className="sr-only">{split.rangeLabel}. </span>
+      {rows.map((r) => (
+        <span key={r.key} className="block mt-3 first:mt-0">
+          <span className="block text-[12px] font-normal" style={DIM}>{r.label}</span>
+          <span className="svc-num block text-[19px] font-semibold leading-tight" style={TEXT}>{peso(r.data.currentCents)}</span>
+          <span className="block text-[12px] font-normal mt-0.5"><PeriodDeltaLine delta={r.data.delta} /></span>
+        </span>
+      ))}
+      <span className="svc-num block mt-3 pt-2 text-[12px] font-normal" style={{ ...DIM, borderTop: "1px solid var(--color-svc-border)" }}>
+        Total {peso(split.totalCents)}
+      </span>
     </span>
   );
 }

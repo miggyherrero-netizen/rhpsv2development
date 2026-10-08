@@ -594,6 +594,7 @@ export const serviceInvoices = pgTable("service_invoices", {
   totalCents: integer("total_cents").notNull().default(0),
   amountPaidCents: integer("amount_paid_cents").notNull().default(0),
   taxRateBps: integer("tax_rate_bps").notNull().default(1200), // 12% PH VAT, snapshotted
+  kind: text("kind").notNull().default("service"), // service | sale (piano sale; dashboard split only)
   notes: text("notes"),
   terms: text("terms"),
   sentAt: timestamp("sent_at", { mode: "date" }),

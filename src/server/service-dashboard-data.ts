@@ -12,7 +12,7 @@ import { effectiveKind } from "@/lib/service-finance-split";
 import type { AgingSummary } from "@/lib/service";
 import { titleCaseName } from "@/lib/service-reports";
 import {
-  buildMonthSeries, lastMonths, pipelineCounts, type DashboardMonth,
+  buildMonthSeries, invoicedByKind, lastMonths, pipelineCounts, type DashboardMonth, type InvoicedByKind,
 } from "@/lib/service-dashboard";
 import {
   countUnreviewedExpenses, getFinanceReport, getReceivablesSnapshot, getRecalls, getServiceSettings, getTodayBoard,
@@ -34,6 +34,8 @@ export type DashboardFinance = {
   };
   /** Same bucket rules as Finance, six Manila months, oldest first; the last one is this month. */
   series: DashboardMonth[];
+  /** This month so far vs the same days last month, service vs piano sales. */
+  invoicedByKind: InvoicedByKind;
   aging: AgingSummary;
   overdueCount: number;
   unreviewedExpenses: number;
@@ -75,7 +77,7 @@ export async function getDashboardBoard(ownerId: string, withFinance: boolean, n
     db
       .select({
         totalCents: serviceInvoices.totalCents, amountPaidCents: serviceInvoices.amountPaidCents, dueDate: serviceInvoices.dueDate,
-        issueDate: serviceInvoices.issueDate, sentAt: serviceInvoices.sentAt, voidedAt: serviceInvoices.voidedAt, status: serviceInvoices.status,
+        issueDate: serviceInvoices.issueDate, sentAt: serviceInvoices.sentAt, voidedAt: serviceInvoices.voidedAt, status: serviceInvoices.status, kind: serviceInvoices.kind,
       })
       .from(serviceInvoices)
       .where(and(gte(serviceInvoices.issueDate, from), lt(serviceInvoices.issueDate, to))),
@@ -115,6 +117,7 @@ export async function getDashboardBoard(ownerId: string, withFinance: boolean, n
         now,
         6,
       ),
+      invoicedByKind: invoicedByKind(invoices, now),
       aging: snapshot.aging,
       overdueCount: snapshot.aging.buckets.filter((b) => b.key !== "current").reduce((n, b) => n + b.count, 0),
       unreviewedExpenses: unreviewed,
