@@ -409,6 +409,12 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
   const [reimbursable, setReimbursable] = useState(initial?.reimbursable ?? false);
   const [jobId, setJobId] = useState(fixedJobId ?? initial?.jobId ?? "");
   const effectiveKind = kindPicked ?? (fixedJobId || jobId ? "job" : defaultKindForCategory(category));
+  // Linking an expense to a job turns a still-default kind (e.g. an old "Overhead" materials row) into Job cost,
+  // so it counts in the job margin. A kind the owner chose on purpose (stock, or a non-default overhead) is kept.
+  const pickJob = (next: string) => {
+    if (!jobId && next && kindPicked === defaultKindForCategory(category)) setKindPicked(null);
+    setJobId(next);
+  };
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptErr, setReceiptErr] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -471,7 +477,7 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
       </div>
       {!fixedJobId && (
         <Field label="Link to a job (optional)">
-          <Select value={jobId} onChange={(e) => setJobId(e.target.value)}>
+          <Select value={jobId} onChange={(e) => pickJob(e.target.value)}>
             <option value="">Not linked to a job</option>
             {jobOptions.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}
           </Select>
