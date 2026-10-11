@@ -24,7 +24,11 @@ import {
 import type { TodayBoard } from "@/server/service-data";
 import { stopTimer, createJob, setInvoiceStatus } from "@/server/service";
 import { closeTrip } from "@/server/service-waitlist";
+import { Zap } from "lucide-react";
 import MessageActions from "@/components/service-message-actions";
+import { QuickInquiryModal } from "@/components/service-quick-inquiry";
+import { ConvertButton, useConvertToJob } from "@/components/service-waitlist-convert";
+import { canConvertEntry } from "@/lib/service-waitlist-convert";
 import { WAIT_STATUS_LABEL } from "@/lib/service-waitlist";
 import type { TripPrompt, WaitlistItem } from "@/server/service-waitlist-data";
 import StepButton from "@/components/service-step-button";
@@ -76,6 +80,8 @@ export default function DashboardClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const convert = useConvertToJob({ technicians: dash.board.technicians.filter((t) => t.active).map((t) => ({ id: t.id, name: t.name })) });
   const [copied, setCopied] = useState<string | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
@@ -158,13 +164,15 @@ export default function DashboardClient({
           <h1 className="font-serif text-3xl mt-1" style={{ color: "var(--color-svc-text)" }}>Dashboard</h1>
           <p className="text-[13px] mt-1" style={DIM}>{fmtDateLong(board.date)}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link href="/service/schedule" className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center text-[13px]">Schedule</Link>
+          <GhostButton onClick={() => setInquiryOpen(true)} className="!min-h-11 !px-3.5"><Zap size={14} aria-hidden="true" /> Quick inquiry</GhostButton>
           <PrimaryButton onClick={() => setQuickOpen(true)} className="!min-h-11"><Plus size={15} /> New job</PrimaryButton>
         </div>
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      {convert.notice}
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Reminder copied to the clipboard" : ""}</p>
 
       {/* KPI strip: every tile opens the page its number comes from */}
@@ -435,6 +443,7 @@ export default function DashboardClient({
                   entryId={w.id} customerName={w.customerName} phone={w.customerPhone} messenger={w.messenger} compact
                   template={templates.find((t) => t.key === (w.source === "recall" && w.status === "waiting" ? "recall" : "follow_up"))?.body ?? ""}
                   vars={{ area: w.areaLabel, piano: w.pianoLabel ?? "piano" }}
+                  extra={canConvertEntry(w) ? <ConvertButton customerName={w.customerName} loading={convert.loadingId === w.id} onClick={() => { void convert.start(w.id); }} /> : undefined}
                 />
               </li>
             ))}
@@ -502,7 +511,7 @@ export default function DashboardClient({
                       <Chip tone={r.daysUntilDue < 0 ? "danger" : r.daysUntilDue <= 14 ? "warn" : "slate"}>
                         {r.daysUntilDue < 0 ? `${Math.abs(r.daysUntilDue)}d overdue` : `in ${r.daysUntilDue}d`}
                       </Chip>
-                      <Link href={`/service/jobs?customer=${r.customerId}&piano=${r.pianoId}`} className={ROW_BTN}>Schedule</Link>
+                      <Link href={`/service/jobs?new=1&customer=${r.customerId}&piano=${r.pianoId}`} className={ROW_BTN}>Schedule</Link>
                     </div>
                   </li>
                 ))}
@@ -562,6 +571,8 @@ export default function DashboardClient({
       </div>
       </div>
 
+      <QuickInquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} onConvert={(id) => { void convert.start(id); }} />
+      {convert.modal}
       <JobFormModal
         open={quickOpen}
         mode="new"

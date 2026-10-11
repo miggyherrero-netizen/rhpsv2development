@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, ListChecks, MessageSquare, Pencil, Plus, Route as RouteIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, ListChecks, MessageSquare, Pencil, Plus, Route as RouteIcon, Zap } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
 import { SERVICE_TYPE_LABEL } from "@/lib/service";
 import {
@@ -12,7 +12,10 @@ import type { WaitlistData, WaitlistItem } from "@/server/service-waitlist-data"
 import { addWaitlistEntry, deleteWaitlistEntry, updateWaitlistEntry } from "@/server/service-waitlist";
 import MessageActions from "@/components/service-message-actions";
 import { WaitlistEntryModal, type EntryFormValues } from "@/components/service-waitlist-forms";
-import { Chip, EmptyState, ErrorLine, Select, StatCard, PrimaryButton } from "@/components/service-ui";
+import { QuickInquiryModal } from "@/components/service-quick-inquiry";
+import { ConvertButton, useConvertToJob } from "@/components/service-waitlist-convert";
+import { canConvertEntry } from "@/lib/service-waitlist-convert";
+import { Chip, EmptyState, ErrorLine, GhostButton, Select, StatCard, PrimaryButton } from "@/components/service-ui";
 
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 const DIM = { color: "var(--color-svc-text-dim)" } as const;
@@ -26,10 +29,11 @@ const ago = (d: Date | null, now: Date): string => {
 };
 
 export default function WaitlistClient({
-  data, customers, templates, routes,
+  data, customers, templates, routes, technicians,
 }: {
   data: WaitlistData;
   customers: { id: string; name: string }[];
+  technicians: { id: string; name: string }[];
   templates: { key: string; name: string; body: string }[];
   routes: { id: string; name: string; cityCodes: string[] }[];
 }) {
@@ -44,6 +48,8 @@ export default function WaitlistClient({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
   const [modal, setModal] = useState<{ mode: "new" | "edit"; entry?: WaitlistItem; preset?: { code: string; label: string } } | null>(null);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const convert = useConvertToJob({ technicians });
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) => {
     setError(null);
@@ -140,6 +146,7 @@ export default function WaitlistClient({
             <button type="button" onClick={() => setOpen(open === i.id ? null : i.id)} aria-expanded={open === i.id} className={GHOST} aria-label={`Message ${i.customerName}`}>
               <MessageSquare size={13} aria-hidden="true" /> Message
             </button>
+            {canConvertEntry(i) && <ConvertButton customerName={i.customerName} loading={convert.loadingId === i.id} onClick={() => { void convert.start(i.id); }} />}
             <button type="button" onClick={() => setModal({ mode: "edit", entry: i })} className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]" style={FAINT} aria-label={`Edit ${i.customerName}'s entry`}>
               <Pencil size={14} aria-hidden="true" />
             </button>
@@ -165,10 +172,14 @@ export default function WaitlistClient({
           <h1 className="font-serif text-3xl mt-1" style={TEXT}>Waitlist by area</h1>
           <p className="text-[13px] mt-1" style={DIM}>Who is waiting, where — so one trip covers everyone nearby</p>
         </div>
-        <PrimaryButton onClick={() => setModal({ mode: "new" })} className="!min-h-11"><Plus size={15} aria-hidden="true" /> Add to waitlist</PrimaryButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <GhostButton onClick={() => setModal({ mode: "new" })} className="!min-h-11 !px-4 !text-[14px]"><Plus size={15} aria-hidden="true" /> Add to waitlist</GhostButton>
+          <PrimaryButton onClick={() => setInquiryOpen(true)} className="!min-h-11"><Zap size={15} aria-hidden="true" /> Quick inquiry</PrimaryButton>
+        </div>
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      {convert.notice}
 
       <section aria-label="Waitlist numbers" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Waiting" value={metrics.waiting} sub={`${groups.length ? `${groups.reduce((n, g) => n + g.provinces.reduce((m, p) => m + p.cities.length, 0), 0)} areas` : "no areas yet"}`} icon={<ListChecks size={15} />} />
@@ -211,7 +222,7 @@ export default function WaitlistClient({
             icon={<ListChecks size={19} strokeWidth={1.7} />}
             title={items.length === 0 ? "Nobody is waiting yet" : "Nothing matches these filters"}
             hint={items.length === 0 ? "Website inquiries and completed tunings land here by themselves. You can also add a client by hand." : "Clear a filter to see more."}
-            action={items.length === 0 ? <PrimaryButton onClick={() => setModal({ mode: "new" })}><Plus size={15} aria-hidden="true" /> Add to waitlist</PrimaryButton> : undefined}
+            action={items.length === 0 ? <PrimaryButton onClick={() => setInquiryOpen(true)}><Zap size={15} aria-hidden="true" /> Quick inquiry</PrimaryButton> : undefined}
           />
         </div>
       ) : (
@@ -249,6 +260,8 @@ export default function WaitlistClient({
         </div>
       )}
 
+      <QuickInquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} onConvert={(id) => { void convert.start(id); }} />
+      {convert.modal}
       <WaitlistEntryModal
         open={!!modal} onClose={() => { setModal(null); setError(null); }} mode={modal?.mode ?? "new"} pending={pending} error={error}
         customers={customers} entry={modal?.entry} presetCity={modal?.preset} onSubmit={submit}

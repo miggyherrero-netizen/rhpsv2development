@@ -1261,6 +1261,12 @@ export async function getCustomerOptions() {
   return rows.map((r) => ({ id: r.id, name: titleCaseName(r.name), isBatch: isBatchCustomer(r.tags, r.name) }));
 }
 
+/** Whose piano this is (a `service_pianos` row), or null when there is no such piano. */
+export async function getPianoOwnerId(pianoId: string): Promise<string | null> {
+  const [row] = await db.select({ customerId: servicePianos.customerId }).from(servicePianos).where(eq(servicePianos.id, pianoId)).limit(1);
+  return row?.customerId ?? null;
+}
+
 export async function getLocationsForCustomer(customerId: string): Promise<ServiceLocation[]> {
   return db
     .select()

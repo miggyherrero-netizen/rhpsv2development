@@ -13,7 +13,7 @@ const BTN = "btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center g
  * SMS with the text prefilled, and "Messaged ✓" (status → messaged, next follow-up in 3 days). Every button is 44px tall.
  */
 export default function MessageActions({
-  entryId, customerName, phone, messenger, template, vars, onMessaged, showMessaged = true, compact = false,
+  entryId, customerName, phone, messenger, template, vars, onMessaged, showMessaged = true, compact = false, extra,
 }: {
   entryId: string;
   customerName: string;
@@ -24,6 +24,8 @@ export default function MessageActions({
   onMessaged?: () => void;
   showMessaged?: boolean;
   compact?: boolean;
+  /** More buttons for the same row (e.g. "Convert to job"). */
+  extra?: React.ReactNode;
 }) {
   const filled = fillTemplate(template, { first_name: firstName(customerName), ...vars });
   const [copied, setCopied] = useState(false);
@@ -78,6 +80,7 @@ export default function MessageActions({
             <Check size={14} aria-hidden="true" /> {done ? "Marked ✓" : "Messaged ✓"}
           </button>
         )}
+        {extra}
       </div>
       {!fb && !compact && <p className="text-[12px]" style={DIM}>No Messenger username saved — add one on the customer page to get a Messenger button.</p>}
       {error && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>{error}</p>}

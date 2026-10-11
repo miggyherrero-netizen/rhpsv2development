@@ -20,6 +20,9 @@ import {
 import { lastServiceDate } from "@/lib/service-last-service";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import { CustomerSheet } from "@/components/service-customers";
+import { ConvertButton, useConvertToJob } from "@/components/service-waitlist-convert";
+import { SERVICE_TYPE_LABEL } from "@/lib/service";
+import type { WaitlistItem } from "@/server/service-waitlist-data";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard, StatCard, SvcModal, TextInput, TONE_TEXT,
 } from "@/components/service-ui";
@@ -28,11 +31,13 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 const FAINT = { color: "var(--color-svc-text-faint)" } as const;
 
 export default function CustomerDetailClient({
-  detail, reminders, invoicePrefix, jobPrefix, technicians, showroomPianos, canSeeMoney,
+  detail, reminders, openEntry, invoicePrefix, jobPrefix, technicians, showroomPianos, canSeeMoney,
 }: {
   detail: CustomerDetail;
   /** This client's open reminders, soonest first. */
   reminders: ReminderRow[];
+  /** The customer's waitlist entry that still needs a visit booked, if any. */
+  openEntry: WaitlistItem | null;
   invoicePrefix: string;
   jobPrefix: string;
   technicians: { id: string; name: string }[];
@@ -44,6 +49,7 @@ export default function CustomerDetailClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newJob, setNewJob] = useState(false);
+  const convert = useConvertToJob({ technicians });
   const [remindOpen, setRemindOpen] = useState(false);
   const [now] = useState(() => new Date());
   const [manage, setManage] = useState(false);
@@ -91,7 +97,14 @@ export default function CustomerDetailClient({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <PrimaryButton onClick={() => setNewJob(true)} className="!min-h-11"><Plus size={15} /> New job for this customer</PrimaryButton>
+            {openEntry ? (
+              <>
+                <ConvertButton customerName={customer.name} loading={convert.loadingId === openEntry.id} onClick={() => { void convert.start(openEntry.id); }} primary />
+                <GhostButton onClick={() => setNewJob(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Plus size={13} /> New job for this customer</GhostButton>
+              </>
+            ) : (
+              <PrimaryButton onClick={() => setNewJob(true)} className="!min-h-11"><Plus size={15} /> New job for this customer</PrimaryButton>
+            )}
             <GhostButton onClick={() => setRemindOpen(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Bell size={13} /> Remind me</GhostButton>
             <GhostButton onClick={() => setManage(true)} className="inline-flex items-center gap-1.5 !min-h-11"><Pencil size={13} /> Edit & manage</GhostButton>
           </div>
@@ -99,6 +112,12 @@ export default function CustomerDetailClient({
       </div>
 
       <ErrorLine>{error}</ErrorLine>
+      {convert.notice}
+      {openEntry && (
+        <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>
+          On the waitlist for {SERVICE_TYPE_LABEL[openEntry.serviceType] ?? openEntry.serviceType}{openEntry.cityName ? ` · ${openEntry.cityName}` : ""}, asked {fmtDate(openEntry.requestedAt)}.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2.5">
         {phone ? (
@@ -240,6 +259,7 @@ export default function CustomerDetailClient({
         <SectionCard title="Notes"><p className="px-5 py-4 text-[14px]" style={{ color: "var(--color-svc-text-dim)" }}>{customer.notes}</p></SectionCard>
       ) : null}
 
+      {convert.modal}
       <RemindMeModal open={remindOpen} onClose={() => setRemindOpen(false)} customerId={customer.id} customerName={customer.name} />
       <JobFormModal
         open={newJob}

@@ -107,6 +107,7 @@ export default function JobsClient({
   showroomPianos,
   technicians,
   initialNew,
+  initialPrefill = null,
   initialFilter = "open",
 }: {
   initialFilter?: string;
@@ -115,6 +116,8 @@ export default function JobsClient({
   showroomPianos: ShowroomPiano[];
   technicians: { id: string; name: string; color: string }[];
   initialNew: boolean;
+  /** From ?new=1&customer=..&piano=..: the new-job form opens with these already chosen. */
+  initialPrefill?: { customerId: string; pianoId: string | null } | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +127,8 @@ export default function JobsClient({
   const [tech, setTech] = useState("all");
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(initialNew);
+  // The link's customer/piano only fill the first opening of the form.
+  const [prefill, setPrefill] = useState(initialPrefill);
   const router = useRouter();
   const now = useMemo(() => new Date(nowMs), [nowMs]);
   // One technician means the crew column and filter would repeat the same name on every row.
@@ -435,11 +440,12 @@ export default function JobsClient({
       <JobFormModal
         open={newOpen}
         mode="new"
-        onClose={() => setNewOpen(false)}
+        onClose={() => { setNewOpen(false); setPrefill(null); }}
         customers={customers}
         showroomPianos={showroomPianos}
         technicians={technicians}
         pending={pending}
+        initial={prefill ? { customerId: prefill.customerId, pianoId: prefill.pianoId } : undefined}
         onSubmit={(values) => run(() => createJob(values))}
       />
 

@@ -195,6 +195,9 @@ working.
 - Every other module in `src/lib` and `src/components` I checked is imported by at least one file; I found
   no orphan file. A tool such as `knip` would confirm unused *exports*, which I did not check.
 
+### Known limits
+- `createJob` (`src/server/service.ts`) inserts the job and its "created" event as two separate statements, not one transaction. "Convert to job" works around this with claim-first / undo on the waitlist entry (`convertEntryToJob`), but a crash between the two inserts can still leave a job without its event row.
+
 ## 6. Documentation sprawl
 
 Root `.md` files and `docs/`:
