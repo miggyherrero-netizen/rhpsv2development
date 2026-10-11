@@ -38,13 +38,14 @@ check("day starts and ends on Manila midnight", edge.map((i) => [i.key, i.dueAt.
   ["waitlist:before", "2026-10-06T16:00:00.000Z"], ["waitlist:late", "2026-10-07T16:00:00.000Z"], ["waitlist:endOfDay", "2026-10-07T16:00:00.000Z"], ["waitlist:tomorrow", "2026-10-08T16:00:00.000Z"],
 ]);
 const g = groupFollowUps(edge, now);
-check("07T16:30Z is today (Oct 8 Manila), not overdue", [keys(g.overdue), keys(g.today), keys(g.upcoming)], [["waitlist:before"], ["waitlist:late", "waitlist:endOfDay"], ["waitlist:tomorrow"]]);
+check("waitlist entries are never overdue: past and today both land in waitlistNow (07T16:30Z is Oct 8 Manila)", [keys(g.overdue), keys(g.today), keys(g.waitlistNow), keys(g.upcoming)], [[], [], ["waitlist:before", "waitlist:late", "waitlist:endOfDay"], ["waitlist:tomorrow"]]);
 
 console.log("\ngrouping");
 const gb = groupFollowUps(both, now);
-check("overdue / today / upcoming", [keys(gb.overdue), keys(gb.today), keys(gb.upcoming)], [
-  ["reminder:r-over", "waitlist:w-over"], ["reminder:r-today", "waitlist:w-today"], ["waitlist:w-up", "reminder:r-up"],
+check("overdue/today are reminders only; waitlist due goes to waitlistNow; upcoming mixes both", [keys(gb.overdue), keys(gb.today), keys(gb.waitlistNow), keys(gb.upcoming)], [
+  ["reminder:r-over"], ["reminder:r-today"], ["waitlist:w-over", "waitlist:w-today"], ["waitlist:w-up", "reminder:r-up"],
 ]);
+check("no waitlist row in overdue or today", [...gb.overdue, ...gb.today].every((i) => i.kind === "reminder"), true);
 
 console.log("\nwhich entries are in the queue");
 const at = (days: number) => new Date(now.getTime() + days * 86_400_000).toISOString();
@@ -57,14 +58,16 @@ check("excluded entries never reach the list", keys(mergeFollowUps([], [ent("d",
 console.log("\ncounts and filters");
 const c = followUpCounts(both, now);
 check("filter counts", [c.all, c.reminder, c.waitlist], [6, 3, 3]);
-check("group counts", [c.overdue, c.today, c.upcoming, c.due], [2, 2, 2, 4]);
+check("group counts (due total unchanged: 4)", [c.overdue, c.today, c.waitlistNow, c.upcoming, c.due], [1, 1, 2, 2, 4]);
+check("group counts add up to All", c.overdue + c.today + c.waitlistNow + c.upcoming, c.all);
+check("groups and counts agree", [gb.overdue.length, gb.today.length, gb.waitlistNow.length, gb.upcoming.length], [c.overdue, c.today, c.waitlistNow, c.upcoming]);
 check("filters split the list", [keys(filterFollowUps(both, "reminder")).length, keys(filterFollowUps(both, "waitlist")).length, filterFollowUps(both, "all").length], [3, 3, 6]);
 check("filter counts add up to All", c.reminder + c.waitlist, c.all);
 const remindersList = [rem("r-today", "2026-10-08"), rem("r-over", "2026-10-05"), rem("r-up", "2026-10-12")];
 const entriesList = [ent("w-over", "messaged", "2026-10-06T03:00:00Z"), ent("w-today", "waiting", "2026-10-08T09:00:00Z"), ent("w-up", "waiting", "2026-10-10T03:00:00Z"), ent("w-done", "done", "2026-10-01T00:00:00Z")];
 check("badge count = the queue's overdue + today", dueFollowUpCount(remindersList, entriesList, now), followUpCounts(mergeFollowUps(remindersList, entriesList, now), now).due);
 check("badge count value", dueFollowUpCount(remindersList, entriesList, now), 4);
-check("empty queue", followUpCounts([], now), { all: 0, reminder: 0, waitlist: 0, overdue: 0, today: 0, upcoming: 0, due: 0 });
+check("empty queue", followUpCounts([], now), { all: 0, reminder: 0, waitlist: 0, overdue: 0, today: 0, waitlistNow: 0, upcoming: 0, due: 0 });
 
 console.log("\nrecalls are counted once (entry owns the recall only if the queue shows it, or it is scheduled with a job)");
 const rc = [{ pianoId: "p1" }, { pianoId: "p2" }];

@@ -154,7 +154,7 @@ export async function getWaitlist(now: Date = new Date()): Promise<WaitlistData>
   };
 }
 
-/** Follow-ups due today (or overdue) for the Today page. */
+/** Follow-ups due today or earlier for the Today page. */
 export async function getFollowUpsDue(now: Date = new Date()): Promise<WaitlistItem[]> {
   await sweepNotNow(now);
   const open = await loadItems(inArray(serviceWaitlistEntries.status, ["waiting", "messaged", "not_now"] as WaitStatus[]));

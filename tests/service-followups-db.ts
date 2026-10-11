@@ -88,8 +88,8 @@ async function main() {
     check("3 reminders (done one excluded)", counts.reminder === 3, counts);
     check("5 waitlist rows: overdue, today, upcoming, recall due, recall in 10 days", counts.waitlist === 5, counts);
     check("done / scheduled / confirmed / paused not_now are absent", !queue.some((q) => q.kind === "waitlist" && ["done", "scheduled", "confirmed", "not_now"].includes(q.entry.status)));
-    check("overdue = reminder(-3) + waitlist(-2) + recall(-2); today = reminder + messaged", counts.overdue === 3 && counts.today === 2, counts);
-    check("upcoming = reminder(+5) + waitlist(+4) + recall(+10)", counts.upcoming === 3, counts);
+    check("overdue = the reminder only; today = the reminder; waitlist due (overdue, today, recall) = 3, none called overdue", counts.overdue === 1 && counts.today === 1 && counts.waitlistNow === 3, counts);
+    check("upcoming = reminder(+5) + waitlist(+4) + recall(+10); due total still 5", counts.upcoming === 3 && counts.due === 5, counts);
     check("sorted by due day", queue.every((q, i) => i === 0 || queue[i - 1]!.dueAt.getTime() <= q.dueAt.getTime()));
 
     console.log("\n2. sidebar badge = the queue's overdue + today = Today's two lists");

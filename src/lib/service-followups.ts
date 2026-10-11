@@ -53,19 +53,48 @@ export function mergeFollowUps<R extends ReminderIn, W extends EntryIn>(reminder
 export const filterFollowUps = <T extends { kind: FollowUpKind }>(items: T[], filter: FollowUpFilter): T[] =>
   filter === "all" ? items : items.filter((i) => i.kind === filter);
 
-/** Overdue / today / upcoming, each in due order. */
-export const groupFollowUps = <T extends { dueAt: Date; createdAt?: Date }>(items: T[], now: Date): ReminderGroups<T> => groupReminders(items, now);
+export type FollowUpGroups<T> = {
+  /** Reminders only: a reminder can be overdue. */
+  overdue: T[];
+  /** Reminders due today. */
+  today: T[];
+  /** Waitlist entries whose follow-up day is today or already past. A waitlist is just a list of people: never "overdue". */
+  waitlistNow: T[];
+  /** Everything with a later day (both kinds). */
+  upcoming: T[];
+};
 
-export type FollowUpCounts = { all: number; reminder: number; waitlist: number; overdue: number; today: number; upcoming: number; /** overdue + today: the number on badges and Today. */ due: number };
+/** Overdue (reminders) / Today (reminders) / Waitlist follow-up now / Upcoming (both), each in due order. */
+export function groupFollowUps<T extends { kind: FollowUpKind; dueAt: Date; createdAt?: Date }>(items: T[], now: Date): FollowUpGroups<T> {
+  const g: FollowUpGroups<T> = { overdue: [], today: [], waitlistNow: [], upcoming: [] };
+  const byState = groupReminders(items, now);
+  g.overdue = byState.overdue.filter((i) => i.kind === "reminder");
+  g.today = byState.today.filter((i) => i.kind === "reminder");
+  g.waitlistNow = [...byState.overdue, ...byState.today].filter((i) => i.kind === "waitlist");
+  g.upcoming = byState.upcoming;
+  return g;
+}
+
+export type FollowUpCounts = {
+  all: number; reminder: number; waitlist: number;
+  /** Overdue reminders. */ overdue: number;
+  /** Reminders due today. */ today: number;
+  /** Waitlist entries to follow up now. */ waitlistNow: number;
+  upcoming: number;
+  /** overdue + today + waitlistNow: the number on the badge, on Today and in the queue header. */ due: number;
+};
 
 /** Every number the queue page, the sidebar badge and Today show, from the same merged list. */
 export function followUpCounts(items: { kind: FollowUpKind; dueAt: Date }[], now: Date): FollowUpCounts {
-  const c: FollowUpCounts = { all: items.length, reminder: 0, waitlist: 0, overdue: 0, today: 0, upcoming: 0, due: 0 };
+  const c: FollowUpCounts = { all: items.length, reminder: 0, waitlist: 0, overdue: 0, today: 0, waitlistNow: 0, upcoming: 0, due: 0 };
   for (const i of items) {
     c[i.kind]++;
-    c[reminderState(i.dueAt, now)]++;
+    const st = reminderState(i.dueAt, now);
+    if (st === "upcoming") c.upcoming++;
+    else if (i.kind === "waitlist") c.waitlistNow++;
+    else c[st]++;
   }
-  c.due = c.overdue + c.today;
+  c.due = c.overdue + c.today + c.waitlistNow;
   return c;
 }
 
