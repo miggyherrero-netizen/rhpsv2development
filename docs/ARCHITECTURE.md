@@ -196,6 +196,7 @@ working.
   no orphan file. A tool such as `knip` would confirm unused *exports*, which I did not check.
 
 ### Known limits
+- Expense quick-add (`ExpenseFormModal`, `createExpense`) has no idempotency key. If the network drops after the server saved but before the reply arrives, the form stays open with the owner's entries and says "It may have been saved. Check the list before trying again."; a second tap can create a duplicate. Fixing it needs a client-generated key stored on the row (schema change), so it is deliberately not done yet.
 - `createJob` (`src/server/service.ts`) inserts the job and its "created" event as two separate statements, not one transaction. "Convert to job" works around this with claim-first / undo on the waitlist entry (`convertEntryToJob`), but a crash between the two inserts can still leave a job without its event row.
 - Follow-up queue (`/service/reminders`, `src/lib/service-followups.ts`): a recall is dropped from Today only when a tuning waitlist entry *on that piano* owns it (`entryOwnsRecall`: in the queue, or scheduled with a job). A piano-less tuning entry does not suppress a customer's piano recall: it is a different follow-up (backlog: let the owner link it to a piano). Reminders and waitlist entries of archived customers are still counted the same way everywhere (queue, badge, Today); hiding them consistently is backlog.
 
