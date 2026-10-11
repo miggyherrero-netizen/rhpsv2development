@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Check, Phone, Trash2 } from "lucide-react";
@@ -110,7 +110,7 @@ export function RemindMeModal({
  * page `showClient` is off because the page already says who it is, and the note leads instead.
  * Wide: who + note on the left, when in the middle, actions on the right. Narrow: stacked, Done gets the width.
  */
-export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date; showClient: boolean }) {
+export function ReminderItem({ r, now, showClient, badge }: { r: ReminderRow; now: Date; showClient: boolean; badge?: ReactNode }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +134,7 @@ export function ReminderItem({ r, now, showClient }: { r: ReminderRow; now: Date
       <div className="grid gap-x-5 gap-y-3 items-center @min-[40rem]:grid-cols-[minmax(0,1fr)_auto_auto]">
         {/* Who + what */}
         <div className="min-w-0">
+          {badge ? <div className="mb-1.5 flex flex-wrap items-center gap-1.5">{badge}</div> : null}
           {showClient ? (
             <Link
               href={`/service/customers/${r.customerId}`}

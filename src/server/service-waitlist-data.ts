@@ -15,6 +15,8 @@ import {
   DEFAULT_TEMPLATES, OPEN_WAIT_STATUSES, avgDaysWaiting, isFollowUpDue, jobsPerTrip, messagedToConfirmedRate, type WaitStatus,
 } from "@/lib/service-waitlist";
 import { sweepNotNow } from "@/server/service-waitlist-core";
+import { FOLLOW_UP_HORIZON_DAYS, QUEUE_WAIT_STATUSES } from "@/lib/service-followups";
+import { startOfManilaDayUTC } from "@/lib/dates";
 
 /* ------------------------------------------------------------------ geography */
 
@@ -157,6 +159,16 @@ export async function getFollowUpsDue(now: Date = new Date()): Promise<WaitlistI
   await sweepNotNow(now);
   const open = await loadItems(inArray(serviceWaitlistEntries.status, ["waiting", "messaged", "not_now"] as WaitStatus[]));
   return open.filter((i) => isFollowUpDue(i, now)).sort((a, b) => a.nextFollowUpAt.getTime() - b.nextFollowUpAt.getTime());
+}
+
+/**
+ * Waitlist entries for the follow-up queue: still being chased (waiting / messaged / not_now) with a follow-up due by the
+ * horizon. One query (no per-row reads); the queue's merge decides which ones show. Sweeps first, like Today does.
+ */
+export async function getQueueEntries(now: Date = new Date()): Promise<WaitlistItem[]> {
+  await sweepNotNow(now);
+  const until = new Date(startOfManilaDayUTC(now).getTime() + (FOLLOW_UP_HORIZON_DAYS + 1) * 86_400_000);
+  return loadItems(and(inArray(serviceWaitlistEntries.status, [...QUEUE_WAIT_STATUSES] as WaitStatus[]), lt(serviceWaitlistEntries.nextFollowUpAt, until)));
 }
 
 /** The oldest waitlist entry of this customer that still needs a visit booked (so the customer page can offer "Convert to job"). */

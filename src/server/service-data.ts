@@ -8,7 +8,7 @@ import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
   serviceJobs, serviceJobItems, serviceJobEvents, serviceTimeLogs, serviceInvoices,
-  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, pianos,
+  serviceInvoiceItems, servicePayments, serviceExpenses, serviceSettings, serviceWaitlistEntries, pianos,
   type ServiceTechnician, type ServiceCustomer, type ServiceLocation, type ServicePiano,
   type ServiceCatalogItem, type ServiceJob, type ServiceJobItem, type ServiceJobEvent,
   type ServiceTimeLog, type ServiceInvoice, type ServiceInvoiceItem, type ServicePayment,
@@ -20,6 +20,7 @@ import { getNextReminderByCustomer } from "@/server/service-reminders-data";
 import { startOfManilaDayUTC, addDays, expandRecurrence } from "@/lib/dates";
 import { addManilaDays, daysSince, isStaleQuote, manilaWeekBounds } from "@/lib/service-today";
 import { messengerHandle } from "@/lib/service-flow";
+import { untrackedRecalls } from "@/lib/service-followups";
 import { effectiveKind, financeSplit, type FinanceSplit, type SaleLine } from "@/lib/service-finance-split";
 import { jobCostBasis } from "@/lib/service-job-cost";
 import { partLinesCostFromLines, otherLinesCostFromLines } from "@/lib/service-lines";
@@ -213,6 +214,23 @@ export async function getRecalls(now: Date = new Date(), leadDays = 30): Promise
     daysUntilDue: Math.round((piano.nextServiceDueAt!.getTime() - now.getTime()) / dayMs),
     lastServiceAt: piano.lastServiceAt,
   }));
+}
+
+/**
+ * Recalls for Today's count and card: a piano is left out only when a waitlist entry owns its recall (`entryOwnsRecall`: the
+ * entry is in the follow-up queue, or is scheduled with a job). Anything else stays here, so a recall is never in neither place.
+ * (The customers page keeps using getRecalls: it is a per-piano view, not a count.)
+ */
+export async function getUntrackedRecalls(now: Date = new Date(), leadDays = 30): Promise<RecallRow[]> {
+  const [recalls, open] = await Promise.all([
+    getRecalls(now, leadDays),
+    db.select({
+      pianoId: serviceWaitlistEntries.pianoId, serviceType: serviceWaitlistEntries.serviceType, status: serviceWaitlistEntries.status,
+      nextFollowUpAt: serviceWaitlistEntries.nextFollowUpAt, jobId: serviceWaitlistEntries.jobId,
+    }).from(serviceWaitlistEntries)
+      .where(and(eq(serviceWaitlistEntries.serviceType, "tuning"), isNotNull(serviceWaitlistEntries.pianoId), ne(serviceWaitlistEntries.status, "done"))),
+  ]);
+  return untrackedRecalls(recalls, open, now);
 }
 
 /* ============================================================
@@ -531,7 +549,7 @@ export async function getTodayBoard(ownerId: string, now: Date = new Date()): Pr
   const [jobs, technicians, recalls, running, moneyToday, timeToday, pastDue, snapshot] = await Promise.all([
     getJobs({ from: dayStart, to: dayEnd, limit: 200 }),
     getTechnicians(),
-    getRecalls(now),
+    getUntrackedRecalls(now),
     db
       .select({ log: serviceTimeLogs, jobTitle: serviceJobs.title, customerName: serviceCustomers.name, technicianName: serviceTechnicians.name })
       .from(serviceTimeLogs)

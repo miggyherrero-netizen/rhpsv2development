@@ -15,7 +15,7 @@ import {
   buildMonthSeries, invoicedByKind, lastMonths, pipelineCounts, type DashboardMonth, type InvoicedByKind,
 } from "@/lib/service-dashboard";
 import {
-  countUnreviewedExpenses, getFinanceReport, getReceivablesSnapshot, getRecalls, getServiceSettings, getTodayBoard,
+  countUnreviewedExpenses, getFinanceReport, getReceivablesSnapshot, getUntrackedRecalls, getServiceSettings, getTodayBoard,
   type TodayBoard,
 } from "@/server/service-data";
 import { getFinanceHealth } from "@/server/service-finance-audit-data";
@@ -55,7 +55,7 @@ export type DashboardBoard = {
 export async function getDashboardBoard(ownerId: string, withFinance: boolean, now: Date = new Date()): Promise<DashboardBoard> {
   const [board, recalls, pipelineRows] = await Promise.all([
     getTodayBoard(ownerId, now),
-    getRecalls(now),
+    getUntrackedRecalls(now),
     db
       .select({ status: serviceJobs.status, count: sql<number>`count(*)::int` })
       .from(serviceJobs)

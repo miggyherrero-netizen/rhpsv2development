@@ -104,6 +104,7 @@ export function AttentionQueue({ items }: { items: AttentionItem[] }) {
                 <span className="min-w-0 flex-1">
                   <span className="block text-[14px] truncate" style={TEXT}>{it.label}</span>
                   {it.amountCents !== undefined && <span className="svc-num block text-[12px]" style={FAINT}>{peso(it.amountCents)}</span>}
+                  {it.detail && <span className="block text-[12px]" style={FAINT}>{it.detail}</span>}
                 </span>
                 <Chip tone={SEVERITY_TONE[it.severity]}>{SEVERITY_LABEL[it.severity]}</Chip>
                 <ArrowRight size={14} style={FAINT} aria-hidden="true" />

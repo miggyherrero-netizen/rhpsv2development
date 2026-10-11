@@ -197,6 +197,7 @@ working.
 
 ### Known limits
 - `createJob` (`src/server/service.ts`) inserts the job and its "created" event as two separate statements, not one transaction. "Convert to job" works around this with claim-first / undo on the waitlist entry (`convertEntryToJob`), but a crash between the two inserts can still leave a job without its event row.
+- Follow-up queue (`/service/reminders`, `src/lib/service-followups.ts`): a recall is dropped from Today only when a tuning waitlist entry *on that piano* owns it (`entryOwnsRecall`: in the queue, or scheduled with a job). A piano-less tuning entry does not suppress a customer's piano recall: it is a different follow-up (backlog: let the owner link it to a piano). Reminders and waitlist entries of archived customers are still counted the same way everywhere (queue, badge, Today); hiding them consistently is backlog.
 
 ## 6. Documentation sprawl
 

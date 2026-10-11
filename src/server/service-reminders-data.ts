@@ -1,5 +1,5 @@
 /** Client follow-up reminders — reads. (Writes: service-reminders.ts.) */
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { serviceCustomers, serviceReminders } from "@/db/schema";
 import { titleCaseName } from "@/lib/service-reports";
@@ -59,4 +59,10 @@ export async function getNextReminderByCustomer(): Promise<Map<string, Date>> {
   const next = new Map<string, Date>();
   for (const r of rows) if (!next.has(r.customerId)) next.set(r.customerId, r.dueAt);
   return next;
+}
+
+/** Open reminders due before `before` (id + day only): feeds the combined follow-up badge without joining customers. */
+export async function getOpenReminderDueDates(before: Date): Promise<{ id: string; dueAt: Date }[]> {
+  return db.select({ id: serviceReminders.id, dueAt: serviceReminders.dueAt }).from(serviceReminders)
+    .where(and(eq(serviceReminders.status, "open"), lt(serviceReminders.dueAt, before)));
 }

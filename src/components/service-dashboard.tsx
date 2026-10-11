@@ -310,7 +310,9 @@ export default function DashboardClient({
 
       {/* Client reminders — who to follow up with today */}
       {counts.reminders > 0 && (
-        <SectionCard className="order-3 lg:order-none" title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders ({reminders.length})</span>}>
+        <SectionCard className="order-3 lg:order-none" title={<span className="inline-flex items-center gap-2"><Bell size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> Reminders ({reminders.length})</span>}
+          action={<Link href="/service/reminders" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>All follow-ups</Link>}
+        >
           <ul className="svc-divide">
             {reminders.map((r) => <ReminderItem key={r.id} r={r} now={board.date} showClient />)}
           </ul>
@@ -410,7 +412,7 @@ export default function DashboardClient({
         <SectionCard
           className="order-5 lg:order-none"
           title={<span className="inline-flex items-center gap-2"><ListChecks size={14} style={{ color: "var(--color-svc-accent)" }} aria-hidden="true" /> {waitlistFollowUps.length > 0 ? `Follow up today (${waitlistFollowUps.length})` : "Trips"}</span>}
-          action={<Link href="/service/waitlist" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open waitlist</Link>}
+          action={<span className="inline-flex items-center gap-3"><Link href="/service/reminders" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>All follow-ups</Link><Link href="/service/waitlist" className="inline-flex items-center min-h-11 text-[12px] hover:underline" style={{ color: TONE_TEXT.azure }}>Open waitlist</Link></span>}
         >
           {tripPrompts.length > 0 && (
             <ul className="svc-divide">
