@@ -445,7 +445,8 @@ export function MoreMenu({ items, label = "More", startOnMobile = false }: { ite
 export function PesoInput({
   value, onChange, placeholder = "e.g. 2,500", suffix, ...rest
 }: { value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
-  const bad = value.trim() !== "" && parsePesoInput(value) === null;
+  // A trailing dot ("1250.") is just a number mid-typing, not an error.
+  const bad = value.trim() !== "" && parsePesoInput(value.replace(/\.\s*$/, "")) === null;
   return (
     <UnitInput
       {...rest} type="text" inputMode="decimal" autoComplete="off" prefix="₱" suffix={suffix}

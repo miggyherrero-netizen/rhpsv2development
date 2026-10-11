@@ -661,9 +661,9 @@ export default function JobDetailClient({
       <ExpenseFormModal
         open={expenseOpen}
         onClose={() => setExpenseOpen(false)}
-        pending={pending}
         fixedJobId={job.id}
-        onSubmit={(values) => run(() => createExpense(values))}
+        fixedJobLabel={`${jobCode(jobPrefix, job.jobNumber, job.createdAt)} · ${job.customerName}`}
+        onSubmit={(values) => createExpense(values)}
       />
       <ConfirmTypeDialog
         open={confirmDelete}

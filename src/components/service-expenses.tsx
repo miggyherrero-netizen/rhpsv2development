@@ -326,21 +326,22 @@ export default function ExpensesClient({
       <ExpenseFormModal
         open={open}
         onClose={() => setOpen(false)}
-        pending={pending}
         jobOptions={jobOptions}
         pianoOptions={pianoOptions}
-        onSubmit={(values) => run(() => createExpense(values))}
+        onSubmit={(values) => createExpense(values)}
       />
       <ExpenseFormModal
         open={!!editing}
         mode="edit"
         onClose={() => setEditing(null)}
-        pending={pending}
         jobOptions={jobOptions}
         pianoOptions={pianoOptions}
         initial={editing ? expenseToFormInitial(editing) : undefined}
         hasReceipt={editing?.hasReceipt}
-        onSubmit={(values) => { const id = editing?.id; if (id) run(() => updateExpense(id, buildExpensePatch(values))); }}
+        onSubmit={async (values) => {
+          const id = editing?.id;
+          return id ? updateExpense(id, buildExpensePatch(values)) : { ok: false, error: "Missing expense." };
+        }}
       />
     </div>
   );

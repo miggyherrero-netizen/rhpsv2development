@@ -26,6 +26,7 @@ import { titleCaseName } from "@/lib/service-reports";
 import {
   canViewFinance, confirmMatches, nextJobStep, stepEffect, type StepKey,
 } from "@/lib/service-flow";
+import { validateExpenseAmountCents } from "@/lib/service-expense-form";
 import { cleanDetails, partsCostFromLines } from "@/lib/service-lines";
 import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
@@ -1419,6 +1420,8 @@ export async function createExpense(input: ExpenseInput): Promise<Result<{ id: s
   if (!user) return FINANCE_DENIED;
   const description = str(input.description, 300);
   if (!description) return fail("Describe the expense.");
+  const amountCheck = validateExpenseAmountCents(moneyToCents(input.amount));
+  if (!amountCheck.ok) return fail(amountCheck.error);
   const receipt = validReceipt(input.receiptUrl);
   if (!receipt.ok) return fail("Receipt must be a JPG, PNG or WebP photo under 3MB.");
   const linkedJob = str(input.jobId);
@@ -1481,6 +1484,10 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>): P
     const receipt = validReceipt(patch.receiptUrl);
     if (!receipt.ok) return fail("Receipt must be a JPG, PNG or WebP photo under 3MB.");
     newReceipt = receipt.url ?? undefined;
+  }
+  if (patch.amount !== undefined) {
+    const amountCheck = validateExpenseAmountCents(moneyToCents(patch.amount), { allowZero: true });
+    if (!amountCheck.ok) return fail(amountCheck.error);
   }
   let kindPatch: { kind: ExpenseKind; pianoId: string | null } | null = null;
   if (patch.kind !== undefined || patch.pianoId !== undefined) {

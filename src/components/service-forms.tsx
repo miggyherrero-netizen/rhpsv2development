@@ -6,13 +6,17 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, ChevronDown, Plus, X } from "lucide-react";
+import { Camera, ChevronDown, Image as ImageIcon, Plus, X } from "lucide-react";
 import { kindAfterJobLink } from "@/lib/service-expense-edit";
+import {
+  GENERIC_SAVE_ERROR, amountHint, buildExpensePayload, canSaveExpense, categoryLabel, effectiveExpenseKind, saveBlockReason, shouldOpenMore,
+  stockNeedsPiano, thrownSubmitMessage,
+} from "@/lib/service-expense-form";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
 import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
 import { peso } from "@/lib/format";
-import { EXPENSE_KINDS, defaultKindForCategory } from "@/lib/service-finance-split";
+import { EXPENSE_KINDS } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
 import { parsePesoInput } from "@/lib/service-flow";
 import { createCustomer, createLocation, createPiano, loadCustomerPlaces } from "@/server/service";
@@ -431,28 +435,39 @@ export type ExpenseFormValues = {
   kind: string; pianoId: string | null;
 };
 
+export type ExpenseSubmitResult = { ok: boolean; error?: string };
+
 export function ExpenseFormModal(props: {
-  open: boolean; onClose: () => void; pending: boolean;
+  open: boolean; onClose: () => void;
   /** Set when opened from a job page: the link is fixed and the picker is hidden. */
   fixedJobId?: string;
+  /** Read-only context shown instead of the picker when fixedJobId is set, e.g. "WO-0012 · Maria Santos". */
+  fixedJobLabel?: string;
   jobOptions?: { id: string; label: string }[];
   /** Showroom pianos for "Piano stock" expenses. Without it the stock kind isn't offered. */
   pianoOptions?: { id: string; label: string; status: string }[];
-  onSubmit: (values: ExpenseFormValues) => void;
+  /** Resolves with the server result. The modal stays open (keeping what was typed) until it reports ok. */
+  onSubmit: (values: ExpenseFormValues) => Promise<ExpenseSubmitResult>;
   /** Edit mode only: values to pre-fill (and the expense id). */
   initial?: Partial<ExpenseFormValues> & { id?: string };
   /** Edit mode only: the expense already has a stored receipt (kept unless a new photo is chosen). */
   hasReceipt?: boolean;
   mode?: "create" | "edit";
 }) {
+  // While a save is in flight every close path (X, Esc, backdrop, Cancel) is ignored, so the form can't unmount
+  // mid-request and a late result can't close a modal the owner has since reopened.
+  const savingRef = useRef(false);
+  const [saving, setSavingState] = useState(false);
+  const setSaving = (v: boolean) => { savingRef.current = v; setSavingState(v); };
+  const guardedClose = () => { if (!savingRef.current) props.onClose(); };
   return (
-    <SvcModal open={props.open} onClose={props.onClose} title={props.mode === "edit" ? "Edit expense" : "Add expense"}>
-      {props.open && <ExpenseFormBody {...props} />}
+    <SvcModal open={props.open} onClose={guardedClose} title={props.mode === "edit" ? "Edit expense" : "Add expense"}>
+      {props.open && <ExpenseFormBody {...props} saving={saving} setSaving={setSaving} />}
     </SvcModal>
   );
 }
 
-function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoOptions, onSubmit, initial, hasReceipt, mode }: Parameters<typeof ExpenseFormModal>[0]) {
+function ExpenseFormBody({ saving, setSaving, onClose, fixedJobId, fixedJobLabel, jobOptions = [], pianoOptions, onSubmit, initial, hasReceipt, mode }: Parameters<typeof ExpenseFormModal>[0] & { saving: boolean; setSaving: (v: boolean) => void }) {
   const editing = mode === "edit";
   const [category, setCategory] = useState(initial?.category ?? "fuel");
   // The kind follows the category (Fuel → Job cost, Rent → Overhead) until the owner picks one themselves.
@@ -460,12 +475,13 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
   const [pianoId, setPianoId] = useState(initial?.pianoId ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [amount, setAmount] = useState(initial?.amount !== undefined ? String(initial.amount) : "");
-  const [spentAt, setSpentAt] = useState(() => manilaDateTimeLocal(initial?.spentAt ? new Date(initial.spentAt) : new Date()));
+  const [initialSpentAt] = useState(() => manilaDateTimeLocal(initial?.spentAt ? new Date(initial.spentAt) : new Date()));
+  const [spentAt, setSpentAt] = useState(initialSpentAt);
   const [vendor, setVendor] = useState(initial?.vendor ?? "");
   const [method, setMethod] = useState(initial?.method ?? "cash");
   const [reimbursable, setReimbursable] = useState(initial?.reimbursable ?? false);
   const [jobId, setJobId] = useState(fixedJobId ?? initial?.jobId ?? "");
-  const effectiveKind = kindPicked ?? (fixedJobId || jobId ? "job" : defaultKindForCategory(category));
+  const effectiveKind = effectiveExpenseKind({ kindPicked, fixedJobId, jobId, category });
   // Linking an expense to a job makes it Job cost (so an old "Overhead" row counts in the margin); stock is kept.
   const pickJob = (next: string) => {
     setKindPicked(kindAfterJobLink(jobId, next, kindPicked));
@@ -474,9 +490,15 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
   const [receipt, setReceipt] = useState<string | null>(null);
   const [receiptErr, setReceiptErr] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const errBoxRef = useRef<HTMLDivElement>(null);
+  // On a phone the sheet scrolls: bring a failed save's message into view.
+  useEffect(() => { if (saveErr) errBoxRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [saveErr]);
 
-  const pickReceipt = async (file?: File) => {
+  const pickReceipt = async (file: File | undefined, input: HTMLInputElement) => {
     setReceiptErr(null);
     if (!file) return;
     if (!file.type.startsWith("image/")) return setReceiptErr("Please choose a photo.");
@@ -484,21 +506,57 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
     try { setReceipt(await downsizeImage(file)); }
     catch { setReceiptErr("Couldn't use that photo — try a smaller one."); }
     setReading(false);
-    if (fileRef.current) fileRef.current.value = "";
+    input.value = "";
   };
-  const amountBad = amount.trim() !== "" && parsePesoInput(amount) === null;
+
+  const aHint = amountHint(amount, editing ? "edit" : "create");
+  const dateChanged = spentAt !== initialSpentAt;
+  // Create mode starts collapsed; edit shows everything. Anything already typed in the hidden part keeps it open.
+  const forcedOpen = !editing && shouldOpenMore({ vendor, receipt, method, reimbursable, dateChanged });
+  const showMore = editing || moreOpen || forcedOpen;
+  const needsPiano = stockNeedsPiano({ kind: effectiveKind, fixedJobId, pianosOffered: !!pianoOptions, pianoId });
+  const canSave = canSaveExpense({ amount, description, category, mode: editing ? "edit" : "create", blocked: reading || needsPiano });
+  const catLabel = categoryLabel(category);
+  const blockReason = saveBlockReason({ mode: editing ? "edit" : "create", description, needsPiano, reading });
+
+  const submit = async () => {
+    if (!canSave || saving) return;
+    setSaving(true); setSaveErr(null);
+    try {
+      const res = await onSubmit(buildExpensePayload({
+        mode: editing ? "edit" : "create", category, description, amount, spentAt, vendor, method, reimbursable,
+        jobId, fixedJobId, receipt, kindPicked, pianoId,
+      }));
+      if (res.ok) { setSaving(false); onClose(); return; }
+      setSaveErr(res.error ?? GENERIC_SAVE_ERROR);
+    } catch (err) {
+      setSaveErr(thrownSubmitMessage(err, typeof navigator !== "undefined" && navigator.onLine === false));
+    }
+    setSaving(false);
+  };
 
   return (
     <div className="space-y-3.5">
+      {fixedJobId && fixedJobLabel && (
+        <p className="text-[13px]" style={{ color: "var(--color-svc-text-dim)" }}>For <span style={{ color: "var(--color-svc-text)" }}>{fixedJobLabel}</span></p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Category">
           <Select value={category} onChange={(e) => setCategory(e.target.value)}>
             {EXPENSE_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </Select>
         </Field>
-        <Field label="Amount"><PesoInput value={amount} onChange={setAmount} autoFocus /></Field>
+        <Field label="Amount"><PesoInput value={amount} onChange={setAmount} autoFocus aria-describedby="exp-amount-hint" /></Field>
       </div>
-      {amountBad && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>Use a number like 1,250.</p>}
+      <p
+        id="exp-amount-hint" role={aHint.tone === "danger" ? "alert" : undefined} className="text-[12px] -mt-1.5 min-h-4"
+        style={{ color: aHint.tone === "danger" ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}
+      >
+        {aHint.text}
+      </p>
+      <Field label={editing ? "Description" : "What was it for?"} hint={editing ? undefined : `Leave blank to save it as “${catLabel}”`}>
+        <TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder={editing ? "e.g. Diesel — Buhangin run" : "e.g. Diesel, Buhangin run"} />
+      </Field>
       {!fixedJobId && (
         <Field label="What is this for?" hint={EXPENSE_KINDS.find((k) => k.key === effectiveKind)?.hint}>
           <Select value={effectiveKind} onChange={(e) => setKindPicked(e.target.value)}>
@@ -514,23 +572,6 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
           </Select>
         </Field>
       )}
-      <Field label="Description"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Diesel — Buhangin run" /></Field>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Vendor"><TextInput value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Shell Matina" /></Field>
-        <Field label="Date" hint="Defaults to now"><DateField kind="datetime-local" value={spentAt} onChange={setSpentAt} /></Field>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Paid with">
-          <Select value={method} onChange={(e) => setMethod(e.target.value)}>
-            {PAYMENT_METHODS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Reimbursable">
-          <Select value={reimbursable ? "yes" : "no"} onChange={(e) => setReimbursable(e.target.value === "yes")}>
-            <option value="no">Business expense</option><option value="yes">Owed to crew</option>
-          </Select>
-        </Field>
-      </div>
       {!fixedJobId && (
         <Field label="Link to a job (optional)">
           <Select value={jobId} onChange={(e) => pickJob(e.target.value)}>
@@ -540,40 +581,70 @@ function ExpenseFormBody({ onClose, pending, fixedJobId, jobOptions = [], pianoO
         </Field>
       )}
 
-      <div>
-        <p className="text-[12px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>Receipt photo (optional)</p>
-        {/* capture="environment" opens the rear camera on phones; desktops fall back to a file picker */}
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pickReceipt(e.target.files?.[0])} />
-        {receipt ? (
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={receipt} alt="Receipt preview" className="h-20 w-20 rounded-lg object-cover border" style={{ borderColor: "var(--color-svc-border)" }} />
-            <GhostButton onClick={() => setReceipt(null)} className="inline-flex items-center gap-1.5 !min-h-11"><X size={13} /> Remove</GhostButton>
-          </div>
-        ) : (
-          <GhostButton onClick={() => fileRef.current?.click()} disabled={reading} className="inline-flex items-center gap-2 !min-h-11">
-            <Camera size={15} /> {reading ? "Preparing photo…" : "Take or choose a photo"}
-          </GhostButton>
-        )}
-        {editing && hasReceipt && !receipt && (
-          <p className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>A receipt is already saved. Choosing a new photo replaces it.</p>
-        )}
-        {receiptErr && <p role="alert" className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-danger)" }}>{receiptErr}</p>}
+      {!editing && (
+        <button
+          type="button" aria-expanded={showMore} aria-controls="expense-more" onClick={() => { if (!forcedOpen) setMoreOpen((v) => !v); }}
+          className="inline-flex flex-wrap items-center gap-x-1.5 min-h-11 -ml-1 px-1 text-[13px] text-left rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)] cursor-pointer"
+          style={{ color: "var(--color-svc-accent)" }}
+        >
+          <ChevronDown size={15} aria-hidden="true" className={showMore ? "rotate-180 transition-transform" : "transition-transform"} /> More details
+          <span className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>vendor, date, paid with, reimbursable, receipt</span>
+        </button>
+      )}
+
+      {/* Always rendered so aria-controls resolves; hidden while collapsed. */}
+      <div id="expense-more" hidden={!showMore} className="space-y-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Vendor"><TextInput value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Shell Matina" /></Field>
+          <Field label="Date" hint="Defaults to now"><DateField kind="datetime-local" value={spentAt} onChange={setSpentAt} /></Field>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Paid with">
+            <Select value={method} onChange={(e) => setMethod(e.target.value)}>
+              {PAYMENT_METHODS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Reimbursable">
+            <Select value={reimbursable ? "yes" : "no"} onChange={(e) => setReimbursable(e.target.value === "yes")}>
+              <option value="no">Business expense</option><option value="yes">Owed to crew</option>
+            </Select>
+          </Field>
+        </div>
+        <div>
+          <p className="text-[12px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>Receipt photo (optional)</p>
+          {/* Two inputs: one opens the rear camera on phones, the other the gallery / file picker (capture can hide the gallery). */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => pickReceipt(e.target.files?.[0], e.target)} />
+          <input ref={galleryRef} type="file" accept="image/*" className="hidden" tabIndex={-1} aria-hidden="true" onChange={(e) => pickReceipt(e.target.files?.[0], e.target)} />
+          {receipt ? (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={receipt} alt="Receipt preview" width={80} height={80} className="h-20 w-20 rounded-lg object-cover border" style={{ borderColor: "var(--color-svc-border)" }} />
+              <GhostButton onClick={() => setReceipt(null)} className="inline-flex items-center gap-1.5 !min-h-11"><X size={13} /> Remove</GhostButton>
+            </div>
+          ) : reading ? (
+            <p className="text-[13px] min-h-11 flex items-center" style={{ color: "var(--color-svc-text-dim)" }}>Preparing photo…</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <GhostButton onClick={() => cameraRef.current?.click()} className="inline-flex items-center gap-2 !min-h-11">
+                <Camera size={15} /> Take photo
+              </GhostButton>
+              <GhostButton onClick={() => galleryRef.current?.click()} className="inline-flex items-center gap-2 !min-h-11">
+                <ImageIcon size={15} /> Choose photo
+              </GhostButton>
+            </div>
+          )}
+          {editing && hasReceipt && !receipt && (
+            <p className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-text-dim)" }}>A receipt is already saved. Choosing a new photo replaces it.</p>
+          )}
+          {receiptErr && <p role="alert" className="text-[12px] mt-1.5" style={{ color: "var(--color-svc-danger)" }}>{receiptErr}</p>}
+        </div>
       </div>
 
+      <div ref={errBoxRef}><ErrorLine>{saveErr}</ErrorLine></div>
+      {blockReason && <p className="text-[12px] text-right" style={{ color: "var(--color-svc-text-dim)" }}>{blockReason}</p>}
       <div className="flex justify-end gap-2 pt-2">
-        <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
-        <PrimaryButton
-          pending={pending} disabled={!description.trim() || amountBad || reading || (effectiveKind === "stock" && !pianoId)} className="!min-h-11"
-          onClick={() => {
-            onSubmit({
-              category, description: description.trim(), amount: parsePesoInput(amount) ?? 0, spentAt: spentAt || null,
-              vendor, method, reimbursable, jobId: fixedJobId ?? (jobId || null), receiptUrl: receipt,
-              kind: effectiveKind, pianoId: effectiveKind === "stock" ? pianoId || null : null,
-            });
-            onClose();
-          }}
-        >
+        <GhostButton onClick={onClose} disabled={saving} className="!min-h-11">Cancel</GhostButton>
+        <PrimaryButton pending={saving} disabled={!canSave} className="!min-h-11" onClick={submit}>
           {editing ? "Save changes" : "Add expense"}
         </PrimaryButton>
       </div>

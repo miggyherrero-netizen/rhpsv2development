@@ -11,6 +11,7 @@
     "test:domain": "node tests/run-tests.mjs",
     "test:service": "tsx tests/service-money.ts",
     "test:jobs-list": "tsx tests/service-jobs-list.ts",
+    "test:expense-form": "tsx tests/service-expense-form.ts",
     "test:job-cost": "tsx tests/service-job-cost.ts",
     "test:parts-backfill": "tsx tests/service-parts-backfill.ts",
     "backfill:job-parts-cost": "tsx scripts/backfill-job-parts-cost.ts",
