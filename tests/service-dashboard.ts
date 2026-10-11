@@ -60,9 +60,11 @@ const q = attentionQueue({
   ...base, overdueInvoices: { count: 2, amountCents: 450_000 }, drafts: { count: 1, amountCents: 10_000 }, remindersDue: 3,
   recallsDue: 4, staleQuotes: 1, unreviewedExpenses: 5, health: { errors: 1, warnings: 2 },
 });
-check("danger first, then warnings, then reviews", q.map((i) => i.key), ["overdue", "health_errors", "reminders", "drafts", "quotes", "recalls", "expenses", "health_warnings"]);
+check("danger first, then warnings, then reviews", q.map((i) => i.key), ["overdue", "health_errors", "followups", "drafts", "quotes", "recalls", "expenses", "health_warnings"]);
+const both = attentionQueue({ ...base, remindersDue: 2, waitlistFollowUps: 3 });
+check("reminders and waitlist follow-ups are ONE line with the combined count", both.map((i) => [i.key, i.count, i.href, i.detail]), [["followups", 5, "/service/reminders", "2 reminders, 3 waitlist"]]);
 check("overdue carries its amount", q[0]!.amountCents, 450_000);
-check("no finance: no money, no finance items", attentionQueue({ ...base, drafts: { count: 2 }, remindersDue: 1 }).map((i) => [i.key, i.amountCents]), [["reminders", undefined], ["drafts", undefined]]);
+check("no finance: no money, no finance items", attentionQueue({ ...base, drafts: { count: 2 }, remindersDue: 1 }).map((i) => [i.key, i.amountCents]), [["followups", undefined], ["drafts", undefined]]);
 
 console.log("\ncrew");
 const t = [{ id: "a", name: "Ana", color: "#38bdf8" }, { id: "b", name: "Ben", color: null }, { id: "c", name: "Cy", color: null }];

@@ -14,7 +14,7 @@ const GROUPS: { label: string; items: { href: string; label: string; icon: typeo
     label: "Operations",
     items: [
       { href: "/service/today", label: "Dashboard", icon: Gauge },
-      { href: "/service/reminders", label: "Reminders", icon: Bell },
+      { href: "/service/reminders", label: "Follow-ups", icon: Bell },
       { href: "/service/schedule", label: "Schedule", icon: CalendarDays },
       { href: "/service/jobs", label: "Jobs", icon: ClipboardList },
       { href: "/service/waitlist", label: "Waitlist", icon: ListChecks },
@@ -54,14 +54,14 @@ export default function ServiceShell({
   businessName,
   showFinance = true,
   canFinance = true,
-  dueReminders = 0,
+  dueFollowUps = 0,
 }: {
   /** Role check (server-enforced separately): non-finance roles never see Finance or Expenses. */
   canFinance?: boolean;
   children: ReactNode;
   businessName: string;
-  /** Open reminders due today or earlier (badge on the Reminders link). */
-  dueReminders?: number;
+  /** Reminders + waitlist follow-ups due today or earlier, counted once each (badge on the Follow-ups link). */
+  dueFollowUps?: number;
   /** Owner setting: hides the Finance link only — the route itself is not blocked. */
   showFinance?: boolean;
 }) {
@@ -105,12 +105,12 @@ export default function ServiceShell({
               >
                 <item.icon size={16} strokeWidth={1.8} />
                 {item.label}
-                {item.href === "/service/reminders" && dueReminders > 0 ? (
+                {item.href === "/service/reminders" && dueFollowUps > 0 ? (
                   <span
                     className="ml-auto min-w-6 h-6 px-1.5 rounded-full text-[12px] leading-6 text-center svc-num"
                     style={{ background: "var(--color-svc-primary)", color: "#fff" }}
                   >
-                    {dueReminders}<span className="sr-only"> due</span>
+                    {dueFollowUps}<span className="sr-only"> due</span>
                   </span>
                 ) : null}
               </Link>

@@ -211,9 +211,12 @@ export type AttentionInput = {
   overdueInvoices: { count: number; amountCents?: number };
   drafts: { count: number; amountCents?: number };
   closeOut: number;
+  /** Manual reminders due today or earlier. */
   remindersDue: number;
+  /** Recalls with NO waitlist entry (those with one are already in waitlistFollowUps). */
   recallsDue: number;
   staleQuotes: number;
+  /** Waitlist follow-ups due today or earlier (recall entries included). */
   waitlistFollowUps: number;
   /** null = finance not visible to this user. */
   unreviewedExpenses: number | null;
@@ -223,15 +226,20 @@ export type AttentionInput = {
 
 const SEVERITY_RANK: Record<AttentionSeverity, number> = { danger: 0, warn: 1, info: 2 };
 
+/** "2 reminders, 3 waitlist" when both kinds are due (one combined line, one link to the queue). */
+function followUpDetail(i: AttentionInput): string | undefined {
+  if (i.remindersDue === 0 || i.waitlistFollowUps === 0) return undefined;
+  return `${i.remindersDue} reminder${i.remindersDue === 1 ? "" : "s"}, ${i.waitlistFollowUps} waitlist`;
+}
+
 /** One prioritised list: danger first, then warnings, then reminders-to-self. Zero-count items are dropped. */
 export function attentionQueue(i: AttentionInput): AttentionItem[] {
   const items: AttentionItem[] = [
     { key: "overdue", label: "Overdue invoices", count: i.overdueInvoices.count, severity: "danger", href: "/service/invoices?filter=overdue", amountCents: i.overdueInvoices.amountCents },
     { key: "health_errors", label: "Finance errors to fix", count: i.health?.errors ?? 0, severity: "danger", href: "/service/finance/health" },
     { key: "close_out", label: "Past visits to close out", count: i.closeOut, severity: "warn", href: "/service/jobs?filter=scheduled" },
-    { key: "reminders", label: "Reminders due", count: i.remindersDue, severity: "warn", href: "/service/reminders" },
+    { key: "followups", label: "Follow-ups due", count: i.remindersDue + i.waitlistFollowUps, severity: "warn", href: "/service/reminders", detail: followUpDetail(i) },
     { key: "drafts", label: "Draft invoices to send", count: i.drafts.count, severity: "warn", href: "/service/invoices?filter=draft", amountCents: i.drafts.amountCents },
-    { key: "waitlist", label: "Waitlist follow-ups", count: i.waitlistFollowUps, severity: "warn", href: "/service/waitlist" },
     { key: "quotes", label: "Quotes with no answer", count: i.staleQuotes, severity: "info", href: "/service/jobs?filter=quoted" },
     { key: "recalls", label: "Recalls due", count: i.recallsDue, severity: "info", href: "/service/customers" },
     { key: "expenses", label: "Expenses to review", count: i.unreviewedExpenses ?? 0, severity: "info", href: "/service/expenses/review" },

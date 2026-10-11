@@ -106,7 +106,7 @@ export async function releaseEntriesForJob(jobId: string, why: "cancelled" | "re
 
 /** Messaged three times with no yes and the last follow-up date passed -> "not now", back in 30 days. */
 export async function sweepNotNow(now: Date = new Date()): Promise<number> {
-  const stale = await db.select().from(serviceWaitlistEntries)
+  const stale = await db.select({ id: serviceWaitlistEntries.id, status: serviceWaitlistEntries.status, followUpCount: serviceWaitlistEntries.followUpCount, nextFollowUpAt: serviceWaitlistEntries.nextFollowUpAt }).from(serviceWaitlistEntries)
     .where(and(eq(serviceWaitlistEntries.status, "messaged"), lte(serviceWaitlistEntries.nextFollowUpAt, now)));
   const ids = stale.filter((e) => shouldGoNotNow({ status: e.status, followUpCount: e.followUpCount, nextFollowUpAt: e.nextFollowUpAt }, now)).map((e) => e.id);
   if (!ids.length) return 0;
