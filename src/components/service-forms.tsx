@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Plus, X } from "lucide-react";
+import { Camera, ChevronDown, Plus, X } from "lucide-react";
 import { kindAfterJobLink } from "@/lib/service-expense-edit";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SERVICE_TYPES, TIME_KINDS, serviceTypeMinutes } from "@/lib/service";
 import { downsizeImage } from "@/lib/image-client";
@@ -106,17 +106,27 @@ export function JobFormModal(props: {
   showroomPianos?: ShowroomPiano[];
   initial?: Partial<JobFormValues>;
   onSubmit: (values: JobFormValues) => void;
+  /**
+   * "Convert to job" from the waitlist: the customer is fixed, only the essentials show (service type, time, notes) and
+   * the rest sits under "More options". The modal stays open on submit, so an error can be shown without losing the form.
+   */
+  convert?: { title: string; subtitle?: string; submitLabel: string; customerName: string; error?: string | null };
 }) {
-  const { open, onClose, mode } = props;
+  const { open, onClose, mode, convert } = props;
   const sale = props.initial?.jobType === "sale";
   return (
-    <SvcModal open={open} onClose={onClose} title={mode === "new" ? "New job" : sale ? "Edit piano sale" : "Edit visit"} subtitle={mode === "new" ? "Leave the time blank to park it in Unscheduled." : undefined} wide>
+    <SvcModal
+      open={open} onClose={onClose} wide
+      title={convert?.title ?? (mode === "new" ? "New job" : sale ? "Edit piano sale" : "Edit visit")}
+      subtitle={convert ? convert.subtitle : mode === "new" ? "Leave the time blank to park it in Unscheduled." : undefined}
+    >
       {open && <JobFormBody {...props} />}
     </SvcModal>
   );
 }
 
-function JobFormBody({ onClose, mode, pending, customers, technicians, showroomPianos, initial, onSubmit }: Parameters<typeof JobFormModal>[0]) {
+function JobFormBody({ onClose, mode, pending, customers, technicians, showroomPianos, initial, onSubmit, convert }: Parameters<typeof JobFormModal>[0]) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const [jobType, setJobType] = useState<string>(initial?.jobType ?? "service");
   const isSale = jobType === "sale";
   const [salePianoId, setSalePianoId] = useState(initial?.salePianoId ?? "");
@@ -209,7 +219,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
       buyCost: parsePesoInput(buyCost) ?? 0, prepCost: parsePesoInput(prepCost) ?? 0,
       salePrice: parsePesoInput(salePrice) ?? 0, deposit: parsePesoInput(deposit) ?? 0,
     });
-    onClose();
+    if (!convert) onClose();
   };
 
   return (
@@ -227,7 +237,14 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
           ))}
         </div>
       )}
-      <Field label={isSale ? "Buyer" : "Customer"}><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+      {convert ? (
+        <div>
+          <p className="text-[12px] uppercase tracking-[0.1em] mb-1.5" style={{ color: "var(--color-svc-text-dim)" }}>Customer</p>
+          <p className="text-[16px] font-medium" style={{ color: "var(--color-svc-text)" }}>{convert.customerName}</p>
+        </div>
+      ) : (
+        <Field label={isSale ? "Buyer" : "Customer"}><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+      )}
 
       {isSale && (
         <Field label="Piano being sold" hint={showroomPick ? `${showroomPick.status === "sold" ? "Marked sold in the showroom · " : ""}${showroomPick.listPriceCents ? `Listed at ${peso(showroomPick.listPriceCents)}` : "No list price"}` : "From your showroom list (Piano Management)"}>
@@ -304,48 +321,87 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
         </fieldset>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {!isSale && (
+      {(() => {
+        const serviceTypeField = !isSale && (
           <Field label="Service type">
             <Select value={serviceType} onChange={(e) => { setServiceType(e.target.value); if (!minutesTouched) setMinutes(String(serviceTypeMinutes(e.target.value))); }}>
               {SERVICE_TYPES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </Select>
           </Field>
-        )}
-        <Field label={isSale ? "Delivery crew" : "Technician"}>
-          <Select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-            <option value="">Unassigned</option>
-            {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Priority">
-          <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
-          </Select>
-        </Field>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label={isSale ? "Delivery date & time" : "Scheduled start"} hint="Manila time">
-          <DateField kind="datetime-local" value={start} onChange={setStart} />
-        </Field>
-        <Field label="Duration">
-          <UnitInput type="number" inputMode="numeric" min={15} step={15} suffix="min" value={minutes} onChange={(e) => { setMinutes(e.target.value); setMinutesTouched(true); }} />
-        </Field>
-        {!isSale && (
+        );
+        const technicianField = (
+          <Field label={isSale ? "Delivery crew" : "Technician"}>
+            <Select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
+              <option value="">Unassigned</option>
+              {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </Select>
+          </Field>
+        );
+        const priorityField = (
+          <Field label="Priority">
+            <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
+            </Select>
+          </Field>
+        );
+        const startField = (
+          <Field label={isSale ? "Delivery date & time" : "Scheduled start"} hint={convert ? "Manila time. Leave blank to book the time later." : "Manila time"}>
+            <DateField kind="datetime-local" value={start} onChange={setStart} />
+          </Field>
+        );
+        const durationField = (
+          <Field label="Duration">
+            <UnitInput type="number" inputMode="numeric" min={15} step={15} suffix="min" value={minutes} onChange={(e) => { setMinutes(e.target.value); setMinutesTouched(true); }} />
+          </Field>
+        );
+        const travelField = !isSale && (
           <Field label="Travel fee">
             <PesoInput value={travelFee} onChange={setTravelFee} placeholder="e.g. 300" />
           </Field>
-        )}
-      </div>
+        );
+        const notesField = <Field label="Notes (visible to client)"><TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Please bring the stool; gate code 1234" /></Field>;
+        const privateField = <Field label="Private notes (only you)"><TextArea rows={convert ? 3 : 2} value={privateNotes} onChange={(e) => setPrivateNotes(e.target.value)} placeholder="e.g. Pedal squeak, check dampers" /></Field>;
 
-      <Field label="Notes (visible to client)"><TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Please bring the stool; gate code 1234" /></Field>
-      <Field label="Private notes (only you)"><TextArea rows={2} value={privateNotes} onChange={(e) => setPrivateNotes(e.target.value)} placeholder="e.g. Pedal squeak, check dampers" /></Field>
+        if (convert) {
+          return (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{serviceTypeField}{startField}</div>
+              {notesField}
+              {privateField}
+              <div>
+                <button
+                  type="button" aria-expanded={moreOpen} aria-controls="convert-more" onClick={() => setMoreOpen((v) => !v)}
+                  className="inline-flex items-center gap-1.5 min-h-11 -ml-1 px-1 text-[13px] rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]"
+                  style={{ color: "var(--color-svc-accent)" }}
+                >
+                  <ChevronDown size={15} aria-hidden="true" className={moreOpen ? "rotate-180 transition-transform" : "transition-transform"} /> More options
+                  <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>technician, duration, travel fee</span>
+                </button>
+                {moreOpen && (
+                  <div id="convert-more" className="mt-2 space-y-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{technicianField}{priorityField}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{durationField}{travelField}</div>
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        }
+        return (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{serviceTypeField}{technicianField}{priorityField}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{startField}{durationField}{travelField}</div>
+            {notesField}
+            {privateField}
+          </>
+        );
+      })()}
 
+      {convert && <ErrorLine>{convert.error}</ErrorLine>}
       <div className="flex justify-end gap-2 pt-2">
         <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
         <PrimaryButton pending={pending} disabled={!customerId || needsPiano || needsSalePiano || moneyBad} onClick={submit} className="!min-h-11">
-          {mode === "new" ? (isSale ? "Create sale" : "Create job") : "Save changes"}
+          {convert ? convert.submitLabel : mode === "new" ? (isSale ? "Create sale" : "Create job") : "Save changes"}
         </PrimaryButton>
       </div>
     </div>

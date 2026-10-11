@@ -159,6 +159,15 @@ export async function getFollowUpsDue(now: Date = new Date()): Promise<WaitlistI
   return open.filter((i) => isFollowUpDue(i, now)).sort((a, b) => a.nextFollowUpAt.getTime() - b.nextFollowUpAt.getTime());
 }
 
+/** The oldest waitlist entry of this customer that still needs a visit booked (so the customer page can offer "Convert to job"). */
+export async function getOpenEntryForCustomer(customerId: string): Promise<WaitlistItem | null> {
+  const open = await loadItems(and(
+    eq(serviceWaitlistEntries.customerId, customerId), isNull(serviceWaitlistEntries.jobId),
+    inArray(serviceWaitlistEntries.status, ["waiting", "messaged", "confirmed", "not_now"] as WaitStatus[]),
+  ));
+  return open[0] ?? null;
+}
+
 /* ------------------------------------------------------------------ trips */
 
 export type TripPlanData = {

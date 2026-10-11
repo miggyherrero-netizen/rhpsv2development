@@ -14,9 +14,12 @@ import {
 import { requireUser } from "@/lib/auth";
 import { SERVICE_TYPES, SERVICE_TYPE_LABEL, serviceTypeMinutes } from "@/lib/service";
 import { placeLabel } from "@/lib/service-geo";
+import { isBatchCustomer } from "@/lib/service-reports";
 import { NOT_NOW_DAYS, PLACEHOLDERS, WAIT_SOURCES, WAIT_STATUSES, afterMessaged, defaultNextFollowUp, type WaitSource, type WaitStatus } from "@/lib/service-waitlist";
-import { createJob } from "@/server/service";
-import { insertEntry } from "@/server/service-waitlist-core";
+import { createJob, type JobInput } from "@/server/service";
+import { claimEntryForTrip, convertEntryToJob, createQuickInquiryEntry, insertEntry } from "@/server/service-waitlist-core";
+import { validateQuickInquiry, type InquiryField, type QuickInquiryInput } from "@/lib/service-inquiry";
+import { canConvertEntry, waitlistToJobInitial, type JobInitial } from "@/lib/service-waitlist-convert";
 import { findCities, getBarangaysOf } from "@/server/service-waitlist-data";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -165,6 +168,65 @@ export async function deleteWaitlistEntry(id: string): Promise<Result> {
   return ok();
 }
 
+/* ------------------------------------------------------------------ quick inquiry */
+
+export type QuickInquiryResult = { entryId: string; customerId: string; customerName: string; customerWasNew: boolean; nextFollowUpAt: string; duplicate: boolean };
+
+/**
+ * "Quick inquiry": name, phone, area and what they asked for. Finds the customer with the same phone number or makes a
+ * new one, then adds the waitlist entry — the normal follow-up (3 days out) applies. Nothing is defaulted silently:
+ * a missing name, phone, area or request is rejected with a message, and `fields` says which box to mark.
+ */
+export async function createQuickInquiry(input: QuickInquiryInput): Promise<Result<QuickInquiryResult> & { fields?: Partial<Record<InquiryField, string>> }> {
+  await requireUser();
+  const check = validateQuickInquiry(input ?? {});
+  if (!check.ok) return { ...fail(check.error), fields: check.errors };
+  const res = await createQuickInquiryEntry(check.value);
+  if (!res.ok) return fail(res.error);
+  touch();
+  // Only the matched customer's name goes back (so the owner can see who it was attached to) — nothing else about them.
+  return ok({ ...res.data, nextFollowUpAt: res.data.nextFollowUpAt.toISOString() });
+}
+
+/* ------------------------------------------------------------------ waitlist -> job */
+
+/** What the job form starts with for "Convert to job": the entry's customer, piano, location, service, title and notes. */
+export async function getConvertDefaults(entryId: string): Promise<Result<{ initial: JobInitial; customerName: string; isBatch: boolean; areaLabel: string | null }>> {
+  await requireUser();
+  if (!UUID_RE.test(String(entryId))) return fail("Entry not found.");
+  const [entry] = await db.select().from(serviceWaitlistEntries).where(eq(serviceWaitlistEntries.id, entryId)).limit(1);
+  if (!entry) return fail("Entry not found. It may have been removed.");
+  if (!canConvertEntry(entry)) return fail(entry.status === "done" ? "This one is already done." : "This client is already booked as a job.");
+  const [[customer], locations, pianos, [city]] = await Promise.all([
+    db.select({ id: serviceCustomers.id, name: serviceCustomers.name, tags: serviceCustomers.tags }).from(serviceCustomers).where(eq(serviceCustomers.id, entry.customerId)).limit(1),
+    db.select({ id: serviceLocations.id, cityCode: serviceLocations.cityCode, barangayCode: serviceLocations.barangayCode }).from(serviceLocations)
+      .where(eq(serviceLocations.customerId, entry.customerId)).orderBy(serviceLocations.createdAt),
+    db.select({ id: servicePianos.id, brand: servicePianos.brand, model: servicePianos.model, type: servicePianos.type }).from(servicePianos)
+      .where(eq(servicePianos.customerId, entry.customerId)).orderBy(servicePianos.brand),
+    entry.cityCode ? db.select({ name: phCities.name }).from(phCities).where(eq(phCities.code, entry.cityCode)).limit(1) : Promise.resolve([] as { name: string }[]),
+  ]);
+  if (!customer) return fail("That customer no longer exists.");
+  const initial = waitlistToJobInitial(
+    entry, customer, locations,
+    pianos.map((p) => ({ id: p.id, label: [p.brand, p.model].filter(Boolean).join(" ") || p.type })),
+  );
+  return ok({ initial, customerName: customer.name, isBatch: isBatchCustomer(customer.tags, customer.name), areaLabel: city?.name ?? null });
+}
+
+/**
+ * "Convert to job": books the waitlist entry as a job, once, and links the two. The job form values come from the
+ * screen (prefilled from the entry); the customer must be the entry's own. See `convertEntryToJob` for the claim/undo rules.
+ */
+export async function convertWaitlistEntryToJob(entryId: string, values: JobInput): Promise<Result<{ jobId: string }>> {
+  await requireUser();
+  if (!UUID_RE.test(String(entryId))) return fail("Entry not found.");
+  if (!values || typeof values !== "object" || Array.isArray(values)) return fail("The job details are missing. Reopen the form and try again.");
+  const res = await convertEntryToJob(entryId, values, createJob);
+  if (!res.ok) return fail(res.error);
+  touch();
+  return ok(res.data);
+}
+
 /* ------------------------------------------------------------------ trips */
 
 export async function createTrip(input: { name: string; cityCode: string | null; tripDate: string | null }): Promise<Result<{ id: string }>> {
@@ -208,10 +270,7 @@ export async function confirmEntryForTrip(input: { entryId: string; tripId: stri
 
   // Claim the entry before creating anything, so a double-click or a second tab can only ever book it once.
   const prevStatus = entry.status;
-  const [claimed] = await db.update(serviceWaitlistEntries)
-    .set({ status: "scheduled", tripId: trip.id, pianoId, updatedAt: new Date() })
-    .where(and(eq(serviceWaitlistEntries.id, entry.id), inArray(serviceWaitlistEntries.status, ["waiting", "messaged", "confirmed", "not_now", "scheduled"] as WaitStatus[])))
-    .returning({ id: serviceWaitlistEntries.id, jobId: serviceWaitlistEntries.jobId });
+  const claimed = await claimEntryForTrip(entry.id, trip.id, pianoId);
   if (!claimed) return fail("This client was just booked or finished — refresh the list.");
   if (prevStatus === "scheduled" && !entry.jobId) { /* a stale "scheduled" with no visit: carry on and book it properly */ }
 
