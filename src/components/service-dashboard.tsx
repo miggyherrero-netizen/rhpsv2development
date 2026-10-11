@@ -437,7 +437,7 @@ export default function DashboardClient({
                   <p className="text-[14px] font-medium" style={{ color: "var(--color-svc-text)" }}>
                     {w.customerName} <span className="text-[12px] font-normal" style={DIM}>· {w.pianoLabel ?? "piano"} · {w.cityName ?? "Unsorted"}</span>
                   </p>
-                  <span className="text-[12px]" style={{ color: w.nextFollowUpAt.getTime() < board.date.getTime() ? "var(--color-svc-danger)" : "var(--color-svc-text-faint)" }}>
+                  <span className="text-[12px]" style={{ color: "var(--color-svc-text-faint)" }}>
                     {WAIT_STATUS_LABEL[w.status]} · message {w.followUpCount + 1}
                   </span>
                 </div>

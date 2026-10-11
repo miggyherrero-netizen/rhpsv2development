@@ -18,7 +18,7 @@ const FILTERS: { key: FollowUpFilter; label: string }[] = [
   { key: "waitlist", label: "Waitlist" },
 ];
 
-/** The single follow-up queue: manual reminders and waitlist follow-ups, grouped overdue / today / upcoming. */
+/** The single follow-up queue: manual reminders and waitlist follow-ups, grouped overdue / today (reminders), waitlist follow up now, upcoming. Only reminders can be overdue. */
 export default function RemindersClient({
   queue, customers, templates, technicians,
 }: {
@@ -35,13 +35,14 @@ export default function RemindersClient({
   const convert = useConvertToJob({ technicians });
   const counts = useMemo(() => followUpCounts(queue, now), [queue, now]);
   const groups = useMemo(() => groupFollowUps(filterFollowUps(queue, filter), now), [queue, filter, now]);
-  const shown = groups.overdue.length + groups.today.length + groups.upcoming.length;
+  const shown = groups.overdue.length + groups.today.length + groups.waitlistNow.length + groups.upcoming.length;
   const tpl = (source: string, status: string) =>
     templates.find((t) => t.key === (source === "recall" && status === "waiting" ? "recall" : "follow_up"))?.body ?? "";
 
   const sections = [
     { key: "overdue", title: "Overdue", items: groups.overdue, color: "var(--color-svc-danger)" },
     { key: "today", title: "Today", items: groups.today, color: "var(--color-svc-warn)" },
+    { key: "waitlistNow", title: "Waitlist · follow up now", items: groups.waitlistNow, color: "var(--color-svc-text)" },
     { key: "upcoming", title: "Upcoming", items: groups.upcoming, color: "var(--color-svc-text-dim)" },
   ] as const;
 

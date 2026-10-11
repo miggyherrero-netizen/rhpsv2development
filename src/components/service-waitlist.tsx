@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, ListChecks, MessageSquare, Pencil, Plus, Rou
 import { fmtDate, peso } from "@/lib/format";
 import { SERVICE_TYPE_LABEL } from "@/lib/service";
 import {
-  LONG_WAIT_DAYS, WAIT_SOURCE_LABEL, WAIT_STATUSES, WAIT_STATUS_LABEL, WAIT_STATUS_TONE, daysWaiting, groupWaitlist, isUpcoming, type WaitRow,
+  LONG_WAIT_DAYS, WAIT_SOURCE_LABEL, isFollowUpDue, WAIT_STATUSES, WAIT_STATUS_LABEL, WAIT_STATUS_TONE, daysWaiting, groupWaitlist, isUpcoming, type WaitRow,
 } from "@/lib/service-waitlist";
 import type { WaitlistData, WaitlistItem } from "@/server/service-waitlist-data";
 import { addWaitlistEntry, deleteWaitlistEntry, updateWaitlistEntry } from "@/server/service-waitlist";
@@ -43,7 +43,7 @@ export default function WaitlistClient({
   const [area, setArea] = useState("all");
   const [status, setStatus] = useState("active");
   const [route, setRoute] = useState("all");
-  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [dueNowOnly, setDueNowOnly] = useState(false);
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
@@ -72,10 +72,10 @@ export default function WaitlistClient({
     if (status === "active" ? i.status === "done" : status !== "all" && i.status !== status) return false;
     if (area !== "all" && (area === "unsorted" ? i.cityCode : i.cityCode !== area)) return false;
     if (route !== "all" && !(i.cityCode && routeCodes.has(i.cityCode))) return false;
-    if (overdueOnly && !(i.nextFollowUpAt < now && ["waiting", "messaged", "not_now"].includes(i.status))) return false;
+    if (dueNowOnly && !isFollowUpDue(i, now)) return false;
     if (!showUpcoming && isUpcoming(i.requestedAt, now)) return false;
     return true;
-  }), [items, status, area, route, routeCodes, overdueOnly, showUpcoming, now]);
+  }), [items, status, area, route, routeCodes, dueNowOnly, showUpcoming, now]);
   const upcomingHidden = items.filter((i) => isUpcoming(i.requestedAt, now) && i.status !== "done").length;
 
   const rows: (WaitRow & { item: WaitlistItem })[] = useMemo(() => filtered.map((i) => ({
@@ -122,7 +122,7 @@ export default function WaitlistClient({
 
   const Row = ({ i }: { i: WaitlistItem }) => {
     const dw = daysWaiting(i.requestedAt, now);
-    const overdue = i.nextFollowUpAt < now && ["waiting", "messaged", "not_now"].includes(i.status);
+    const due = isFollowUpDue(i, now);
     return (
       <li style={{ borderTop: "1px solid var(--color-svc-border)" }}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 sm:px-5 py-3 min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_88px_110px_120px_auto]">
@@ -138,8 +138,8 @@ export default function WaitlistClient({
             <span className="min-[1100px]:hidden" style={FAINT}>Waiting </span>{isUpcoming(i.requestedAt, now) ? `due ${fmtDate(i.requestedAt)}` : `${dw}d`}
           </p>
           <p className="text-[12px]" style={DIM}><span className="min-[1100px]:hidden" style={FAINT}>Contacted </span>{ago(i.lastContactedAt, now)}</p>
-          <p className="text-[12px]" style={{ color: overdue ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
-            <span className="min-[1100px]:hidden" style={FAINT}>Follow up </span>{overdue ? "overdue · " : ""}{fmtDate(i.nextFollowUpAt)}
+          <p className="text-[12px]" style={DIM}>
+            <span className="min-[1100px]:hidden" style={FAINT}>Follow up </span>{due ? "due · " : ""}{fmtDate(i.nextFollowUpAt)}
           </p>
           <div className="flex flex-wrap items-center gap-2 basis-full min-[1100px]:basis-auto min-[1100px]:justify-end">
             <Chip tone={WAIT_STATUS_TONE[i.status] ?? "slate"}>{WAIT_STATUS_LABEL[i.status] ?? i.status}</Chip>
@@ -206,8 +206,8 @@ export default function WaitlistClient({
               {routes.map((r) => <option key={r.id} value={r.id}>On route: {r.name}</option>)}
             </Select></label>
         )}
-        <button type="button" aria-pressed={overdueOnly} onClick={() => setOverdueOnly((v) => !v)} className={GHOST} style={overdueOnly ? { borderColor: "var(--color-svc-accent)", color: "var(--color-svc-accent)" } : undefined}>
-          Overdue follow-ups
+        <button type="button" aria-pressed={dueNowOnly} onClick={() => setDueNowOnly((v) => !v)} className={GHOST} style={dueNowOnly ? { borderColor: "var(--color-svc-accent)", color: "var(--color-svc-accent)" } : undefined}>
+          Due now
         </button>
         {upcomingHidden > 0 && (
           <button type="button" aria-pressed={showUpcoming} onClick={() => setShowUpcoming((v) => !v)} className={GHOST}>

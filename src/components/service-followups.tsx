@@ -44,8 +44,9 @@ export function WaitlistFollowUpItem({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const state = reminderState(dueDay, now);
-  const label = reminderLabel(dueDay, now);
+  // A waitlist entry is never "overdue": once its day has come the cue is a neutral "Follow up now".
+  const upcoming = reminderState(dueDay, now) === "upcoming";
+  const label = upcoming ? reminderLabel(dueDay, now) : "Follow up now";
   const tel = telHref(w.customerPhone);
   const what = [w.pianoLabel ?? "No piano chosen", SERVICE_TYPE_LABEL[w.serviceType] ?? w.serviceType, w.areaLabel || null].filter(Boolean).join(" · ");
 
@@ -73,7 +74,7 @@ export function WaitlistFollowUpItem({
 
         <p className="flex flex-wrap items-center gap-2 @min-[40rem]:justify-end">
           <span className="svc-num text-[14px]" style={DIM}>{fmtDate(dueDay)}</span>
-          {label ? <Chip tone={state === "overdue" ? "danger" : state === "today" ? "warn" : "slate"}>{label}</Chip> : null}
+          {label ? <Chip tone={upcoming ? "slate" : "azure"}>{label}</Chip> : null}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
