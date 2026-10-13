@@ -1,19 +1,13 @@
 import { requireUser } from "@/lib/auth";
-import { getCustomerOptions, getTechnicians } from "@/server/service-data";
-import { getFollowUpQueue } from "@/server/service-followups-data";
-import { getTemplates } from "@/server/service-waitlist-data";
+import { getCustomerOptions } from "@/server/service-data";
+import { getOpenReminders } from "@/server/service-reminders-data";
 import RemindersClient from "@/components/service-reminders-page";
 
 export const dynamic = "force-dynamic";
 
-/** The one follow-up queue (route kept as /service/reminders): manual reminders and waitlist follow-ups together. */
+/** Follow-ups (route kept as /service/reminders): manual reminders only. The waitlist lives on its own page. */
 export default async function ServiceRemindersPage() {
   await requireUser();
-  const [queue, customers, templates, technicians] = await Promise.all([getFollowUpQueue(), getCustomerOptions(), getTemplates(), getTechnicians(true)]);
-  return (
-    <RemindersClient
-      queue={queue} customers={customers.map((c) => ({ id: c.id, name: c.name }))} templates={templates}
-      technicians={technicians.map((t) => ({ id: t.id, name: t.name }))}
-    />
-  );
+  const [reminders, customers] = await Promise.all([getOpenReminders(), getCustomerOptions()]);
+  return <RemindersClient reminders={reminders} customers={customers.map((c) => ({ id: c.id, name: c.name }))} />;
 }

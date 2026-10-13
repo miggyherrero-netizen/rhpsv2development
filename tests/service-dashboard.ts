@@ -62,7 +62,7 @@ const q = attentionQueue({
 });
 check("danger first, then warnings, then reviews", q.map((i) => i.key), ["overdue", "health_errors", "followups", "drafts", "quotes", "recalls", "expenses", "health_warnings"]);
 const both = attentionQueue({ ...base, remindersDue: 2, waitlistFollowUps: 3 });
-check("reminders and waitlist follow-ups are ONE line with the combined count", both.map((i) => [i.key, i.count, i.href, i.detail]), [["followups", 5, "/service/reminders", "2 reminders, 3 waitlist"]]);
+check("reminders and waitlist follow-ups are SEPARATE lines, each with its own count and page", both.map((i) => [i.key, i.count, i.href]), [["followups", 2, "/service/reminders"], ["waitlist_followups", 3, "/service/waitlist"]]);
 check("overdue carries its amount", q[0]!.amountCents, 450_000);
 check("no finance: no money, no finance items", attentionQueue({ ...base, drafts: { count: 2 }, remindersDue: 1 }).map((i) => [i.key, i.amountCents]), [["followups", undefined], ["drafts", undefined]]);
 
