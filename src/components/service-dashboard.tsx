@@ -23,6 +23,8 @@ import {
 } from "@/lib/service";
 import type { TodayBoard } from "@/server/service-data";
 import { stopTimer, createJob, setInvoiceStatus } from "@/server/service";
+import { createJobWithNewCustomer } from "@/server/service-new-customer-actions";
+import { NewContactNotice, addedNotice } from "@/components/service-customer-combobox";
 import { closeTrip } from "@/server/service-waitlist";
 import { Zap } from "lucide-react";
 import MessageActions from "@/components/service-message-actions";
@@ -79,13 +81,14 @@ export default function DashboardClient({
   const clock = useNow(1_000);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const convert = useConvertToJob({ technicians: dash.board.technicians.filter((t) => t.active).map((t) => ({ id: t.id, name: t.name })) });
   const [copied, setCopied] = useState<string | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
-    setError(null);
+    setError(null); setNotice(null);
     startTransition(async () => {
       const res = await fn();
       if (res && !res.ok) setError(res.error ?? "Something went wrong.");
@@ -172,6 +175,7 @@ export default function DashboardClient({
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      <NewContactNotice text={notice} />
       {convert.notice}
       <p role="status" aria-live="polite" className="sr-only">{copied ? "Reminder copied to the clipboard" : ""}</p>
 
@@ -584,6 +588,13 @@ export default function DashboardClient({
         showroomPianos={showroomPianos}
         technicians={board.technicians.filter((t) => t.active).map((t) => ({ id: t.id, name: t.name }))}
         onSubmit={(values) => run(() => createJob(values))}
+        onSubmitNewCustomer={async (customer, piano, values) => {
+          setError(null); setNotice(null);
+          const res = await createJobWithNewCustomer(customer, piano, values);
+          if (!res.ok) return { ok: false, error: res.error, duplicateOf: res.duplicateOf };
+          setNotice(addedNotice(res.data.customerName));
+          return { ok: true };
+        }}
       />
     </div>
   );

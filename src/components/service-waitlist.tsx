@@ -9,7 +9,8 @@ import {
   LONG_WAIT_DAYS, WAIT_SOURCE_LABEL, isFollowUpDue, WAIT_STATUSES, WAIT_STATUS_LABEL, WAIT_STATUS_TONE, daysWaiting, groupWaitlist, isUpcoming, type WaitRow,
 } from "@/lib/service-waitlist";
 import type { WaitlistData, WaitlistItem } from "@/server/service-waitlist-data";
-import { addWaitlistEntry, deleteWaitlistEntry, updateWaitlistEntry } from "@/server/service-waitlist";
+import { addWaitlistEntry, addWaitlistEntryWithNewCustomer, deleteWaitlistEntry, updateWaitlistEntry } from "@/server/service-waitlist";
+import { NewContactNotice, addedNotice } from "@/components/service-customer-combobox";
 import MessageActions from "@/components/service-message-actions";
 import { WaitlistEntryModal, type EntryFormValues } from "@/components/service-waitlist-forms";
 import { QuickInquiryModal } from "@/components/service-quick-inquiry";
@@ -40,6 +41,7 @@ export default function WaitlistClient({
   const [now] = useState(() => new Date());
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [area, setArea] = useState("all");
   const [status, setStatus] = useState("active");
   const [route, setRoute] = useState("all");
@@ -52,7 +54,7 @@ export default function WaitlistClient({
   const convert = useConvertToJob({ technicians });
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) => {
-    setError(null);
+    setError(null); setNotice(null);
     start(async () => {
       const r = await fn();
       if (!r.ok) setError(r.error ?? "Something went wrong."); else after?.();
@@ -179,6 +181,7 @@ export default function WaitlistClient({
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      <NewContactNotice text={notice} />
       {convert.notice}
 
       <section aria-label="Waitlist numbers" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -265,6 +268,16 @@ export default function WaitlistClient({
       <WaitlistEntryModal
         open={!!modal} onClose={() => { setModal(null); setError(null); }} mode={modal?.mode ?? "new"} pending={pending} error={error}
         customers={customers} entry={modal?.entry} presetCity={modal?.preset} onSubmit={submit}
+        onSubmitNewCustomer={async (customer, v) => {
+          setError(null); setNotice(null);
+          const res = await addWaitlistEntryWithNewCustomer(customer, {
+            serviceType: v.serviceType, source: v.source, requestedAt: v.requestedAt, nextFollowUpAt: v.nextFollowUpAt,
+            estValue: v.estValue, notes: v.notes, ...(v.useCustomerAddress ? {} : { cityCode: v.cityCode, barangayCode: v.barangayCode }),
+          });
+          if (!res.ok) return { ok: false, error: res.error, duplicateOf: res.duplicateOf };
+          setNotice(addedNotice(res.data.customerName));
+          return { ok: true };
+        }}
         onDelete={modal?.mode === "edit" && modal.entry ? () => run(() => deleteWaitlistEntry(modal.entry!.id), () => setModal(null)) : undefined}
       />
     </div>

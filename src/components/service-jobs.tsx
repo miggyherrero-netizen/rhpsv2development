@@ -12,6 +12,8 @@ import { hasQuote, jobHeading, needsClosing } from "@/lib/service-reports";
 import { OPEN_JOB_STATUSES, groupJobs, quickFilterCounts, relativeDayLabel } from "@/lib/service-jobs-list";
 import type { JobRow } from "@/server/service-data";
 import { createJob } from "@/server/service";
+import { createJobWithNewCustomer } from "@/server/service-new-customer-actions";
+import { NewContactNotice, addedNotice } from "@/components/service-customer-combobox";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import {
   Chip, Dot, EmptyState, ErrorLine, GhostButton, Money,
@@ -121,6 +123,7 @@ export default function JobsClient({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [status, setStatus] = useState(() => (ALL_FILTER_KEYS.has(initialFilter) ? initialFilter : "open"));
   const [nowMs] = useState(() => Date.now());
   const [type, setType] = useState("all");
@@ -153,7 +156,7 @@ export default function JobsClient({
   const counts = useMemo(() => quickFilterCounts(jobs), [jobs]);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
-    setError(null);
+    setError(null); setNotice(null);
     startTransition(async () => {
       const res = await fn();
       if (res && !res.ok) setError(res.error ?? "Something went wrong.");
@@ -219,6 +222,7 @@ export default function JobsClient({
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      <NewContactNotice text={notice} />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
@@ -447,6 +451,13 @@ export default function JobsClient({
         pending={pending}
         initial={prefill ? { customerId: prefill.customerId, pianoId: prefill.pianoId } : undefined}
         onSubmit={(values) => run(() => createJob(values))}
+        onSubmitNewCustomer={async (customer, piano, values) => {
+          setError(null); setNotice(null);
+          const res = await createJobWithNewCustomer(customer, piano, values);
+          if (!res.ok) return { ok: false, error: res.error, duplicateOf: res.duplicateOf };
+          setNotice(addedNotice(res.data.customerName));
+          return { ok: true };
+        }}
       />
 
     </div>

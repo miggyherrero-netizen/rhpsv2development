@@ -21,6 +21,8 @@ import { claimEntryForTrip, convertEntryToJob, createQuickInquiryEntry, insertEn
 import { validateQuickInquiry, type InquiryField, type QuickInquiryInput } from "@/lib/service-inquiry";
 import { canConvertEntry, waitlistToJobInitial, type JobInitial } from "@/lib/service-waitlist-convert";
 import { findCities, getBarangaysOf } from "@/server/service-waitlist-data";
+import { canCreateNew } from "@/lib/service-customer-match";
+import { withNewCustomerTx, type NewCustomerInput } from "@/server/service-new-customer";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 const ok = <T>(data?: T): Result<T> => ({ ok: true, data });
@@ -93,6 +95,35 @@ export async function addWaitlistEntry(input: EntryInput): Promise<Result<{ id: 
   }, now);
   touch();
   return ok({ id });
+}
+
+/**
+ * Add to waitlist for a customer typed in the form. The new customer and the entry are written in ONE transaction, so a
+ * refused entry (bad area, duplicate name) leaves no customer behind. A brand-new customer has no piano and no saved
+ * address yet, so the entry takes the area chosen in the form (or none).
+ */
+export async function addWaitlistEntryWithNewCustomer(
+  newCustomer: NewCustomerInput,
+  input: Omit<EntryInput, "customerId" | "pianoId">,
+): Promise<{ ok: true; data: { id: string; customerId: string; customerName: string } } | { ok: false; error: string; duplicateOf?: { id: string; name: string } }> {
+  await requireUser();
+  if (!newCustomer || typeof newCustomer !== "object" || !canCreateNew(newCustomer.name)) return { ok: false, error: "Type the customer's name — it needs at least one letter." };
+  if (!input || typeof input !== "object") return { ok: false, error: "The entry details are missing. Reopen the form and try again." };
+  const cityCode = text(input.cityCode, 20);
+  const now = new Date();
+  const res = await withNewCustomerTx(newCustomer, null, async (ctx, tx) => {
+    if (cityCode && !(await tx.select({ c: phCities.code }).from(phCities).where(eq(phCities.code, cityCode)).limit(1)).length) return { ok: false as const, error: "That city isn't in the list." };
+    const id = await insertEntry(tx, {
+      customerId: ctx.customerId, pianoId: null, serviceType: oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
+      ...(input.cityCode !== undefined ? { cityCode, barangayCode: text(input.barangayCode, 20) } : {}),
+      requestedAt: when(input.requestedAt) ?? now, nextFollowUpAt: when(input.nextFollowUpAt) ?? defaultNextFollowUp(now),
+      estValueCents: pesoToCents(input.estValue), notes: text(input.notes, 1_000), source: oneOf(input.source, WAIT_SOURCES.map((s) => s.key) as WaitSource[], "phone"),
+    }, now);
+    return { ok: true as const, data: { id } };
+  });
+  if (!res.ok) return res;
+  touch();
+  return { ok: true, data: { id: res.data!.id, customerId: res.customerId, customerName: res.customerName } };
 }
 
 export async function updateWaitlistEntry(id: string, patch: Partial<EntryInput> & { status?: string }): Promise<Result> {
