@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Receipt, Search, ArrowUpRight, Wallet2, FileClock, X } from "lucide-react";
 import { fmtDate, peso } from "@/lib/format";
@@ -9,7 +9,10 @@ import {
 } from "@/lib/service";
 import { isCountable } from "@/lib/service-reports";
 import { defaultDueDate, parsePesoInput } from "@/lib/service-flow";
-import { CustomerPicker } from "@/components/service-forms";
+import { CustomerCombobox, NewContactNotice, addedNotice, type ComboCustomer, type NewCustomerSubmitResult } from "@/components/service-customer-combobox";
+import { choiceState, type CustomerChoice } from "@/lib/service-customer-match";
+import { GENERIC_SAVE_ERROR, thrownSubmitMessage } from "@/lib/service-expense-form";
+import { createInvoiceWithNewCustomer } from "@/server/service-new-customer-actions";
 import type { InvoiceRow } from "@/server/service-data";
 import { createInvoice, recordPayment, setInvoiceStatus } from "@/server/service";
 import {
@@ -59,13 +62,14 @@ export default function InvoicesClient({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState(() => (FILTERS.some((f) => f.key === initialFilter) ? initialFilter : "open"));
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [payFor, setPayFor] = useState<InvoiceRow | null>(null);
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
-    setError(null);
+    setError(null); setNotice(null);
     startTransition(async () => {
       const res = await fn();
       if (res && !res.ok) setError(res.error ?? "Something went wrong.");
@@ -115,6 +119,7 @@ export default function InvoicesClient({
       </header>
 
       <ErrorLine>{error}</ErrorLine>
+      <NewContactNotice text={notice} />
 
       <div className="svc-tiles">
         <StatCard label="Invoiced" value={<Money cents={totals.invoiced} />} icon={<Receipt size={15} />} sub="sent · all time" />
@@ -300,6 +305,13 @@ export default function InvoicesClient({
         vatEnabled={vatEnabled}
         pending={pending}
         onCreate={(input) => run(() => createInvoice(input))}
+        onCreateForNewCustomer={async (customer, input) => {
+          setError(null); setNotice(null);
+          const res = await createInvoiceWithNewCustomer(customer, input);
+          if (!res.ok) return { ok: false, error: res.error, duplicateOf: res.duplicateOf };
+          setNotice(addedNotice(res.data.customerName));
+          return { ok: true };
+        }}
       />
 
       <PaymentModal
@@ -331,7 +343,7 @@ function InvoiceActions({ inv, pending, onPay, onSend }: { inv: InvoiceRow; pend
 type NewInvoiceProps = {
   open: boolean;
   onClose: () => void;
-  customers: { id: string; name: string }[];
+  customers: ComboCustomer[];
   catalog: { id: string; name: string; unitPriceCents: number; taxable: boolean }[];
   jobOptions: { id: string; customerId: string; label: string }[];
   termsDays: number;
@@ -342,20 +354,40 @@ type NewInvoiceProps = {
     items: { description: string; qty: number; unitPrice: number; taxable: boolean }[];
     dueDate: string | null; notes: string;
   }) => void;
+  /**
+   * The Customer field takes a name that isn't saved yet: the customer and the invoice are saved together. Resolves with the
+   * server result; the form stays open (keeping what was typed) until it reports ok.
+   */
+  onCreateForNewCustomer: (
+    customer: { name: string; phone?: string; allowDuplicate?: boolean },
+    input: { items: { description: string; qty: number; unitPrice: number; taxable: boolean }[]; dueDate: string | null; notes: string },
+  ) => Promise<NewCustomerSubmitResult>;
 };
 
 function NewInvoiceModal(props: NewInvoiceProps) {
+  // While a save is in flight every close path is ignored, so the form can't unmount mid-request.
+  const savingRef = useRef(false);
+  const [saving, setSavingState] = useState(false);
+  const setSaving = (v: boolean) => { savingRef.current = v; setSavingState(v); };
+  const close = () => { if (!savingRef.current) props.onClose(); };
   return (
-    <SvcModal open={props.open} onClose={props.onClose} title="New invoice" subtitle="Add as many lines as you need — a job link is optional." wide>
-      {props.open && <NewInvoiceBody {...props} />}
+    <SvcModal open={props.open} onClose={close} title="New invoice" subtitle="Add as many lines as you need — a job link is optional." wide>
+      {props.open && <NewInvoiceBody {...props} onClose={close} saving={saving} setSaving={setSaving} />}
     </SvcModal>
   );
 }
 
 type DraftLine = { key: number; description: string; qty: string; price: string; taxable: boolean };
 
-function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, vatEnabled, pending, onCreate }: NewInvoiceProps) {
-  const [customerId, setCustomerId] = useState("");
+function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, vatEnabled, pending, onCreate, onCreateForNewCustomer, saving, setSaving }: NewInvoiceProps & { saving: boolean; setSaving: (v: boolean) => void }) {
+  const [choice, setChoice] = useState<CustomerChoice>({ kind: "none" });
+  const [learned, setLearned] = useState<ComboCustomer[]>([]);
+  const comboCustomers = useMemo(() => [...customers, ...learned.filter((l) => !customers.some((c) => c.id === l.id))], [customers, learned]);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const errBoxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (saveErr) errBoxRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [saveErr]);
+  const customerId = choice.kind === "existing" ? choice.id : "";
+  const cState = choiceState(choice, comboCustomers);
   const [jobId, setJobId] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([{ key: 1, description: "", qty: "1", price: "", taxable: true }]);
   // Due date starts at today + the payment-terms setting, so the usual case needs no typing.
@@ -375,7 +407,7 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
 
   return (
     <div className="space-y-4">
-      <Field label="Customer"><CustomerPicker customers={customers} value={customerId} onChange={(id) => { setCustomerId(id); setJobId(""); }} autoFocus /></Field>
+      <CustomerCombobox label="Customer" customers={comboCustomers} value={choice} onChange={(next) => { setChoice(next); setSaveErr(null); setJobId(""); }} autoFocus />
       {customerId && customerJobs.length > 0 && (
         <Field label="Link to a job (optional)">
           <Select value={jobId} onChange={(e) => setJobId(e.target.value)}>
@@ -436,18 +468,34 @@ function NewInvoiceBody({ onClose, customers, catalog, jobOptions, termsDays, va
         <Field label="Notes"><TextInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Thank you! GCash accepted" /></Field>
       </div>
 
+      <div ref={errBoxRef}><ErrorLine>{saveErr}</ErrorLine></div>
+      {cState === "needs-decision" && <p className="text-[12px] text-right" style={{ color: "var(--color-svc-text-dim)" }}>Choose “Use existing” or “Create as new anyway” first.</p>}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <p className="text-[14px] svc-num" style={{ color: "var(--color-svc-text-dim)" }}>Subtotal <b className="font-medium" style={{ color: "var(--color-svc-text)" }}>{peso(totalCents)}</b>{vatEnabled ? " + VAT" : ""}</p>
         <div className="flex gap-2">
-          <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
+          <GhostButton onClick={onClose} disabled={saving} className="!min-h-11">Cancel</GhostButton>
           <PrimaryButton
-            pending={pending} disabled={!customerId || usable.length === 0 || priceBad} className="!min-h-11"
-            onClick={() => {
-              onCreate({
-                customerId, jobId: jobId || null,
-                items: usable.map((l) => ({ description: l.description.trim(), qty: Math.max(1, Math.round(Number(l.qty)) || 1), unitPrice: parsePesoInput(l.price) ?? 0, taxable: l.taxable })),
-                dueDate: dueDate || null, notes,
-              });
+            pending={pending || saving} disabled={cState !== "ready" || usable.length === 0 || priceBad} className="!min-h-11"
+            onClick={async () => {
+              if (saving) return;
+              const items = usable.map((l) => ({ description: l.description.trim(), qty: Math.max(1, Math.round(Number(l.qty)) || 1), unitPrice: parsePesoInput(l.price) ?? 0, taxable: l.taxable }));
+              if (choice.kind === "new") {
+                setSaving(true); setSaveErr(null);
+                try {
+                  const res = await onCreateForNewCustomer(
+                    { name: choice.name, ...(choice.phone ? { phone: choice.phone } : {}), ...(choice.allowDuplicate ? { allowDuplicate: true } : {}) },
+                    { items, dueDate: dueDate || null, notes },
+                  );
+                  if (res.ok) { setSaving(false); onClose(); return; }
+                  if (res.duplicateOf) setLearned((cur) => [...cur, { id: res.duplicateOf!.id, name: res.duplicateOf!.name }]);
+        setSaveErr(res.error ?? GENERIC_SAVE_ERROR);
+                } catch (err) {
+                  setSaveErr(thrownSubmitMessage(err, typeof navigator !== "undefined" && navigator.onLine === false));
+                }
+                setSaving(false);
+                return;
+              }
+              onCreate({ customerId, jobId: jobId || null, items, dueDate: dueDate || null, notes });
               onClose();
             }}
           >

@@ -26,6 +26,8 @@
     "test:inquiry": "tsx tests/service-inquiry.ts",
     "test:followups": "tsx tests/service-followups.ts",
     "test:followups-db": "tsx tests/service-followups-db.ts",
+    "test:customer-match": "tsx tests/service-customer-match.ts",
+    "test:new-customer-db": "tsx tests/service-new-customer-db.ts",
     "test:waitlist-convert-db": "tsx tests/service-waitlist-convert-db.ts",
     "test:integration": "node tests/task-flow.cjs",
     "test:all": "npm test && npm run test:integration && npm run build",

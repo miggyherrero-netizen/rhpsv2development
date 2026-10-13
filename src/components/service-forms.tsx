@@ -20,6 +20,9 @@ import { EXPENSE_KINDS } from "@/lib/service-finance-split";
 import { manilaDateTimeLocal } from "@/lib/service-flow";
 import { parsePesoInput } from "@/lib/service-flow";
 import { createCustomer, createLocation, createPiano, loadCustomerPlaces } from "@/server/service";
+import { isBatchCustomer, titleCaseName } from "@/lib/service-reports";
+import { choiceState, type CustomerChoice } from "@/lib/service-customer-match";
+import { CustomerCombobox, type ComboCustomer, type NewCustomerSubmitResult } from "@/components/service-customer-combobox";
 import {
   DateField, ErrorLine, Field, GhostButton, PesoInput, PrimaryButton, Select, SvcModal, TextArea, TextInput, UnitInput,
 } from "@/components/service-ui";
@@ -111,6 +114,16 @@ export function JobFormModal(props: {
   initial?: Partial<JobFormValues>;
   onSubmit: (values: JobFormValues) => void;
   /**
+   * New jobs only. When given, the Customer field is a type-to-search box and a name that isn't saved yet becomes a new
+   * contact together with the job. Resolves with the server result; the form stays open (keeping what was typed) until it
+   * reports ok. Customers picked from the list still go through `onSubmit`, exactly as before.
+   */
+  onSubmitNewCustomer?: (
+    customer: { name: string; phone?: string; allowDuplicate?: boolean },
+    piano: { brand: string; model: string; type: string } | null,
+    values: JobFormValues,
+  ) => Promise<NewCustomerSubmitResult>;
+  /**
    * "Convert to job" from the waitlist: the customer is fixed, only the essentials show (service type, time, notes) and
    * the rest sits under "More options". The modal stays open on submit, so an error can be shown without losing the form.
    */
@@ -118,18 +131,25 @@ export function JobFormModal(props: {
 }) {
   const { open, onClose, mode, convert } = props;
   const sale = props.initial?.jobType === "sale";
+  // While a save is in flight every close path (X, Esc, backdrop, Cancel) is ignored, so the form can't unmount mid-request.
+  const savingRef = useRef(false);
+  const [saving, setSavingState] = useState(false);
+  const setSaving = (v: boolean) => { savingRef.current = v; setSavingState(v); };
+  const guardedClose = () => { if (!savingRef.current) onClose(); };
   return (
     <SvcModal
-      open={open} onClose={onClose} wide
+      open={open} onClose={guardedClose} wide
       title={convert?.title ?? (mode === "new" ? "New job" : sale ? "Edit piano sale" : "Edit visit")}
       subtitle={convert ? convert.subtitle : mode === "new" ? "Leave the time blank to park it in Unscheduled." : undefined}
     >
-      {open && <JobFormBody {...props} />}
+      {open && <JobFormBody {...props} onClose={guardedClose} saving={saving} setSaving={setSaving} />}
     </SvcModal>
   );
 }
 
-function JobFormBody({ onClose, mode, pending, customers, technicians, showroomPianos, initial, onSubmit, convert }: Parameters<typeof JobFormModal>[0]) {
+function JobFormBody({ onClose, mode, pending, customers, technicians, showroomPianos, initial, onSubmit, onSubmitNewCustomer, convert, saving, setSaving }: Parameters<typeof JobFormModal>[0] & { saving: boolean; setSaving: (v: boolean) => void }) {
+  // Type-to-search customer (new jobs only). Edit and convert keep the old picker / fixed customer.
+  const typing = mode === "new" && !convert && !!onSubmitNewCustomer;
   const [moreOpen, setMoreOpen] = useState(false);
   const [jobType, setJobType] = useState<string>(initial?.jobType ?? "service");
   const isSale = jobType === "sale";
@@ -142,6 +162,14 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
   const [deposit, setDeposit] = useState(initial?.deposit ? String(initial.deposit) : "");
   const showroomPick = showroomPianos?.find((p) => p.id === salePianoId) ?? null;
   const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
+  const [choice, setChoice] = useState<CustomerChoice>(initial?.customerId ? { kind: "existing", id: initial.customerId } : { kind: "none" });
+  // Customers the server told us about (a duplicate it found that this list didn't have yet).
+  const [learned, setLearned] = useState<ComboCustomer[]>([]);
+  const comboCustomers = useMemo(() => [...customers, ...learned.filter((l) => !customers.some((c) => c.id === l.id))], [customers, learned]);
+  const [newPiano, setNewPiano] = useState({ brand: "", model: "", type: "Upright" });
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const errBoxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (saveErr) errBoxRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [saveErr]);
   const [locationId, setLocationId] = useState(initial?.locationId ?? "");
   const [pianoId, setPianoId] = useState(initial?.pianoId ?? "");
   // The one active technician is preselected so a solo operator never has to pick themselves.
@@ -177,6 +205,14 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
   const [inlineErr, setInlineErr] = useState<string | null>(null);
 
   const pickCustomer = (id: string) => { setCustomerId(id); setLocationId(""); setPianoId(""); setAddPlace(false); setAddPiano(false); };
+  const pickChoice = (next: CustomerChoice) => {
+    setChoice(next); setSaveErr(null);
+    const id = next.kind === "existing" ? next.id : "";
+    if (id !== customerId) pickCustomer(id);
+  };
+  const newName = typing && choice.kind === "new" ? choice.name : "";
+  const isNew = typing && choice.kind === "new";
+  const cState = typing ? choiceState(choice, comboCustomers) : null;
 
   const savePlace = async () => {
     setInlineBusy(true); setInlineErr(null);
@@ -197,9 +233,10 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
     setPianoId(res.data.id); setAddPiano(false); setPiano({ brand: "", model: "", type: "Upright", lastTuned: "" });
   };
 
-  const isBatch = !!customers.find((c) => c.id === customerId)?.isBatch;
+  const isBatch = isNew ? isBatchCustomer([], titleCaseName(newName)) : !!comboCustomers.find((c) => c.id === customerId)?.isBatch;
   // A home-service job must name the customer's piano (or add one on the spot) so history and recalls stay right.
-  const needsPiano = !isSale && !isBatch && !pianoId;
+  // A customer who isn't saved yet has no piano to pick, so the brand is typed here and saved with them.
+  const needsPiano = !isSale && !isBatch && (isNew ? !newPiano.brand.trim() : !pianoId);
   const needsSalePiano = isSale && !salePianoId;
   const moneyBad = [buyCost, prepCost, salePrice, deposit].some((v) => v.trim() !== "" && parsePesoInput(v) === null);
 
@@ -212,17 +249,38 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
     if (!priceTouched && p.listPriceCents) setSalePrice(String(p.listPriceCents / 100));
   };
 
-  const submit = () => {
-    if (!customerId || needsPiano || needsSalePiano || moneyBad) return;
-    onSubmit({
-      customerId, locationId: locationId || null, pianoId: isSale ? null : pianoId || null, technicianId: technicianId || null,
-      title: title.trim() || (isSale ? "" : "Home service visit"), serviceType: isSale ? "delivery" : serviceType, priority, scheduledStart: start || null,
-      estimatedMinutes: Math.max(15, Number(minutes) || serviceTypeMinutes(isSale ? "delivery" : serviceType)),
-      travelFee: isSale ? 0 : parsePesoInput(travelFee) ?? 0, notes, privateNotes,
-      jobType, salePianoId: isSale ? salePianoId || null : null,
-      buyCost: parsePesoInput(buyCost) ?? 0, prepCost: parsePesoInput(prepCost) ?? 0,
-      salePrice: parsePesoInput(salePrice) ?? 0, deposit: parsePesoInput(deposit) ?? 0,
-    });
+  const values = (): JobFormValues => ({
+    customerId, locationId: locationId || null, pianoId: isSale ? null : pianoId || null, technicianId: technicianId || null,
+    title: title.trim() || (isSale ? "" : "Home service visit"), serviceType: isSale ? "delivery" : serviceType, priority, scheduledStart: start || null,
+    estimatedMinutes: Math.max(15, Number(minutes) || serviceTypeMinutes(isSale ? "delivery" : serviceType)),
+    travelFee: isSale ? 0 : parsePesoInput(travelFee) ?? 0, notes, privateNotes,
+    jobType, salePianoId: isSale ? salePianoId || null : null,
+    buyCost: parsePesoInput(buyCost) ?? 0, prepCost: parsePesoInput(prepCost) ?? 0,
+    salePrice: parsePesoInput(salePrice) ?? 0, deposit: parsePesoInput(deposit) ?? 0,
+  });
+  const customerReady = typing ? cState === "ready" : !!customerId;
+  const canSubmit = customerReady && !needsPiano && !needsSalePiano && !moneyBad && !saving;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    if (isNew && choice.kind === "new" && onSubmitNewCustomer) {
+      setSaving(true); setSaveErr(null);
+      try {
+        const res = await onSubmitNewCustomer(
+          { name: choice.name, ...(choice.phone ? { phone: choice.phone } : {}), ...(choice.allowDuplicate ? { allowDuplicate: true } : {}) },
+          isSale || isBatch ? null : { brand: newPiano.brand.trim(), model: newPiano.model.trim(), type: newPiano.type },
+          values(),
+        );
+        if (res.ok) { setSaving(false); onClose(); return; }
+        if (res.duplicateOf) setLearned((cur) => [...cur, { id: res.duplicateOf!.id, name: res.duplicateOf!.name }]);
+        setSaveErr(res.error ?? GENERIC_SAVE_ERROR);
+      } catch (err) {
+        setSaveErr(thrownSubmitMessage(err, typeof navigator !== "undefined" && navigator.onLine === false));
+      }
+      setSaving(false);
+      return;
+    }
+    onSubmit(values());
     if (!convert) onClose();
   };
 
@@ -247,7 +305,11 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
           <p className="text-[16px] font-medium" style={{ color: "var(--color-svc-text)" }}>{convert.customerName}</p>
         </div>
       ) : (
-        <Field label={isSale ? "Buyer" : "Customer"}><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+        typing ? (
+          <CustomerCombobox label={isSale ? "Buyer" : "Customer"} customers={comboCustomers} value={choice} onChange={pickChoice} autoFocus />
+        ) : (
+          <Field label={isSale ? "Buyer" : "Customer"}><CustomerPicker customers={customers} value={customerId} onChange={pickCustomer} autoFocus={mode === "new"} /></Field>
+        )
       )}
 
       {isSale && (
@@ -260,17 +322,17 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label={isSale ? "Delivery address" : "Location"} hint={loadingPlaces ? "Loading addresses…" : undefined}>
+        <Field label={isSale ? "Delivery address" : "Location"} hint={loadingPlaces ? "Loading addresses…" : isNew ? "Add an address later on the customer page" : undefined}>
           <Select
             aria-label="Location" disabled={!customerId} value={addPlace ? ADD_PLACE : locationId}
             onChange={(e) => (e.target.value === ADD_PLACE ? setAddPlace(true) : (setAddPlace(false), setLocationId(e.target.value)))}
           >
-            <option value="">{customerId ? "No location yet" : "Pick a customer first"}</option>
+            <option value="">{customerId || isNew ? "No location yet" : "Pick a customer first"}</option>
             {places.locations.map((l) => <option key={l.id} value={l.id}>{l.label} — {l.addressLine}</option>)}
             {customerId && <option value={ADD_PLACE}>＋ Add an address…</option>}
           </Select>
         </Field>
-        {!isSale && (
+        {!isSale && !isNew && (
           <Field label="Piano" hint={needsPiano && customerId ? "Required — pick one or add a new piano" : undefined}>
             <Select
               aria-label="Piano" aria-required={!isBatch} disabled={!customerId} value={addPiano ? ADD_PIANO : pianoId}
@@ -283,6 +345,22 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
           </Field>
         )}
       </div>
+
+      {isNew && cState === "ready" && !isSale && !isBatch && (
+        <fieldset className="rounded-xl p-3.5 space-y-3" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
+          <legend className="px-1.5 text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>Piano for this visit</legend>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Field label="Brand"><TextInput value={newPiano.brand} onChange={(e) => setNewPiano({ ...newPiano, brand: e.target.value })} placeholder="e.g. Yamaha" aria-required="true" maxLength={120} /></Field>
+            <Field label="Model (optional)"><TextInput value={newPiano.model} onChange={(e) => setNewPiano({ ...newPiano, model: e.target.value })} placeholder="e.g. U1" maxLength={120} /></Field>
+            <Field label="Type">
+              <Select value={newPiano.type} onChange={(e) => setNewPiano({ ...newPiano, type: e.target.value })}>
+                {["Upright", "Grand", "Digital", "Organ"].map((t) => <option key={t}>{t}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <p className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>Saved with the new customer. Every visit is logged against a piano.</p>
+        </fieldset>
+      )}
 
       {addPlace && (
         <InlineBox onCancel={() => { setAddPlace(false); setInlineErr(null); }} onSave={savePlace} busy={inlineBusy} err={inlineErr} saveLabel="Save address" canSave={!!place.addressLine.trim()}>
@@ -402,9 +480,11 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
       })()}
 
       {convert && <ErrorLine>{convert.error}</ErrorLine>}
+      <div ref={errBoxRef}><ErrorLine>{saveErr}</ErrorLine></div>
+      {typing && cState === "needs-decision" && <p className="text-[12px] text-right" style={{ color: "var(--color-svc-text-dim)" }}>Choose “Use existing” or “Create as new anyway” first.</p>}
       <div className="flex justify-end gap-2 pt-2">
-        <GhostButton onClick={onClose} className="!min-h-11">Cancel</GhostButton>
-        <PrimaryButton pending={pending} disabled={!customerId || needsPiano || needsSalePiano || moneyBad} onClick={submit} className="!min-h-11">
+        <GhostButton onClick={onClose} disabled={saving} className="!min-h-11">Cancel</GhostButton>
+        <PrimaryButton pending={pending || saving} disabled={!customerReady || needsPiano || needsSalePiano || moneyBad} onClick={submit} className="!min-h-11">
           {convert ? convert.submitLabel : mode === "new" ? (isSale ? "Create sale" : "Create job") : "Save changes"}
         </PrimaryButton>
       </div>

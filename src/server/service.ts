@@ -509,40 +509,44 @@ export async function createJob(input: JobInput): Promise<Result<{ id: string }>
       if (!owned) return fail("That piano belongs to a different customer.");
     }
   }
-  const [row] = await db
-    .insert(serviceJobs)
-    .values({
-      jobType,
-      ...(sale && sale.ok ? {
-        salePianoId: sale.salePianoId, buyCostCents: sale.buyCostCents, prepCostCents: sale.prepCostCents,
-        salePriceCents: sale.salePriceCents, depositCents: sale.depositCents,
-      } : {}),
-      customerId: input.customerId,
-      locationId: str(input.locationId) || null,
-      pianoId,
-      technicianId: str(input.technicianId) || null,
-      title,
-      serviceType: jobType === "sale" ? "delivery" : oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
-      status: jobType === "sale" ? "lead" : oneOf(input.status, JOB_STATUSES.map((s) => s.key), "lead"),
-      priority: oneOf(input.priority, ["low", "normal", "high", "urgent"], "normal"),
-      scheduledStart: optionalDate(input.scheduledStart),
-      scheduledEnd: optionalDate(input.scheduledEnd),
-      estimatedMinutes: Math.max(0, intOr(input.estimatedMinutes, 60)),
-      travelMinutes: Math.max(0, intOr(input.travelMinutes, 0)),
-      travelFeeCents: Math.max(0, moneyToCents(input.travelFee)),
-      notes: str(input.notes, 4_000),
-      privateNotes: str(input.privateNotes, 4_000),
-    })
-    .returning({ id: serviceJobs.id });
+  // One transaction: a job never exists without its "created" event (and a failed save leaves nothing behind).
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(serviceJobs)
+      .values({
+        jobType,
+        ...(sale && sale.ok ? {
+          salePianoId: sale.salePianoId, buyCostCents: sale.buyCostCents, prepCostCents: sale.prepCostCents,
+          salePriceCents: sale.salePriceCents, depositCents: sale.depositCents,
+        } : {}),
+        customerId: input.customerId,
+        locationId: str(input.locationId) || null,
+        pianoId,
+        technicianId: str(input.technicianId) || null,
+        title,
+        serviceType: jobType === "sale" ? "delivery" : oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
+        status: jobType === "sale" ? "lead" : oneOf(input.status, JOB_STATUSES.map((s) => s.key), "lead"),
+        priority: oneOf(input.priority, ["low", "normal", "high", "urgent"], "normal"),
+        scheduledStart: optionalDate(input.scheduledStart),
+        scheduledEnd: optionalDate(input.scheduledEnd),
+        estimatedMinutes: Math.max(0, intOr(input.estimatedMinutes, 60)),
+        travelMinutes: Math.max(0, intOr(input.travelMinutes, 0)),
+        travelFeeCents: Math.max(0, moneyToCents(input.travelFee)),
+        notes: str(input.notes, 4_000),
+        privateNotes: str(input.privateNotes, 4_000),
+      })
+      .returning({ id: serviceJobs.id });
 
-  await db.insert(serviceJobEvents).values({
-    jobId: row!.id,
-    type: "created",
-    message: jobType === "sale" ? "Piano sale created" : "Job created",
-    actorName: "Owner",
+    await tx.insert(serviceJobEvents).values({
+      jobId: created!.id,
+      type: "created",
+      message: jobType === "sale" ? "Piano sale created" : "Job created",
+      actorName: "Owner",
+    });
+    return created!;
   });
   touch();
-  return ok({ id: row!.id });
+  return ok({ id: row.id });
 }
 
 export async function updateJob(id: string, patch: Partial<JobInput>): Promise<Result> {
