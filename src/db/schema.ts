@@ -10,6 +10,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  foreignKey,
   type AnyPgColumn,
   pgEnum,
   doublePrecision,
@@ -860,3 +861,18 @@ export const serviceReminders = pgTable("service_reminders", {
 }));
 
 export type ServiceReminder = typeof serviceReminders.$inferSelect;
+
+/* ============ MAINTENANCE: customer consent (Phase 1: read by /service/maintenance, nothing writes it yet, nothing is sent) ============ */
+
+export const serviceNotificationPreferences = pgTable("service_notification_preferences", {
+  customerId: uuid("customer_id").primaryKey(),
+  emailConsent: boolean("email_consent").notNull().default(false),
+  smsConsent: boolean("sms_consent").notNull().default(false),
+  preferredChannel: text("preferred_channel").notNull().default("manual"),
+  optedOutAt: timestamp("opted_out_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+}, (t) => ({
+  // Explicit short names: Postgres cuts identifiers at 63 characters, and a truncated default name makes `drizzle-kit push` drop and re-add the key on every run.
+  customerFk: foreignKey({ columns: [t.customerId], foreignColumns: [serviceCustomers.id], name: "service_notif_prefs_customer_fk" }).onDelete("cascade"),
+}));
