@@ -219,7 +219,7 @@ export async function getRecalls(now: Date = new Date(), leadDays = 30): Promise
 
 /**
  * Recalls for Today's count and card: a piano is left out only when a waitlist entry owns its recall (`entryOwnsRecall`: the
- * entry is in the follow-up queue, or is scheduled with a job). Anything else stays here, so a recall is never in neither place.
+ * entry is due now, so it is on Today's "Follow up today" panel, or is scheduled with a job). Anything else stays here, so a recall is never in neither place.
  * (The customers page keeps using getRecalls: it is a per-piano view, not a count.)
  */
 export async function getUntrackedRecalls(now: Date = new Date(), leadDays = 30): Promise<RecallRow[]> {

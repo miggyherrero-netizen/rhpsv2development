@@ -61,7 +61,7 @@ export async function getNextReminderByCustomer(): Promise<Map<string, Date>> {
   return next;
 }
 
-/** Open reminders due before `before` (id + day only): feeds the combined follow-up badge without joining customers. */
+/** Open reminders due before `before` (id + day only): feeds the Follow-ups sidebar badge without joining customers. */
 export async function getOpenReminderDueDates(before: Date): Promise<{ id: string; dueAt: Date }[]> {
   return db.select({ id: serviceReminders.id, dueAt: serviceReminders.dueAt }).from(serviceReminders)
     .where(and(eq(serviceReminders.status, "open"), lt(serviceReminders.dueAt, before)));

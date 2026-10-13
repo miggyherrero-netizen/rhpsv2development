@@ -1,5 +1,5 @@
 /**
- * DB-backed scenario for the one follow-up queue. LOCAL POSTGRES ONLY. NOT part of `npm test`.
+ * DB-backed scenario for the reminders badge / page and the waitlist recall dedupe. LOCAL POSTGRES ONLY. NOT part of `npm test`.
  * Same pattern as tests/service-waitlist-convert-db.ts: a throw-away database `herrero_followups_test` is created on the same
  * local server (schema copied with pg_dump -s from the base database), the real read functions run there, then it is dropped.
  *
@@ -40,11 +40,11 @@ async function main() {
   const { db, pool } = await import("../src/db");
   const S = await import("../src/db/schema");
   const core = await import("../src/server/service-waitlist-core");
-  const { getFollowUpQueue, getFollowUpDueCount, getFollowUpDueCountSafe } = await import("../src/server/service-followups-data");
+  const { getFollowUpDueCount, getFollowUpDueCountSafe } = await import("../src/server/service-followups-data");
   const { getRemindersDue } = await import("../src/server/service-reminders-data");
   const { getFollowUpsDue } = await import("../src/server/service-waitlist-data");
   const { getRecalls, getUntrackedRecalls } = await import("../src/server/service-data");
-  const { followUpCounts } = await import("../src/lib/service-followups");
+  const { groupReminders } = await import("../src/lib/service-reminders");
   const { startOfManilaDayUTC } = await import("../src/lib/dates");
 
   try {
@@ -80,55 +80,36 @@ async function main() {
     await entry(cai.id, { pianoId: pRecall.id, source: "recall", status: "waiting", requestedAt: day(-2), nextFollowUpAt: day(-2) });
     await entry(ben.id, { pianoId: pFuture.id, source: "recall", status: "waiting", requestedAt: day(10), nextFollowUpAt: day(10) });
 
-    console.log("1. the queue returns every open item once");
-    const queue = await getFollowUpQueue(now);
-    const keys = queue.map((q) => q.key);
-    check("no duplicate rows", new Set(keys).size === keys.length, keys);
-    const counts = followUpCounts(queue, now);
-    check("3 reminders (done one excluded)", counts.reminder === 3, counts);
-    check("5 waitlist rows: overdue, today, upcoming, recall due, recall in 10 days", counts.waitlist === 5, counts);
-    check("done / scheduled / confirmed / paused not_now are absent", !queue.some((q) => q.kind === "waitlist" && ["done", "scheduled", "confirmed", "not_now"].includes(q.entry.status)));
-    check("overdue = the reminder only; today = the reminder; waitlist due (overdue, today, recall) = 3, none called overdue", counts.overdue === 1 && counts.today === 1 && counts.waitlistNow === 3, counts);
-    check("upcoming = reminder(+5) + waitlist(+4) + recall(+10); due total still 5", counts.upcoming === 3 && counts.due === 5, counts);
-    check("sorted by due day", queue.every((q, i) => i === 0 || queue[i - 1]!.dueAt.getTime() <= q.dueAt.getTime()));
+    console.log("1. the Follow-ups page / badge are reminders only");
+    const { getOpenReminders } = await import("../src/server/service-reminders-data");
+    const reminders = await getOpenReminders();
+    check("3 open reminders (the done one is excluded); no waitlist row can be in the list", reminders.length === 3 && reminders.every((r) => "customerName" in r && !("entry" in r)), reminders.length);
+    const groups = groupReminders(reminders, now);
+    check("overdue 1, today 1, upcoming 1", [groups.overdue.length, groups.today.length, groups.upcoming.length].join() === "1,1,1");
 
-    console.log("\n2. sidebar badge = the queue's overdue + today = Today's two lists");
+    console.log("\n2. sidebar badge = overdue + today REMINDERS only (waitlist entries are not counted)");
     const badge = await getFollowUpDueCount(now);
     const [remsDue, waitDue] = await Promise.all([getRemindersDue(now), getFollowUpsDue(now)]);
-    check(`badge ${badge} === queue due ${counts.due}`, badge === counts.due, { badge, due: counts.due });
-    check(`Today's reminders (${remsDue.length}) + Today's follow-ups (${waitDue.length}) === badge`, remsDue.length + waitDue.length === badge, { r: remsDue.length, w: waitDue.length, badge });
+    check(`badge ${badge} === Today's reminders ${remsDue.length}`, badge === remsDue.length && badge === 2, { badge, r: remsDue.length });
+    check(`...even though ${waitDue.length} waitlist follow-ups are due (they live on the Waitlist page and Today's own panel)`, waitDue.length >= 3 && badge === 2, waitDue.length);
 
-    console.log("\n3. the recall with an entry is counted once");
+    console.log("\n3. the recall with an entry is not listed twice");
     const allRecalls = await getRecalls(now);
     const untracked = await getUntrackedRecalls(now);
     check("getRecalls (customers page) still lists all three pianos", allRecalls.length === 3, allRecalls.map((r) => r.pianoLabel));
-    check("getUntrackedRecalls keeps only the piano with no entry", untracked.length === 1 && untracked[0]!.pianoId === pPlain.id, untracked.map((r) => r.pianoLabel));
-    check("the tracked recall is in the queue (as a waitlist row)", queue.some((q) => q.kind === "waitlist" && q.entry.pianoId === pRecall.id));
-    const todayTotal = remsDue.length + waitDue.length + untracked.length;
-    check(`Today's combined total ${todayTotal} = badge ${badge} + untracked recalls ${untracked.length} (no piano twice)`, todayTotal === badge + 1);
+    check("getUntrackedRecalls hides only the piano whose entry is due now; the one with no entry and the one whose entry is 10 days out stay", untracked.length === 2 && untracked.some((r) => r.pianoId === pPlain.id) && untracked.some((r) => r.pianoId === pFuture.id) && !untracked.some((r) => r.pianoId === pRecall.id), untracked.map((r) => r.pianoLabel));
+    check("the tracked recall is a waitlist entry that Today's follow-up panel lists", waitDue.some((w) => w.pianoId === pRecall.id));
 
-    console.log("\n4. marking messaged moves the row, not duplicates it");
-    const overdueEntry = queue.find((q) => q.kind === "waitlist" && q.entry.status === "waiting" && q.dueAt.getTime() < today.getTime() && !q.entry.pianoId);
-    if (overdueEntry && overdueEntry.kind === "waitlist") {
-      const { eq } = await import("drizzle-orm");
-      const { afterMessaged } = await import("../src/lib/service-waitlist");
-      const next = afterMessaged({ status: overdueEntry.entry.status, followUpCount: overdueEntry.entry.followUpCount }, now);
-      await db.update(S.serviceWaitlistEntries).set({ status: next.status as never, followUpCount: next.followUpCount, nextFollowUpAt: next.nextFollowUpAt }).where(eq(S.serviceWaitlistEntries.id, overdueEntry.entry.id));
-      const after = await getFollowUpQueue(now);
-      check("same number of rows, one fewer due", after.length === queue.length && followUpCounts(after, now).due === counts.due - 1);
-      check("badge follows", (await getFollowUpDueCount(now)) === counts.due - 1);
-    } else check("found a plain overdue entry", false);
-
-    console.log("\n5. which entries own a piano's recall (same rule as the queue)");
-    const { entryInQueue } = await import("../src/lib/service-followups");
+    console.log("\n5. which entries own a piano's recall (the waitlist's own rule)");
     const eva = await mk("Eva Rules");
     const [job] = await db.insert(S.serviceJobs).values({ customerId: eva.id, title: "Booked tuning" } as never).returning();
     const cases: { label: string; owns: boolean; entry: Record<string, unknown> | null; withPiano?: boolean }[] = [
-      { label: "waiting in the queue", owns: true, entry: { status: "waiting", nextFollowUpAt: at(0) } },
-      { label: "messaged in the queue", owns: true, entry: { status: "messaged", nextFollowUpAt: at(-1) } },
+      { label: "waiting, due today", owns: true, entry: { status: "waiting", nextFollowUpAt: at(0) } },
+      { label: "messaged, overdue", owns: true, entry: { status: "messaged", nextFollowUpAt: at(-1) } },
       { label: "scheduled with a job", owns: true, entry: { status: "scheduled", jobId: job!.id, nextFollowUpAt: at(0) } },
       { label: "confirmed", owns: false, entry: { status: "confirmed", nextFollowUpAt: at(0) } },
-      { label: "waiting 45 days ahead (beyond the horizon)", owns: false, entry: { status: "waiting", nextFollowUpAt: at(45) } },
+      { label: "waiting 3 days ahead", owns: false, entry: { status: "waiting", nextFollowUpAt: at(3) } },
+      { label: "waiting 45 days ahead", owns: false, entry: { status: "waiting", nextFollowUpAt: at(45) } },
       { label: "paused not_now", owns: false, entry: { status: "not_now", nextFollowUpAt: at(20) } },
       { label: "scheduled but no job", owns: false, entry: { status: "scheduled", nextFollowUpAt: at(0) } },
       { label: "different service type (repair)", owns: false, entry: { status: "waiting", serviceType: "repair", nextFollowUpAt: at(0) } },
@@ -143,13 +124,9 @@ async function main() {
       made.push({ label: c.label, owns: c.owns, pianoId: p.id });
     }
     const untracked2 = new Set((await getUntrackedRecalls(now)).map((r) => r.pianoId));
-    const queue2 = await getFollowUpQueue(now);
     for (const m of made) {
-      check(`${m.label}: ${m.owns ? "suppresses the recall (in queue once)" : "recall stays on Today"}`, untracked2.has(m.pianoId) === !m.owns);
+      check(`${m.label}: ${m.owns ? "suppresses the recall (listed once)" : "recall stays on Today"}`, untracked2.has(m.pianoId) === !m.owns);
     }
-    check("every entry the queue shows equals entryInQueue", queue2.filter((q) => q.kind === "waitlist").every((q) => entryInQueue(q.entry, now)));
-    const inQueueIds = new Set(queue2.flatMap((q) => (q.kind === "waitlist" && q.entry.pianoId ? [q.entry.pianoId] : [])));
-    check("no recall is in neither place (queue or Today's recalls) unless a job owns it", made.every((m) => untracked2.has(m.pianoId) || inQueueIds.has(m.pianoId) || m.label === "scheduled with a job"));
   } finally {
     await pool.end();
     const hard = await getFollowUpDueCount().then(() => "ok", () => "threw");

@@ -60,7 +60,7 @@ export default function ServiceShell({
   canFinance?: boolean;
   children: ReactNode;
   businessName: string;
-  /** Reminders + waitlist follow-ups due today or earlier, counted once each (badge on the Follow-ups link). */
+  /** Open reminders due today or earlier (badge on the Follow-ups link; waitlist follow-ups are not counted here). */
   dueFollowUps?: number;
   /** Owner setting: hides the Finance link only — the route itself is not blocked. */
   showFinance?: boolean;
