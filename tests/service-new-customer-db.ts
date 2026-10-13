@@ -89,10 +89,12 @@ async function main() {
     const mj = maria ? await jobsOf(maria.id) : [];
     check("job saved against that customer and that piano", mj.length === 1 && mj[0]!.pianoId === mp[0]?.id, mj);
 
-    console.log("\n2. phone is optional, piano is optional");
-    const r2 = await nc.withNewCustomer({ name: "Lourdes Tan" }, null, jobStep("Visit"));
+    console.log("\n2. phone is optional; no piano typed -> an \"N/A\" piano is still created");
+    const r2 = await nc.withNewCustomer({ name: "Lourdes Tan" }, { brand: "" }, jobStep("Visit"));
     const lou = (await byName("Lourdes Tan"))[0];
-    check("customer without phone and without piano", r2.ok && !!lou && lou.phone === null && (await pianosOf(lou.id)).length === 0, r2);
+    const lp = lou ? await pianosOf(lou.id) : [];
+    check("customer without phone gets an N/A piano (model empty) and the job is linked to it", r2.ok && !!lou && lou.phone === null && lp.length === 1 && lp[0]!.brand === "N/A" && lp[0]!.model === null
+      && (await jobsOf(lou.id))[0]?.pianoId === lp[0]!.id, { r2, lp });
 
     /* ---- 3. failures leave nothing behind ---- */
     console.log("\n3. a refused job leaves no orphan customer, piano or job");
@@ -158,7 +160,8 @@ async function main() {
       check(`"${bad.slice(0, 12)}${bad.length > 12 ? "…" : ""}" is refused`, !rr.ok && (await countCustomers()) === beforeInvalid, rr);
     }
     const rbp = await nc.withNewCustomer({ name: "No Brand" }, { brand: "  " }, jobStep());
-    check("a piano without a brand is refused and nothing is written", !rbp.ok && (await countCustomers()) === beforeInvalid, rbp);
+    const nbp = (await byName("No Brand"))[0];
+    check("a blank brand becomes the N/A placeholder", rbp.ok && !!nbp && (await pianosOf(nbp.id))[0]?.brand === "N/A", rbp);
 
     /* ---- 7. parallel submits ---- */
     console.log("\n7. two parallel submits of the same new name");
@@ -182,13 +185,14 @@ async function main() {
 
     /* ---- 9. waitlist: one real transaction ---- */
     console.log("\n9. waitlist entry for a new customer (single transaction)");
-    const rw = await nc.withNewCustomerTx({ name: "wait person", phone: "0999 111 2222" }, null, async (ctx, tx) => {
+    const rw = await nc.withNewCustomerTx({ name: "wait person", phone: "0999 111 2222" }, { brand: "" }, async (ctx, tx) => {
       const id = await core.insertEntry(tx, { customerId: ctx.customerId, pianoId: null, cityCode: "112403000", notes: "Sticky keys" });
       return { ok: true as const, data: { id } };
     });
     const wp = (await byName("Wait Person"))[0];
     const we = wp ? await entriesOf(wp.id) : [];
     check("customer and entry saved, entry waiting with a follow-up", rw.ok && we.length === 1 && we[0]!.status === "waiting" && we[0]!.pianoId === null, { rw, we });
+    check("…and the new customer got an N/A piano", !!wp && (await pianosOf(wp.id)).length === 1 && (await pianosOf(wp.id))[0]!.brand === "N/A");
     const entriesBefore = (await db.select().from(S.serviceWaitlistEntries)).length;
     const custBefore = await countCustomers();
     const rwf = await nc.withNewCustomerTx({ name: "Wait Refused" }, null, async (ctx, tx) => {
@@ -267,10 +271,11 @@ async function main() {
     check("…and the other customer's data was not touched", (await jobsOf(otherCust!.id)).length === 0 && (await db.select().from(S.serviceLocations).where(eq(S.serviceLocations.customerId, otherCust!.id))).length === 1);
 
     const needPiano = await real.createJobWithNewCustomer({ name: "No Piano Person" }, null, jobFields() as never);
-    check("a home visit for a new customer needs a piano: refused before anything is written", !needPiano.ok && /piano/i.test(needPiano.error) && (await byName("No Piano Person")).length === 0, needPiano);
+    const npp = (await byName("No Piano Person"))[0];
+    check("a home visit for a new customer with no piano typed gets an N/A piano linked to the job", needPiano.ok && !!npp && (await pianosOf(npp.id))[0]?.brand === "N/A" && (await jobsOf(npp.id))[0]?.pianoId === (await pianosOf(npp.id))[0]?.id, needPiano);
     const batch = await real.createJobWithNewCustomer({ name: "Trip to Digos" }, null, jobFields() as never);
     const bp = (await byName("Trip to Digos"))[0];
-    check("a trip / batch name needs no piano", batch.ok && !!bp && (await pianosOf(bp.id)).length === 0 && (await jobsOf(bp.id)).length === 1, batch);
+    check("a trip / batch name gets no piano; the job has none", batch.ok && !!bp && (await pianosOf(bp.id)).length === 0 && (await jobsOf(bp.id)).length === 1 && (await jobsOf(bp.id))[0]!.pianoId === null, batch);
 
     for (const bad of [123, null, {}, ["x"]]) {
       let r: { ok: boolean } | "threw" = "threw";

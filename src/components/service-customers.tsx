@@ -10,6 +10,7 @@ import {
   CUSTOMER_SOURCES, CUSTOMER_SOURCE_LABEL, PIANO_TYPES, EXPENSE_CATEGORIES,
 } from "@/lib/service";
 import { isBatchCustomer, withCustomerType } from "@/lib/service-reports";
+import { pianoLabel, realBrand, realModel } from "@/lib/service-piano-info";
 import { reminderLabel, reminderState } from "@/lib/service-reminders";
 import { customerRowSummary, dueLabel, dueSortKey, telHref, type CustomerRowSummary } from "@/lib/service-customer-list";
 import { parsePesoInput } from "@/lib/service-flow";
@@ -21,6 +22,7 @@ import {
 import {
   Chip, ConfirmDialog, EmptyState, PesoInput, ErrorLine, Field, FilterPills, GhostButton, Money,
   PrimaryButton, SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT,
+  PianoInfoBadge,
 } from "@/components/service-ui";
 
 export default function CustomersClient({
@@ -440,7 +442,7 @@ export function CustomerSheet({
     brand: string; model: string; type: string; serialNumber: string;
     locationId: string; tuningIntervalMonths: number; conditionNotes: string;
   }) => void;
-  onUpdatePiano: (id: string, patch: { tuningIntervalMonths?: number; lastServiceAt?: string | null; nextServiceDueAt?: string | null }) => void;
+  onUpdatePiano: (id: string, patch: { brand?: string; model?: string; tuningIntervalMonths?: number; lastServiceAt?: string | null; nextServiceDueAt?: string | null }) => void;
   onDeletePiano: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -454,6 +456,8 @@ export function CustomerSheet({
 
   const [locOpen, setLocOpen] = useState(false);
   const [pianoOpen, setPianoOpen] = useState(false);
+  // Brand and model start EMPTY when they are only the "N/A" placeholder, so the owner types the real values.
+  const [editPiano, setEditPiano] = useState<{ id: string; brand: string; model: string } | null>(null);
 
   return (
     <SvcModal open onClose={onClose} title={customer.name} subtitle={`${customer.jobCount} jobs · billed ${""}`} wide>
@@ -601,9 +605,10 @@ export function CustomerSheet({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[13px]" style={{ color: "var(--color-svc-text)" }}>
-                        {[p.brand, p.model].filter(Boolean).join(" ") || p.type}
+                        {pianoLabel(p)}
                         <span style={{ color: "var(--color-svc-text-faint)" }}> · {p.type}</span>
                         {p.year ? <span style={{ color: "var(--color-svc-text-faint)" }}> · {p.year}</span> : null}
+                        <PianoInfoBadge piano={p} className="ml-2" />
                       </p>
                       <p className="text-[12px] mt-0.5" style={{ color: "var(--color-svc-text-faint)" }}>
                         {p.locationLabel ? `${p.locationLabel} · ` : ""}
@@ -612,6 +617,14 @@ export function CustomerSheet({
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditPiano({ id: p.id, brand: realBrand(p.brand), model: realModel(p.model) })}
+                        className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg hover:bg-white/[0.06]"
+                        style={{ color: "var(--color-svc-text-dim)" }}
+                        aria-label="Edit brand and model"
+                      >
+                        <Pencil size={13} />
+                      </button>
                       <input
                         type="number"
                         min={1}
@@ -650,6 +663,18 @@ export function CustomerSheet({
           setLocOpen(false);
         }}
       />
+      {editPiano ? (
+        <EditPianoModal
+          key={editPiano.id}
+          initial={editPiano}
+          pending={pending}
+          onClose={() => setEditPiano(null)}
+          onSave={(brand, model) => {
+            onUpdatePiano(editPiano.id, { brand, model });
+            setEditPiano(null);
+          }}
+        />
+      ) : null}
       <AddPianoModal
         open={pianoOpen}
         onClose={() => setPianoOpen(false)}
@@ -727,6 +752,41 @@ function AddLocationModal({
             }
           >
             Add location
+          </PrimaryButton>
+        </div>
+      </div>
+    </SvcModal>
+  );
+}
+
+function EditPianoModal({
+  initial,
+  pending,
+  onClose,
+  onSave,
+}: {
+  initial: { id: string; brand: string; model: string };
+  pending: boolean;
+  onClose: () => void;
+  onSave: (brand: string, model: string) => void;
+}) {
+  const [brand, setBrand] = useState(initial.brand);
+  const [model, setModel] = useState(initial.model);
+  return (
+    <SvcModal open onClose={onClose} title="Piano brand and model">
+      <div className="space-y-3.5">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Brand">
+            <TextInput value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Yamaha" maxLength={120} autoFocus aria-required="true" />
+          </Field>
+          <Field label="Model">
+            <TextInput value={model} onChange={(e) => setModel(e.target.value)} placeholder="U1" maxLength={120} />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <PrimaryButton pending={pending} disabled={!brand.trim()} onClick={() => onSave(brand.trim(), model.trim())}>
+            Save
           </PrimaryButton>
         </div>
       </div>

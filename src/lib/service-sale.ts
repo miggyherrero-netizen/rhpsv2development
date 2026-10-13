@@ -62,3 +62,23 @@ export function recallDueDate(lastTunedAt: Date | null | undefined, intervalMont
 export function pianoRequired(job: { jobType: string; customerIsBatch: boolean }): boolean {
   return job.jobType === "service" && !job.customerIsBatch;
 }
+
+/**
+ * Which date a payment stamps as the piano's "last serviced" date. Only a FINISHED job is ever stamped (the caller checks):
+ * its completion date, else its visit date, else, for the very first payment only, the payment date. Never later than `now`.
+ */
+export function pickServedAt(f: {
+  completedAt: Date | null; scheduledStart: Date | null; paidAt: Date; firstPayment: boolean; now: Date;
+}): Date | null {
+  const picked = f.completedAt ?? f.scheduledStart ?? (f.firstPayment ? f.paidAt : null);
+  if (!picked) return null;
+  return picked.getTime() > f.now.getTime() ? f.now : picked;
+}
+
+/** A payment only dates a service on a job that is actually finished (completed, not cancelled). */
+export const jobIsFinished = (j: { completedAt: Date | null; status: string; cancelledAt?: Date | null }): boolean =>
+  !j.cancelledAt && j.status !== "cancelled" && (!!j.completedAt || j.status === "completed");
+
+/** The service date only ever moves forward: an equal or older date leaves the piano alone. */
+export const isNewerServiceDate = (current: Date | null | undefined, candidate: Date): boolean =>
+  !current || candidate.getTime() > current.getTime();

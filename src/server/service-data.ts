@@ -4,6 +4,7 @@
  * Asia/Manila by the format helpers.
  */
 
+import { pianoLabel as pianoDisplayName } from "@/lib/service-piano-info";
 import { db } from "@/db";
 import {
   serviceTechnicians, serviceCustomers, serviceLocations, servicePianos, serviceCatalog,
@@ -204,7 +205,7 @@ export async function getRecalls(now: Date = new Date(), leadDays = 30): Promise
   const dayMs = 86_400_000;
   return rows.map(({ piano, customer, location }) => ({
     pianoId: piano.id,
-    pianoLabel: [piano.brand, piano.model].filter(Boolean).join(" ") || piano.type,
+    pianoLabel: pianoDisplayName(piano),
     customerId: customer.id,
     customerName: titleCaseName(customer.name),
     phone: customer.phone,
@@ -280,7 +281,7 @@ function toJobRow(r: {
     area: r.area,
     technicianName: r.technicianName,
     technicianColor: r.technicianColor,
-    pianoLabel: r.pianoBrand ? [r.pianoBrand, r.pianoModel].filter(Boolean).join(" ") : null,
+    pianoLabel: r.pianoBrand ? pianoDisplayName({ brand: r.pianoBrand, model: r.pianoModel }) : null,
     itemCount: 0,
     runningLog: running.get(r.job.id) ?? null,
   };

@@ -12,7 +12,7 @@
 
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { serviceInvoiceItems, serviceInvoices, serviceJobEvents, servicePayments } from "@/db/schema";
+import { serviceInvoiceItems, serviceInvoices, serviceJobEvents, serviceJobs, servicePayments } from "@/db/schema";
 import {
   boolOr, computeTotals, intOr, invoiceCode, moneyToCents, oneOf, optionalDate, str, PAYMENT_METHODS,
 } from "@/lib/service";
@@ -23,6 +23,8 @@ import {
   EditRejected, clampQty, clampTaxBps, lineLimitError, discountMessage, discountTooLarge, fmtPesoExact, needsReason, paymentChanges,
   validateReason, wouldOverpay,
 } from "@/lib/service-finance-edit";
+import { jobIsFinished } from "@/lib/service-sale";
+import { rollPianoRecall } from "@/server/service-recall";
 import { describeChange, diffFields, dropSameDay, pesoExact, type FinanceChanges } from "@/lib/service-finance-history";
 import {
   actorOf, assertNotOverpaid, nameRefs, recalcInvoice, safeHistory, withInvoiceLock,
@@ -440,7 +442,28 @@ export async function recordPaymentOp(user: OpUser, input: {
       },
     };
   });
+  // After the lock is released and the payment is committed: date the piano's service. Best-effort, never affects the payment.
+  if (res.ok) await stampPianoServiceDate(input.invoiceId, receivedAt);
   return unwrap(res);
+}
+
+/**
+ * A payment on an invoice linked to a tuning-type home-service job (finished only) dates that piano's last service / next due date and
+ * its recall (see `rollPianoRecall`). Runs OUTSIDE `withInvoiceLock` (the payment is already committed), reads only, and
+ * swallows every error: the money has been recorded and must never be undone or failed by this.
+ */
+async function stampPianoServiceDate(invoiceId: string, paidAt: Date): Promise<void> {
+  try {
+    const [inv] = await db.select({ jobId: serviceInvoices.jobId }).from(serviceInvoices).where(eq(serviceInvoices.id, invoiceId)).limit(1);
+    if (!inv?.jobId) return;
+    const [job] = await db.select({ completedAt: serviceJobs.completedAt, status: serviceJobs.status, cancelledAt: serviceJobs.cancelledAt }).from(serviceJobs).where(eq(serviceJobs.id, inv.jobId)).limit(1);
+    // Only a finished job is dated by a payment (rollPianoRecall re-checks): a deposit or prepayment on a booked job is skipped.
+    if (!job || !jobIsFinished(job)) return;
+    const [count] = await db.select({ n: sql<number>`count(*)::int` }).from(servicePayments).where(eq(servicePayments.invoiceId, invoiceId));
+    await rollPianoRecall(inv.jobId, { paidAt, firstPayment: (count?.n ?? 0) <= 1 });
+  } catch (err) {
+    console.error("recordPayment: payment saved, but dating the piano's service failed", invoiceId, err);
+  }
 }
 
 export type EditPaymentInput = {

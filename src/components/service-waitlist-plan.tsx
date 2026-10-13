@@ -1,12 +1,13 @@
 "use client";
 
+import { waitlistPianoText } from "@/lib/service-piano-info";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarCheck, MapPin } from "lucide-react";
 import { fmtKm, areaName } from "@/lib/service-geo";
 import { SERVICE_TYPE_LABEL } from "@/lib/service";
-import { messageDate, messageTime, daysWaiting, LONG_WAIT_DAYS } from "@/lib/service-waitlist";
+import { messageDate, messageTime, daysWaiting } from "@/lib/service-waitlist";
 import type { TripPlanData } from "@/server/service-waitlist-data";
 import { confirmEntryForTrip, createTrip } from "@/server/service-waitlist";
 import MessageActions from "@/components/service-message-actions";
@@ -129,8 +130,8 @@ export default function PlanTripClient({
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-medium" style={TEXT}>{c.item.customerName}</span>
                         <span className="block text-[12px]" style={DIM}>
-                          {c.item.pianoLabel ?? "No piano chosen"} · {SERVICE_TYPE_LABEL[c.item.serviceType] ?? c.item.serviceType} · {c.item.cityName ?? "Unsorted"}
-                          {" · "}<span style={{ color: dw > LONG_WAIT_DAYS ? "var(--color-svc-danger)" : undefined }}>{dw}d waiting</span>
+                          {waitlistPianoText(c.item)} · {SERVICE_TYPE_LABEL[c.item.serviceType] ?? c.item.serviceType} · {c.item.cityName ?? "Unsorted"}
+                          {" · "}<span>{dw}d waiting</span>
                         </span>
                       </span>
                       <span className="text-right shrink-0">
@@ -149,7 +150,7 @@ export default function PlanTripClient({
               <ul className="svc-divide">
                 {Object.values(booked).map((b) => (
                   <li key={b.item.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-                    <p className="text-[14px]" style={TEXT}>{b.item.customerName} <span className="text-[12px]" style={DIM}>· {b.item.pianoLabel} · {b.time}</span></p>
+                    <p className="text-[14px]" style={TEXT}>{b.item.customerName} <span className="text-[12px]" style={DIM}>· {waitlistPianoText(b.item)} · {b.time}</span></p>
                     <Link href={`/service/jobs/${b.jobId}`} className="btn-svc-ghost rounded-xl px-3.5 min-h-11 inline-flex items-center gap-1.5 text-[13px]"><CalendarCheck size={14} aria-hidden="true" /> Open visit</Link>
                   </li>
                 ))}
@@ -172,7 +173,7 @@ export default function PlanTripClient({
                   return (
                     <li key={it.id} className="px-5 py-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-[14px] font-medium" style={TEXT}>{it.customerName} <span className="text-[12px] font-normal" style={DIM}>· {it.pianoLabel ?? "no piano chosen"}</span></p>
+                        <p className="text-[14px] font-medium" style={TEXT}>{it.customerName} <span className="text-[12px] font-normal" style={DIM}>· {waitlistPianoText(it, "no piano chosen")}</span></p>
                       </div>
                       <MessageActions
                         entryId={it.id} customerName={it.customerName} phone={it.customerPhone} messenger={it.messenger} template={tpl}

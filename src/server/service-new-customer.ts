@@ -19,6 +19,7 @@ import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { serviceCustomers, servicePianos } from "@/db/schema";
 import { CUSTOMER_NAME_MAX, canCreateNew, normalizeName } from "@/lib/service-customer-match";
+import { PIANO_PLACEHOLDER } from "@/lib/service-piano-info";
 import { PIANO_TYPES, oneOf, str } from "@/lib/service";
 import { titleCaseName } from "@/lib/service-reports";
 
@@ -57,15 +58,16 @@ export async function findExactCustomer(x: Exec, name: string): Promise<{ id: st
 
 /**
  * Inside the caller's transaction: lock on the name, refuse an exact duplicate (unless allowed), then insert the
- * customer — with the same field rules as `createCustomer` (title case, source "referral", phone optional) — and,
- * when given, their first piano (same rules as `createPiano`).
+ * customer — with the same field rules as `createCustomer` (title case, source "referral", phone optional) — and
+ * their first piano when the caller passes one (same rules as `createPiano`; brand "N/A" when none was typed).
  */
 export async function insertNewCustomer(tx: Tx, input: NewCustomerInput, piano?: NewPianoInput | null): Promise<CreatedOk | NewCustomerFailure> {
   if (!input || typeof input !== "object" || !canCreateNew(input.name)) return { ok: false, error: "Type the customer's name — it needs at least one letter." };
   const name = titleCaseName(str(input.name, CUSTOMER_NAME_MAX));
   if (!name) return { ok: false, error: "Type the customer's name — it needs at least one letter." };
-  const pianoBrand = piano ? str(piano.brand, 120) : null;
-  if (piano && !pianoBrand) return { ok: false, error: "Piano brand is required." };
+  // A piano is created when the caller passes one (even with an empty brand: then it carries the "N/A" placeholder, "Needs piano info").
+  // null / undefined = no piano (piano sale, trip / batch name, invoice-only customer).
+  const pianoBrand = piano ? str(piano.brand, 120) ?? PIANO_PLACEHOLDER : null;
 
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"new-customer:" + normalizeName(name)}))`);
   if (input.allowDuplicate !== true) {

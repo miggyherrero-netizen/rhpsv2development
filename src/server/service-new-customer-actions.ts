@@ -22,9 +22,9 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const BAD_NAME: NewCustomerOutcome<never> = { ok: false, error: "Type the customer's name — it needs at least one letter." };
 
 /**
- * New job for a customer typed in the form. A home-service visit needs a piano unless the customer is a trip / batch
- * placeholder, so the piano is created in the same call (customer -> piano -> job); a piano sale has no customer piano.
- * If the job is refused, the customer and piano are removed again.
+ * New job for a customer typed in the form. A regular home-service visit gets the customer's first piano (brand "N/A" when none was typed,
+ * shown as "Needs piano info"), created in the same call (customer -> piano -> job) and linked to the job. A piano sale and a
+ * trip / batch name get no piano. If the job is refused, the customer and piano are removed again.
  */
 export async function createJobWithNewCustomer(
   newCustomer: NewCustomerInput,
@@ -35,12 +35,10 @@ export async function createJobWithNewCustomer(
   if (!isObj(newCustomer) || !canCreateNew(newCustomer.name)) return BAD_NAME;
   if (!isObj(values)) return { ok: false, error: "The job details are missing. Reopen the form and try again." };
   const sale = values.jobType === "sale";
-  const needsPiano = !sale && !isBatchCustomer([], titleCaseName(newCustomer.name));
-  if (needsPiano && !(isObj(piano) && typeof piano.brand === "string" && piano.brand.trim())) {
-    return { ok: false, error: "Add the piano for this visit — the brand is enough." };
-  }
-  const res = await withNewCustomer(newCustomer, sale ? null : isObj(piano) ? piano : null, async (ctx) => {
-    const job = await createJob({ ...values, customerId: ctx.customerId, locationId: null, pianoId: sale ? null : ctx.pianoId });
+  // A trip / batch placeholder is not one client's piano, and a piano sale has none: no piano is created for them.
+  const batch = isBatchCustomer([], titleCaseName(newCustomer.name));
+  const res = await withNewCustomer(newCustomer, sale || batch ? null : isObj(piano) ? piano : { brand: "" }, async (ctx) => {
+    const job = await createJob({ ...values, customerId: ctx.customerId, locationId: null, pianoId: ctx.pianoId });
     return job.ok ? { ok: true as const, data: { id: job.data!.id } } : { ok: false as const, error: job.error };
   });
   if (!res.ok) return res;

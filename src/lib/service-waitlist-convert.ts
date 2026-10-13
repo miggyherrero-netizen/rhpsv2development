@@ -18,7 +18,8 @@ export type ConvertEntry = {
   cityCode: string | null; barangayCode: string | null; estValueCents: number; notes: string | null;
 };
 export type ConvertLocation = { id: string; cityCode: string | null; barangayCode: string | null };
-export type ConvertPiano = { id: string; label: string };
+/** `titleName`: what the job title may say (never a placeholder); defaults to `label`. */
+export type ConvertPiano = { id: string; label: string; titleName?: string };
 
 /**
  * What the job form starts with. Only what the entry knows; time, technician, price and the rest stay open.
@@ -48,7 +49,8 @@ export function waitlistToJobInitial(
 ): JobInitial {
   const pianoId = pickPianoId(entry.pianoId, pianos);
   const typeLabel = SERVICE_TYPE_LABEL[entry.serviceType] ?? "Visit";
-  const pianoLabel = pianos.find((p) => p.id === pianoId)?.label ?? "";
+  const picked = pianos.find((p) => p.id === pianoId);
+  const pianoLabel = picked ? picked.titleName ?? picked.label : "";
   const lines = [entry.notes?.trim() ?? "", entry.estValueCents > 0 ? `Estimated value ${peso(entry.estValueCents)}` : ""].filter(Boolean);
   return {
     customerId: customer.id,
