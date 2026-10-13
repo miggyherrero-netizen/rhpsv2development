@@ -75,6 +75,12 @@ Reviewed and installed from aitmpl.com — use proactively when relevant, no nee
 - `supply-chain-guard` — scans installed npm packages against a known-malicious-package list (reviewed, local-only)
 - `security-threat-model` — structured trust-boundary/threat-model writeup for the repo
 
+**Finance / reconciliation** (from anthropics/financial-services, fund-admin vertical; reviewed in full, text-only, no scripts):
+- `gl-recon` — match two extracts (e.g. GCash/bank export vs `service_payments`), bucket the breaks. For Phase 5 of `docs/finance-plan.md`.
+- `break-trace` — root-cause one reconciliation break.
+- `variance-commentary` — month-end "why did this line move" commentary.
+- Not installed: that repo's agents and the other ~100 skills (investment banking, equity research, KYC, PE, DCF/LBO models) need institutional MCP connectors (internal-gl, FactSet, etc.) and don't fit a piano atelier.
+
 **Infra / testing:**
 - `docker-expert` — Dockerfile/Compose optimization, security hardening, container issues
 - `webapp-testing` — Playwright-based toolkit for testing/debugging the running app in-browser
