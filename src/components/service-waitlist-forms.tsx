@@ -16,12 +16,13 @@ import type { WaitlistItem } from "@/server/service-waitlist-data";
 export type EntryFormValues = {
   customerId: string; pianoId: string | null; serviceType: string; source: string;
   cityCode: string | null; barangayCode: string | null; useCustomerAddress: boolean;
-  requestedAt: string; nextFollowUpAt: string; estValue: number; notes: string; status?: string;
+  /** Edit only. A new entry omits both: the server stamps "asked" as now and sets the next follow-up 3 days out. */
+  requestedAt?: string; nextFollowUpAt?: string; estValue: number; notes: string; status?: string;
 };
 
 type Pianos = { id: string; label: string; type: string }[];
 
-/** New entry (mode "new") or edit one (mode "edit"). The next follow-up is required and starts 3 days out. */
+/** New entry (mode "new") or edit one (mode "edit"). A new entry has no date fields (asked = now, next follow-up = 3 days out, both set on the server); Edit keeps them. */
 export function WaitlistEntryModal(props: {
   open: boolean; onClose: () => void; mode: "new" | "edit"; pending: boolean; error: string | null;
   customers: ComboCustomer[];
@@ -81,7 +82,7 @@ function Body({ onClose, mode, pending, error, customers, entry, presetCity, onS
   }, [customerId, pianos]);
   const list = (customerId && pianos[customerId]) || [];
   const valueBad = value.trim() !== "" && parsePesoInput(value) === null;
-  const nextBad = !next;
+  const nextBad = mode === "edit" && !next;
 
   return (
     <div className="space-y-3.5">
@@ -118,10 +119,12 @@ function Body({ onClose, mode, pending, error, customers, entry, presetCity, onS
           <Field label="Status"><Select value={status} onChange={(e) => setStatus(e.target.value)}>{WAIT_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></Field>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Asked on"><DateField kind="datetime-local" value={requested} onChange={setRequested} /></Field>
-        <Field label="Next follow-up" hint="Required — every entry gets a next nudge"><DateField kind="datetime-local" value={next} onChange={setNext} /></Field>
-      </div>
+      {mode === "edit" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Asked on"><DateField kind="datetime-local" value={requested} onChange={setRequested} /></Field>
+          <Field label="Next follow-up" hint="Required — every entry gets a next nudge"><DateField kind="datetime-local" value={next} onChange={setNext} /></Field>
+        </div>
+      )}
       <Field label="Notes"><TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Prefers Saturdays; gate code 1234" /></Field>
       {valueBad && <p role="alert" className="text-[12px]" style={{ color: "var(--color-svc-danger)" }}>Use a number like 2,500.</p>}
       <div ref={errBoxRef}><ErrorLine>{saveErr}</ErrorLine></div>
@@ -136,7 +139,7 @@ function Body({ onClose, mode, pending, error, customers, entry, presetCity, onS
               if (saving) return;
               const v: EntryFormValues = {
                 customerId, pianoId: pianoId || null, serviceType, source, cityCode: place.cityCode, barangayCode: place.barangayCode,
-                useCustomerAddress: mode === "new" && !placeTouched, requestedAt: requested, nextFollowUpAt: next,
+                useCustomerAddress: mode === "new" && !placeTouched, ...(mode === "edit" ? { requestedAt: requested, nextFollowUpAt: next } : {}),
                 estValue: parsePesoInput(value) ?? 0, notes, status: mode === "edit" ? status : undefined,
               };
               if (choice.kind === "new" && onSubmitNewCustomer) {

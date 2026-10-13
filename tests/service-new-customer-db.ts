@@ -297,6 +297,23 @@ async function main() {
     check("customer + invoice saved with the real createInvoice", inv.ok && !!rip && (await invoicesOf(rip.id)).length === 1 && (await invoicesOf(rip.id))[0]!.totalCents > 0, inv);
     const invBad = await real.createInvoiceWithNewCustomer({ name: "empty invoice person" }, { items: [], dueDate: null, notes: "" } as never);
     check("an invoice with no lines is refused and leaves no customer", !invBad.ok && (await byName("Empty Invoice Person")).length === 0, invBad);
+    console.log("\n13b. Add to waitlist without date fields: asked = now, next follow-up = 3 days out (server defaults)");
+    const t0 = Date.now();
+    const wn = await wl2.addWaitlistEntryWithNewCustomer({ name: "No Dates Person" }, { serviceType: "tuning", source: "phone", estValue: 2500, notes: "Saturdays" } as never);
+    const ndp = (await byName("No Dates Person"))[0];
+    const nde = ndp ? await entriesOf(ndp.id) : [];
+    const ndDays = nde[0] ? (nde[0].nextFollowUpAt.getTime() - t0) / 86_400_000 : -1;
+    check("new customer + entry saved with no requestedAt / nextFollowUpAt", wn.ok && nde.length === 1 && nde[0]!.status === "waiting" && nde[0]!.estValueCents === 250000 && nde[0]!.notes === "Saturdays", { wn, nde });
+    check("asked on = save time, next follow-up ~3 days out", !!nde[0] && Math.abs(nde[0]!.requestedAt.getTime() - t0) < 60_000 && ndDays > 2.9 && ndDays < 3.1, ndDays);
+    const wex = await wl2.addWaitlistEntry({ customerId: jose!.id, serviceType: "repair" } as never);
+    const wexRow = wex.ok ? (await db.select().from(S.serviceWaitlistEntries).where(eq(S.serviceWaitlistEntries.id, wex.data!.id)))[0] : null;
+    check("existing customer: same defaults", !!wexRow && (wexRow.nextFollowUpAt.getTime() - t0) / 86_400_000 > 2.9 && Math.abs(wexRow.requestedAt.getTime() - t0) < 60_000, wex);
+    const wgiven = await wl2.addWaitlistEntry({ customerId: jose!.id, requestedAt: "2026-01-05T10:00", nextFollowUpAt: "2026-01-09T10:00" } as never);
+    const wgRow = wgiven.ok ? (await db.select().from(S.serviceWaitlistEntries).where(eq(S.serviceWaitlistEntries.id, wgiven.data!.id)))[0] : null;
+    check("other callers may still pass both dates (Manila time)", !!wgRow && wgRow.nextFollowUpAt.toISOString() === "2026-01-09T02:00:00.000Z" && wgRow.requestedAt.toISOString() === "2026-01-05T02:00:00.000Z", wgRow);
+    const wbad = await wl2.addWaitlistEntry({ customerId: jose!.id, pianoId: "00000000-0000-4000-8000-000000000000" } as never);
+    check("customer / piano still validated", !wbad.ok && (await wl2.addWaitlistEntry({ customerId: "" } as never)).ok === false, wbad);
+
     signedIn = false;
     let gate = "returned"; try { await real.createInvoiceWithNewCustomer({ name: "Signed Out" }, { items: [{ description: "x" }] } as never); } catch { gate = "threw"; }
     check("signed out: the wrapper stops at requireUser", gate === "threw" && (await byName("Signed Out")).length === 0);
