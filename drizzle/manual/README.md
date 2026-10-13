@@ -21,6 +21,7 @@ Run them **in order**. Each one is additive (`ADD COLUMN IF NOT EXISTS`, default
 | 7 | `07_reminders.sql` | Client follow-up reminders: `service_reminders` table (+ status enum) |
 | 10 | `10_recalc_job_parts_cost.sql` | Job cost rules: refreshes the derived `service_jobs.parts_cost_cents` (part lines with no cost now cost 0). Optional, no schema change; clears Finance health parts-drift warnings on old jobs |
 | 11 | `11_invoice_kind.sql` | Invoice type: `service_invoices.kind` ('service' default, or 'sale' for a piano sale). Run it FIRST: until then invoice pages and the dashboard error because the column is missing. Existing invoices stay 'service' |
+| 12 | `12_maintenance_notifications.sql` | Maintenance Phase 1: one new table, `service_notification_preferences` (consent per customer). Read by `/service/maintenance`; the page works without it and shows "No consent recorded". Nothing writes it yet. Idempotent |
 
 Phase 2 (Today command center) needs no schema change.
 
