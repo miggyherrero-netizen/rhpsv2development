@@ -58,12 +58,14 @@ export async function insertEntry(x: Exec, input: NewEntry, now: Date = new Date
  * A completed tuning visit leaves a recall on the waitlist: due one tuning interval later, status waiting.
  * One open entry per piano — never a second one while the first is still being worked.
  */
-export async function ensureRecallEntry(jobId: string): Promise<void> {
+export async function ensureRecallEntry(jobId: string, servedAtOverride?: Date): Promise<void> {
   const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
-  if (!job || job.jobType !== "service" || !job.pianoId || !job.completedAt || !countsAsTuning(job.serviceType)) return;
+  // `servedAtOverride`: a payment dated the service on a job that isn't marked completed yet.
+  const servedAt = servedAtOverride ?? job?.completedAt;
+  if (!job || job.jobType !== "service" || !job.pianoId || !servedAt || !countsAsTuning(job.serviceType)) return;
   const [piano] = await db.select().from(servicePianos).where(eq(servicePianos.id, job.pianoId)).limit(1);
   if (!piano) return;
-  const recall = recallEntryFor({ completedAt: job.completedAt }, piano.tuningIntervalMonths || 6);
+  const recall = recallEntryFor({ completedAt: servedAt }, piano.tuningIntervalMonths || 6);
   if (!recall) return;
   // This piano was just tuned: any request still open for it (a phone call, a website inquiry, an older recall) is served.
   await db.update(serviceWaitlistEntries).set({ status: "done", jobId: job.id, updatedAt: new Date() })

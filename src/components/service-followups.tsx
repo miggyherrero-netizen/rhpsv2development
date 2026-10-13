@@ -1,12 +1,12 @@
 "use client";
 
+import { waitlistPianoText } from "@/lib/service-piano-info";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, ListChecks, MessageSquare, Phone } from "lucide-react";
-import { fmtDate } from "@/lib/format";
 import { telHref } from "@/lib/service-customer-list";
-import { reminderLabel, reminderState } from "@/lib/service-reminders";
+import { reminderState } from "@/lib/service-reminders";
 import { SERVICE_TYPE_LABEL } from "@/lib/service";
 import { WAIT_SOURCE_LABEL, WAIT_STATUS_LABEL, WAIT_STATUS_TONE } from "@/lib/service-waitlist";
 import { canConvertEntry } from "@/lib/service-waitlist-convert";
@@ -44,11 +44,11 @@ export function WaitlistFollowUpItem({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // A waitlist entry is never "overdue": once its day has come the cue is a neutral "Follow up now".
-  const upcoming = reminderState(dueDay, now) === "upcoming";
-  const label = upcoming ? reminderLabel(dueDay, now) : "Follow up now";
+  // A waitlist entry has no due date and is never "overdue": no date, no day counts; once its day has come the only cue is a
+  // neutral "Follow up now" chip. Upcoming entries show nothing (the group heading says it).
+  const followUpNow = reminderState(dueDay, now) !== "upcoming";
   const tel = telHref(w.customerPhone);
-  const what = [w.pianoLabel ?? "No piano chosen", SERVICE_TYPE_LABEL[w.serviceType] ?? w.serviceType, w.areaLabel || null].filter(Boolean).join(" · ");
+  const what = [waitlistPianoText(w), SERVICE_TYPE_LABEL[w.serviceType] ?? w.serviceType, w.areaLabel || null].filter(Boolean).join(" · ");
 
   return (
     <li className="@container px-4 sm:px-5 py-4">
@@ -73,8 +73,7 @@ export function WaitlistFollowUpItem({
         </div>
 
         <p className="flex flex-wrap items-center gap-2 @min-[40rem]:justify-end">
-          <span className="svc-num text-[14px]" style={DIM}>{fmtDate(dueDay)}</span>
-          {label ? <Chip tone={upcoming ? "slate" : "azure"}>{label}</Chip> : null}
+          {followUpNow ? <Chip tone="slate">Follow up now</Chip> : null}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">

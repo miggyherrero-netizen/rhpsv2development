@@ -46,6 +46,7 @@ const testFiles = [
   { name: "service-waitlist", file: "tests/service-waitlist.ts" },
   { name: "service-geo", file: "tests/service-geo.ts" },
   { name: "service-last-service", file: "tests/service-last-service.ts" },
+  { name: "service-piano-info", file: "tests/service-piano-info.ts" },
   { name: "service-customer-list", file: "tests/service-customer-list.ts" },
   { name: "service-customer-match", file: "tests/service-customer-match.ts" },
   { name: "service-reminders", file: "tests/service-reminders.ts" },

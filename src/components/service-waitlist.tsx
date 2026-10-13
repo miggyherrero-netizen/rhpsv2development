@@ -1,12 +1,13 @@
 "use client";
 
+import { waitlistPianoText } from "@/lib/service-piano-info";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, ListChecks, MessageSquare, Pencil, Plus, Route as RouteIcon, Zap } from "lucide-react";
-import { fmtDate, peso } from "@/lib/format";
+import { peso } from "@/lib/format";
 import { SERVICE_TYPE_LABEL } from "@/lib/service";
 import {
-  LONG_WAIT_DAYS, WAIT_SOURCE_LABEL, isFollowUpDue, WAIT_STATUSES, WAIT_STATUS_LABEL, WAIT_STATUS_TONE, daysWaiting, groupWaitlist, isUpcoming, type WaitRow,
+  WAIT_SOURCE_LABEL, isFollowUpDue, WAIT_STATUSES, WAIT_STATUS_LABEL, WAIT_STATUS_TONE, daysWaiting, groupWaitlist, isUpcoming, type WaitRow,
 } from "@/lib/service-waitlist";
 import type { WaitlistData, WaitlistItem } from "@/server/service-waitlist-data";
 import { addWaitlistEntry, addWaitlistEntryWithNewCustomer, deleteWaitlistEntry, updateWaitlistEntry } from "@/server/service-waitlist";
@@ -131,18 +132,16 @@ export default function WaitlistClient({
           <div className="min-w-0 basis-full min-[1100px]:basis-auto">
             <Link href={`/service/customers/${i.customerId}`} className="text-[14px] font-medium hover:underline" style={TEXT}>{i.customerName}</Link>
             <p className="text-[12px] truncate" style={DIM}>
-              {i.pianoLabel ?? "No piano chosen"} · {SERVICE_TYPE_LABEL[i.serviceType] ?? i.serviceType}
+              {waitlistPianoText(i)} · {SERVICE_TYPE_LABEL[i.serviceType] ?? i.serviceType}
               {i.areaLabel && i.areaLabel !== i.cityName ? ` · ${i.areaLabel}` : ""}
             </p>
           </div>
           <p className="text-[12px]" style={DIM}>{WAIT_SOURCE_LABEL[i.source] ?? i.source}{i.estValueCents ? ` · ${peso(i.estValueCents)}` : ""}</p>
-          <p className="text-[13px] svc-num" style={{ color: dw > LONG_WAIT_DAYS ? "var(--color-svc-danger)" : "var(--color-svc-text-dim)" }}>
-            <span className="min-[1100px]:hidden" style={FAINT}>Waiting </span>{isUpcoming(i.requestedAt, now) ? `due ${fmtDate(i.requestedAt)}` : `${dw}d`}
+          <p className="text-[13px] svc-num" style={{ color: "var(--color-svc-text-dim)" }}>
+            <span className="min-[1100px]:hidden" style={FAINT}>Waiting </span>{isUpcoming(i.requestedAt, now) ? "Upcoming" : `${dw}d`}
           </p>
           <p className="text-[12px]" style={DIM}><span className="min-[1100px]:hidden" style={FAINT}>Contacted </span>{ago(i.lastContactedAt, now)}</p>
-          <p className="text-[12px]" style={DIM}>
-            <span className="min-[1100px]:hidden" style={FAINT}>Follow up </span>{due ? "due · " : ""}{fmtDate(i.nextFollowUpAt)}
-          </p>
+          <p className="text-[12px]" style={DIM}>{due ? "Follow up now" : ""}</p>
           <div className="flex flex-wrap items-center gap-2 basis-full min-[1100px]:basis-auto min-[1100px]:justify-end">
             <Chip tone={WAIT_STATUS_TONE[i.status] ?? "slate"}>{WAIT_STATUS_LABEL[i.status] ?? i.status}</Chip>
             <button type="button" onClick={() => setOpen(open === i.id ? null : i.id)} aria-expanded={open === i.id} className={GHOST} aria-label={`Message ${i.customerName}`}>
@@ -186,7 +185,7 @@ export default function WaitlistClient({
 
       <section aria-label="Waitlist numbers" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Waiting" value={metrics.waiting} sub={`${groups.length ? `${groups.reduce((n, g) => n + g.provinces.reduce((m, p) => m + p.cities.length, 0), 0)} areas` : "no areas yet"}`} icon={<ListChecks size={15} />} />
-        <StatCard label="Avg days waiting" value={metrics.avgDaysWaiting === null ? "—" : metrics.avgDaysWaiting} sub="waiting + messaged" tone={metrics.avgDaysWaiting !== null && metrics.avgDaysWaiting > LONG_WAIT_DAYS ? "danger" : undefined} />
+        <StatCard label="Avg days waiting" value={metrics.avgDaysWaiting === null ? "—" : metrics.avgDaysWaiting} sub="waiting + messaged" />
         <StatCard label="Messaged → confirmed" value={metrics.messagedToConfirmed.ratePct === null ? "—" : `${metrics.messagedToConfirmed.ratePct}%`} sub={`${metrics.messagedToConfirmed.confirmed} of ${metrics.messagedToConfirmed.messaged} · last 30 days`} tone="success" />
         <StatCard label="Jobs per trip" value={metrics.jobsPerTrip === null ? "—" : metrics.jobsPerTrip} sub="trips with bookings" tone="azure" />
       </section>

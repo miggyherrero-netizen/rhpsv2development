@@ -7,7 +7,6 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CalendarPlus, CheckCircle2, ChevronDown } from "lucide-react";
-import { fmtDate } from "@/lib/format";
 import { INQUIRY_LIMITS, validateQuickInquiry, type InquiryField } from "@/lib/service-inquiry";
 import { WAIT_SOURCES } from "@/lib/service-waitlist";
 import { CityPicker, type PlaceValue } from "@/components/service-place-picker";
@@ -20,7 +19,7 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 
 export function QuickInquiryModal({ open, onClose, onConvert }: { open: boolean; onClose: () => void; onConvert: (entryId: string) => void }) {
   return (
-    <SvcModal open={open} onClose={onClose} title="Quick inquiry" subtitle="It goes on the waitlist with a follow-up set for you.">
+    <SvcModal open={open} onClose={onClose} title="Quick inquiry" subtitle="It goes on the waitlist.">
       {open && <Body onClose={onClose} onConvert={onConvert} />}
     </SvcModal>
   );
@@ -92,14 +91,13 @@ function Body({ onClose, onConvert }: { onClose: () => void; onConvert: (entryId
   };
 
   if (saved) {
-    const when = fmtDate(new Date(saved.nextFollowUpAt));
     return (
       <div className="space-y-4">
         <div role="status" className="flex items-start gap-3">
           <CheckCircle2 size={22} aria-hidden="true" className="shrink-0 mt-0.5" style={{ color: "var(--color-svc-success)" }} />
           <div>
             <p className="text-[16px] font-medium" style={{ color: "var(--color-svc-text)" }}>
-              {saved.duplicate ? "Already saved." : "Saved."} Follow up on {when}.
+              {saved.duplicate ? "Already saved." : "Saved. Added to the waitlist."}
             </p>
             <p className="text-[14px] mt-1" style={DIM}>
               {saved.duplicate

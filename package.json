@@ -27,6 +27,8 @@
     "test:followups": "tsx tests/service-followups.ts",
     "test:followups-db": "tsx tests/service-followups-db.ts",
     "test:customer-match": "tsx tests/service-customer-match.ts",
+    "test:piano-info": "tsx tests/service-piano-info.ts",
+    "test:piano-service-db": "tsx tests/service-piano-service-db.ts",
     "test:new-customer-db": "tsx tests/service-new-customer-db.ts",
     "test:waitlist-convert-db": "tsx tests/service-waitlist-convert-db.ts",
     "test:integration": "node tests/task-flow.cjs",

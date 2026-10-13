@@ -4,6 +4,8 @@
  * Waitlist by Area — writes (Server Actions). Reads are in service-waitlist-data.ts, shared helpers in
  * service-waitlist-core.ts. Every action starts with requireUser().
  */
+import { pianoLabel as pianoDisplayName } from "@/lib/service-piano-info";
+import { realBrand } from "@/lib/service-piano-info";
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -99,7 +101,7 @@ export async function addWaitlistEntry(input: EntryInput): Promise<Result<{ id: 
 
 /**
  * Add to waitlist for a customer typed in the form. The new customer and the entry are written in ONE transaction, so a
- * refused entry (bad area, duplicate name) leaves no customer behind. A brand-new customer has no piano and no saved
+ * refused entry (bad area, duplicate name) leaves no customer behind. A brand-new customer gets a first piano ("N/A", needs info) that the entry points at, and has no saved
  * address yet, so the entry takes the area chosen in the form (or none).
  */
 export async function addWaitlistEntryWithNewCustomer(
@@ -111,10 +113,10 @@ export async function addWaitlistEntryWithNewCustomer(
   if (!input || typeof input !== "object") return { ok: false, error: "The entry details are missing. Reopen the form and try again." };
   const cityCode = text(input.cityCode, 20);
   const now = new Date();
-  const res = await withNewCustomerTx(newCustomer, null, async (ctx, tx) => {
+  const res = await withNewCustomerTx(newCustomer, { brand: "" }, async (ctx, tx) => {
     if (cityCode && !(await tx.select({ c: phCities.code }).from(phCities).where(eq(phCities.code, cityCode)).limit(1)).length) return { ok: false as const, error: "That city isn't in the list." };
     const id = await insertEntry(tx, {
-      customerId: ctx.customerId, pianoId: null, serviceType: oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
+      customerId: ctx.customerId, pianoId: ctx.pianoId, serviceType: oneOf(input.serviceType, SERVICE_TYPES.map((s) => s.key), "tuning"),
       ...(input.cityCode !== undefined ? { cityCode, barangayCode: text(input.barangayCode, 20) } : {}),
       requestedAt: when(input.requestedAt) ?? now, nextFollowUpAt: when(input.nextFollowUpAt) ?? defaultNextFollowUp(now),
       estValueCents: pesoToCents(input.estValue), notes: text(input.notes, 1_000), source: oneOf(input.source, WAIT_SOURCES.map((s) => s.key) as WaitSource[], "phone"),
@@ -239,7 +241,7 @@ export async function getConvertDefaults(entryId: string): Promise<Result<{ init
   if (!customer) return fail("That customer no longer exists.");
   const initial = waitlistToJobInitial(
     entry, customer, locations,
-    pianos.map((p) => ({ id: p.id, label: [p.brand, p.model].filter(Boolean).join(" ") || p.type })),
+    pianos.map((p) => ({ id: p.id, label: pianoDisplayName(p), titleName: realBrand(p.brand) ? pianoDisplayName(p) : "" })),
   );
   return ok({ initial, customerName: customer.name, isBatch: isBatchCustomer(customer.tags, customer.name), areaLabel: city?.name ?? null });
 }
@@ -311,7 +313,7 @@ export async function confirmEntryForTrip(input: { entryId: string; tripId: stri
   const techs = input.technicianId === undefined ? await db.select({ id: serviceTechnicians.id }).from(serviceTechnicians).where(eq(serviceTechnicians.active, true)) : [];
   const technicianId = input.technicianId ?? (techs.length === 1 ? techs[0]!.id : null);
   const typeLabel = SERVICE_TYPE_LABEL[entry.serviceType] ?? "Visit";
-  const pianoLabel = piano ? [piano.brand, piano.model].filter(Boolean).join(" ") : "";
+  const pianoLabel = piano && realBrand(piano.brand) ? pianoDisplayName(piano) : "";
   const created = await createJob({
     customerId: entry.customerId, locationId: loc?.id ?? null, pianoId, technicianId,
     title: pianoLabel ? `${typeLabel} — ${pianoLabel}` : typeLabel, serviceType: entry.serviceType, status: "scheduled",

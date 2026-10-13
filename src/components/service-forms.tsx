@@ -5,6 +5,7 @@
  * both "New job" and "Edit visit" so the two can never drift apart.
  */
 
+import { pianoLabel } from "@/lib/service-piano-info";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, ChevronDown, Image as ImageIcon, Plus, X } from "lucide-react";
 import { kindAfterJobLink } from "@/lib/service-expense-edit";
@@ -228,7 +229,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
     const res = await createPiano({ customerId, brand: piano.brand, model: piano.model, type: piano.type, locationId: locationId || null, lastServiceAt: piano.lastTuned || null });
     setInlineBusy(false);
     if (!res.ok || !res.data) return setInlineErr(res.ok ? "Couldn't save the piano." : res.error);
-    const created = { id: res.data.id, label: [piano.brand, piano.model].filter(Boolean).join(" "), type: piano.type };
+    const created = { id: res.data.id, label: pianoLabel(piano), type: piano.type };
     setPlacesBy((cur) => ({ ...cur, [customerId]: { ...(cur[customerId] ?? NO_PLACES), pianos: [...(cur[customerId]?.pianos ?? []), created] } }));
     setPianoId(res.data.id); setAddPiano(false); setPiano({ brand: "", model: "", type: "Upright", lastTuned: "" });
   };
@@ -236,7 +237,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
   const isBatch = isNew ? isBatchCustomer([], titleCaseName(newName)) : !!comboCustomers.find((c) => c.id === customerId)?.isBatch;
   // A home-service job must name the customer's piano (or add one on the spot) so history and recalls stay right.
   // A customer who isn't saved yet has no piano to pick, so the brand is typed here and saved with them.
-  const needsPiano = !isSale && !isBatch && (isNew ? !newPiano.brand.trim() : !pianoId);
+  const needsPiano = !isSale && !isBatch && (isNew ? false : !pianoId);
   const needsSalePiano = isSale && !salePianoId;
   const moneyBad = [buyCost, prepCost, salePrice, deposit].some((v) => v.trim() !== "" && parsePesoInput(v) === null);
 
@@ -350,7 +351,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
         <fieldset className="rounded-xl p-3.5 space-y-3" style={{ background: "var(--color-svc-surface-2)", border: "1px solid var(--color-svc-border)" }}>
           <legend className="px-1.5 text-[12px] uppercase tracking-[0.1em]" style={{ color: "var(--color-svc-text-dim)" }}>Piano for this visit</legend>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Brand"><TextInput value={newPiano.brand} onChange={(e) => setNewPiano({ ...newPiano, brand: e.target.value })} placeholder="e.g. Yamaha" aria-required="true" maxLength={120} /></Field>
+            <Field label="Brand"><TextInput value={newPiano.brand} onChange={(e) => setNewPiano({ ...newPiano, brand: e.target.value })} placeholder="Optional — add later" maxLength={120} /></Field>
             <Field label="Model (optional)"><TextInput value={newPiano.model} onChange={(e) => setNewPiano({ ...newPiano, model: e.target.value })} placeholder="e.g. U1" maxLength={120} /></Field>
             <Field label="Type">
               <Select value={newPiano.type} onChange={(e) => setNewPiano({ ...newPiano, type: e.target.value })}>
@@ -358,7 +359,7 @@ function JobFormBody({ onClose, mode, pending, customers, technicians, showroomP
               </Select>
             </Field>
           </div>
-          <p className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>Saved with the new customer. Every visit is logged against a piano.</p>
+          <p className="text-[12px]" style={{ color: "var(--color-svc-text-dim)" }}>Saved with the new customer. Leave the brand empty to add it later; the piano is then marked “Needs piano info”.</p>
         </fieldset>
       )}
 

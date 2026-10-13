@@ -30,9 +30,11 @@ import { validateExpenseAmountCents } from "@/lib/service-expense-form";
 import { cleanDetails, partsCostFromLines } from "@/lib/service-lines";
 import { defaultKindForCategory, isExpenseKind, type ExpenseKind } from "@/lib/service-finance-split";
 import { deriveSegments, planTimeSync, segmentMinutes } from "@/lib/service-time-events";
-import { countsAsTuning, pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
+import { pianoLabel as pianoDisplayName, realBrand } from "@/lib/service-piano-info";
+import { pianoRequired, recallDueDate, saleReadyToComplete } from "@/lib/service-sale";
 import { isBatchCustomer } from "@/lib/service-reports";
-import { completeEntriesForJob, ensureRecallEntry, releaseEntriesForJob } from "@/server/service-waitlist-core";
+import { completeEntriesForJob, releaseEntriesForJob } from "@/server/service-waitlist-core";
+import { rollPianoRecall } from "@/server/service-recall";
 import { getServiceSettings } from "@/server/service-data";
 import { recordFinanceHistory } from "@/server/service-finance-history";
 import { describeChange, diffFields, dropSameDay, pesoExact, type FinanceChanges } from "@/lib/service-finance-history";
@@ -157,7 +159,7 @@ export async function loadCustomerPlaces(customerId: string): Promise<Result<{
   ]);
   return ok({
     locations: locations.map((l) => ({ id: l.id, label: l.label, addressLine: l.addressLine, city: l.city, area: l.area, travelFeeCents: l.travelFeeCents })),
-    pianos: pianos.map((p) => ({ id: p.id, label: [p.brand, p.model].filter(Boolean).join(" ") || p.type, type: p.type })),
+    pianos: pianos.map((p) => ({ id: p.id, label: pianoDisplayName(p), type: p.type })),
   });
 }
 
@@ -257,6 +259,7 @@ export async function createPiano(input: PianoInput): Promise<Result<{ id: strin
   const brand = str(input.brand, 120);
   if (!input.customerId) return fail("Pick a customer first.");
   if (!brand) return fail("Piano brand is required.");
+  if (!realBrand(brand)) return fail("Type the real brand, not N/A.");
   const [row] = await db
     .insert(servicePianos)
     .values({
@@ -282,6 +285,13 @@ export async function createPiano(input: PianoInput): Promise<Result<{ id: strin
 export async function updatePiano(id: string, patch: Partial<PianoInput>): Promise<Result> {
   await requireUser();
   if (!id) return fail("Missing piano.");
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return fail("Nothing to save.");
+  // A brand can be changed but never emptied (a missing brand would hide which instrument this is).
+  if (patch.brand !== undefined) {
+    const b = str(patch.brand, 120);
+    if (!b) return fail("Piano brand is required.");
+    if (!realBrand(b)) return fail("Type the real brand, not N/A.");
+  }
   await db
     .update(servicePianos)
     .set({
@@ -866,23 +876,10 @@ async function recalcJobLabor(jobId: string): Promise<void> {
     .where(eq(serviceJobs.id, jobId));
 }
 
-/** After a tuning/maintenance visit, roll the piano's next-service date forward. */
+/** After a tuning/maintenance visit, roll the piano's next-service date forward (shared with the payment path). */
 async function advanceRecall(jobId: string): Promise<void> {
   await completeEntriesForJob(jobId);
-  const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, jobId)).limit(1);
-  if (!job?.pianoId || job.jobType !== "service") return;
-  // Only a tuning-type visit counts as "last tuned"; a repair or assessment leaves the recall date alone.
-  if (!countsAsTuning(job.serviceType)) return;
-  const [piano] = await db.select().from(servicePianos).where(eq(servicePianos.id, job.pianoId)).limit(1);
-  if (!piano) return;
-  const servedAt = job.completedAt ?? new Date();
-  const next = recallDueDate(servedAt, piano.tuningIntervalMonths || 6)!;
-  await db
-    .update(servicePianos)
-    .set({ lastServiceAt: servedAt, nextServiceDueAt: next, updatedAt: new Date() })
-    .where(eq(servicePianos.id, piano.id));
-  // The recall also goes on the waitlist, due one tuning interval from now.
-  await ensureRecallEntry(jobId);
+  await rollPianoRecall(jobId);
 }
 
 /* ---- job line items ---- */

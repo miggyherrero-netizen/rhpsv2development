@@ -17,6 +17,7 @@ import { ReminderItem, RemindMeModal } from "@/components/service-reminders";
 import {
   archiveCustomer, createJob, updateCustomer, createLocation, deleteLocation, createPiano, updatePiano, deletePiano,
 } from "@/server/service";
+import { pianoLabel } from "@/lib/service-piano-info";
 import { lastServiceDate } from "@/lib/service-last-service";
 import { JobFormModal, type ShowroomPiano } from "@/components/service-forms";
 import { CustomerSheet } from "@/components/service-customers";
@@ -25,6 +26,7 @@ import { SERVICE_TYPE_LABEL } from "@/lib/service";
 import type { WaitlistItem } from "@/server/service-waitlist-data";
 import {
   Chip, ConfirmDialog, EmptyState, ErrorLine, Field, GhostButton, Money, PrimaryButton, SectionCard, StatCard, SvcModal, TextInput, TONE_TEXT,
+  PianoInfoBadge,
 } from "@/components/service-ui";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-svc-accent)]";
@@ -175,7 +177,7 @@ export default function CustomerDetailClient({
               {pianos.map((p) => (
                 <li key={p.id} className="flex items-start justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{[p.brand, p.model].filter(Boolean).join(" ") || p.type}</p>
+                    <p className="text-[14px]" style={{ color: "var(--color-svc-text)" }}>{pianoLabel(p)} <PianoInfoBadge piano={p} className="ml-1.5" /></p>
                     <p className="text-[13px] mt-0.5" style={{ color: "var(--color-svc-text-dim)" }}>{p.type}{p.year ? ` · ${p.year}` : ""}</p>
                   </div>
                   <div className="text-right text-[12px] shrink-0" style={FAINT}>

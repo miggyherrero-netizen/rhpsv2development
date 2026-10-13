@@ -13,6 +13,7 @@ import {
   TIME_KINDS, TIME_KIND_LABEL, ITEM_KINDS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL,
   computeTotals, elapsedMinutes, fmtMinutes, jobCode, jobMargin, lineTotalCents, taxLineLabel,
 } from "@/lib/service";
+import { isPianoInfoMissing, pianoLabel } from "@/lib/service-piano-info";
 import { countable } from "@/lib/service-reports";
 import { nextJobStep, parsePesoInput } from "@/lib/service-flow";
 import { ExpenseFormModal, JobFormModal, TimeEditModal, type ShowroomPiano } from "@/components/service-forms";
@@ -29,6 +30,7 @@ import {
 import {
   Chip, ConfirmTypeDialog, DateField, Dot, PesoInput, EmptyState, ErrorLine, Field, GhostButton, MoreMenu, Money, PrimaryButton,
   SectionCard, Select, StatCard, SvcModal, TextArea, TextInput, TONE_TEXT, UnitInput, type MoreItem,
+  PianoInfoBadge,
 } from "@/components/service-ui";
 
 export default function JobDetailClient({
@@ -248,7 +250,10 @@ export default function JobDetailClient({
               </Info>
               <Info label="Piano">
                 {detail.piano ? (
-                  `${[detail.piano.brand, detail.piano.model].filter(Boolean).join(" ") || detail.piano.type} (${detail.piano.type})`
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    {`${pianoLabel(detail.piano)} (${detail.piano.type})`}
+                    <PianoInfoBadge piano={detail.piano} />
+                  </span>
                 ) : detail.customerPianos.length > 0 ? (
                   // No piano on this job yet — offer the customer's instruments instead of a dead "Not linked".
                   <span className="flex flex-wrap items-center gap-2">
@@ -262,7 +267,7 @@ export default function JobDetailClient({
                       <option value="" disabled>Link piano…</option>
                       {detail.customerPianos.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {[p.brand, p.model].filter(Boolean).join(" ") || p.type} ({p.type})
+                          {pianoLabel(p)}{isPianoInfoMissing(p) ? " — needs piano info" : ""} ({p.type})
                         </option>
                       ))}
                     </Select>

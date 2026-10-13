@@ -2,6 +2,7 @@
  * Waitlist reads: geography, the grouped waitlist, trip suggestions, follow-ups due today, templates, routes.
  * (Writes live in service-waitlist.ts / service-waitlist-core.ts.)
  */
+import { isPianoInfoMissing, pianoLabel as pianoDisplayName, realBrand } from "@/lib/service-piano-info";
 import { and, asc, eq, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -86,7 +87,9 @@ export async function getRoutes(): Promise<RouteRow[]> {
 export type WaitlistItem = {
   id: string;
   customerId: string; customerName: string; customerPhone: string | null; messenger: string | null;
-  pianoId: string | null; pianoLabel: string | null; serviceType: string;
+  pianoId: string | null;
+  /** Real brand/model for messages; null when there is no piano or its brand is still the "N/A" placeholder. */
+  pianoLabel: string | null; pianoInfoMissing: boolean; serviceType: string;
   cityCode: string | null; cityName: string | null; provinceCode: string | null; provinceName: string | null;
   regionCode: string | null; regionShort: string | null; barangayName: string | null;
   /** What {area} means in a message: the city (the barangay inside Davao City). */
@@ -117,7 +120,7 @@ async function loadItems(where?: ReturnType<typeof and>): Promise<WaitlistItem[]
     .orderBy(asc(serviceWaitlistEntries.requestedAt));
   return rows.map((r) => ({
     id: r.e.id, customerId: r.e.customerId, customerName: titleCaseName(r.customerName), customerPhone: r.customerPhone, messenger: messengerHandle(r.customerTags),
-    pianoId: r.e.pianoId, pianoLabel: r.piano ? [r.piano.brand, r.piano.model].filter(Boolean).join(" ") || r.piano.type : null, serviceType: r.e.serviceType,
+    pianoId: r.e.pianoId, pianoLabel: r.piano && realBrand(r.piano.brand) ? pianoDisplayName(r.piano) : null, pianoInfoMissing: !!r.piano && isPianoInfoMissing(r.piano), serviceType: r.e.serviceType,
     cityCode: r.city?.code ?? null, cityName: r.city?.name ?? null, provinceCode: r.city?.provinceCode ?? null, provinceName: r.provinceName ?? null,
     regionCode: r.city?.regionCode ?? null, regionShort: r.regionShort ?? null, barangayName: r.barangayName ?? null,
     areaLabel: r.city ? areaName({ code: r.city.code, name: r.city.name }, r.barangayName ? { name: r.barangayName } : null) : "",

@@ -5,6 +5,7 @@
  * `--color-svc-*` tokens so the theme stays separate from admin/owner/public.
  */
 
+import { isPianoInfoMissing } from "@/lib/service-piano-info";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -84,6 +85,12 @@ export function Chip({
       {children}
     </span>
   );
+}
+
+/** Shown next to a piano whose brand or model is still empty / "N/A" (a customer saved without piano details). */
+export function PianoInfoBadge({ piano, className = "" }: { piano: { brand?: string | null; model?: string | null }; className?: string }) {
+  if (!isPianoInfoMissing(piano)) return null;
+  return <Chip tone="warn" className={className}>Needs piano info</Chip>;
 }
 
 export function StatusChip({

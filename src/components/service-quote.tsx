@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { realBrand, realModel } from "@/lib/service-piano-info";
 import { fmtDateLong } from "@/lib/format";
 import { computeTotals, jobCode, taxLineLabel } from "@/lib/service";
 import { documentMoney } from "@/lib/service-documents";
@@ -20,7 +21,7 @@ export default function ServiceQuote({ detail, settings }: { detail: JobDetail; 
   const accepted = events.find((e) => e.type === "quote_accepted");
   const liveInvoice = detail.invoices.find((i) => !i.voidedAt) ?? null;
   const heading = jobHeading(job.title, job.serviceType).heading;
-  const pianoLabel = piano ? [piano.brand, piano.model].filter(Boolean).join(" ") || piano.type : null;
+  const pianoLabel = piano ? [realBrand(piano.brand), realModel(piano.model)].filter(Boolean).join(" ") || piano.type : null;
 
   return (
     <main className={`${styles.studio} ${SVC_FONT_VARS}`}>
