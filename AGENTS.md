@@ -13,3 +13,24 @@ Work as a practical, collaborative primary coding assistant:
 - Report what was verified and what remains unverified. Never claim a check or live workflow passed without evidence.
 - Use relevant registered skills. Delegate only when requested or otherwise authorized by applicable instructions; registration alone does not require spawning agents.
 - Existing user work must be preserved. Do not expose `.env` values or put credentials into documentation.
+
+## Cloud / GitHub-only checkout (read this if you run in the cloud)
+
+`.codex/` and `.agents/` are git-ignored: the Codex skill adapters and agent TOMLs may not exist in your checkout.
+If they are missing, read the originals directly: skills in `.claude/skills/<name>/SKILL.md`, agent role guidance in
+`.claude/agents/<name>.md` (they are tracked). Ignore Claude-specific tool names and the "orchestrator" wording in `CLAUDE.md`.
+
+## Hard rules for this project (the owner set these)
+
+- Never touch the live database (Supabase "cerise horizon"), run SQL on production, or ask for or print credentials.
+  You have no access to it. Test DB code only against a throw-away local Postgres.
+- Do not merge or deploy. Work on a branch named `codex/<topic>` from the latest `main`, open a PR with the real output of
+  `npm run typecheck`, `npm run lint`, `npm run test:domain` and `npm run build`, then stop. The owner approves merges.
+- A new table/column also needs an additive, idempotent SQL file in `drizzle/manual/` (next number after the highest) and
+  the PR must say which file the owner pastes first (CLAUDE.md gotcha 6).
+- Invoice money writes only through `src/server/service-invoice-ops.ts` + `withInvoiceLock` (gotcha 7). Do not change
+  existing money calculations without asking first.
+- Waitlist and recall records are never "overdue": no red overdue styling, no day counts. Never show "N/A" for a piano
+  (use "Piano (info needed)" and `PianoInfoBadge`). Maintenance (`/service/maintenance`) is read-only: no SMS/email sending.
+- Reply to the owner in short Bisaya/English with tables: what is done, what to check, next step.
+

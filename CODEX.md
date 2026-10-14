@@ -53,6 +53,8 @@ Keep `/api/live` authenticated.
 | --- | --- |
 | `npm run dev` | Local development server |
 | `npm run lint` | ESLint |
+| `npm test` | lint + typecheck + domain checks |
+| `npm run test:domain` | Domain checks only (`node tests/run-tests.mjs`) |
 | `npm run typecheck` | TypeScript checking |
 | `npm run build` | Production build; database configuration must be available |
 | `node tests/task-flow.cjs` | Task/workshop integration checks against a configured PostgreSQL database |
@@ -60,7 +62,9 @@ Keep `/api/live` authenticated.
 | `docker compose up -d --build web` | Rebuild/restart the app when needed for an authorized implementation |
 | `docker compose ps` | Inspect service status and actual published port |
 
-There is no `npm test` script. The integration test creates and removes an isolated
+`npm test` runs lint + typecheck + `node tests/run-tests.mjs` (about 1190 domain checks); `npm run test:domain` runs the domain checks only.
+DB-backed checks are `tests/*-db.ts` and are NOT part of `npm test`: run them only against a throw-away local Postgres, never a real database.
+Schema changes also need an additive, idempotent SQL file in `drizzle/manual/` (see its README). The integration test creates and removes an isolated
 schema, requires existing public tables and schema-creation privileges, and reads local
 database settings. Inspect the test before running it against a database.
 Compose uses `${WEB_PORT:-3000}`; discover the actual port instead of assuming 9847.
@@ -68,6 +72,11 @@ For UI changes, verify the affected flow live when the runtime is available. Doc
 and registration changes need file/schema/reference validation, not a production restart.
 
 ## Registered skills
+
+> `.agents/` and `.codex/` are git-ignored, so a cloud/GitHub checkout will not have the adapters below. In that case read
+> `.claude/skills/<name>/SKILL.md` and `.claude/agents/<name>.md` directly. Three finance skills were added after the
+> adapters were generated and have no adapter: `gl-recon`, `break-trace`, `variance-commentary` (read them in `.claude/skills/`;
+> use them for Phase 5 reconcile of GCash/bank exports against `service_payments`).
 
 Codex discovers the 20 adapters in `.agents/skills/<name>/SKILL.md`. Each adapter
 points to the existing `.claude/skills/<name>/SKILL.md`, retaining its supporting
