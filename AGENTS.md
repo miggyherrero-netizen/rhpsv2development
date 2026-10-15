@@ -34,3 +34,5 @@ If they are missing, read the originals directly: skills in `.claude/skills/<nam
   (use "Piano (info needed)" and `PianoInfoBadge`). Maintenance (`/service/maintenance`) is read-only: no SMS/email sending.
 - Reply to the owner in short Bisaya/English with tables: what is done, what to check, next step.
 
+
+- Database backup/restore is two command-line scripts (`npm run db:export`, `npm run db:import -- <file> [--apply]`), documented in `docs/BACKUP.md`. Never run them against the live database yourself; imports only go into an empty local database. Never put secrets (password/PIN hashes, sessions) into the export; the exclusion lists are in `src/lib/db-backup.ts`. A new table is exported automatically; a new secret-looking column must be excluded there.

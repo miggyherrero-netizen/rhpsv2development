@@ -23,3 +23,8 @@ tsconfig.tsbuildinfo
 .DS_Store
 *.pem
 npm-debug.log*
+
+# database backups (contain customer personal data)
+/backups/
+*.json.gz
+herrero-backup-*
