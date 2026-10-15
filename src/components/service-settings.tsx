@@ -2,6 +2,7 @@
 
 import TripSettings from "@/components/service-settings-trips";
 import PriceBook from "@/components/service-price-book";
+import BackupCard from "@/components/service-backup-card";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Plus, Trash2, Users, Building2, CalendarClock, Database, Receipt, TrendingUp, Eye } from "lucide-react";
@@ -415,6 +416,9 @@ export default function SettingsClient({
 
       {/* Price book */}
       <PriceBook catalog={catalog} />
+
+      {/* Backup (export only) */}
+      <BackupCard />
 
       {/* Demo data */}
       {!hasData && (

@@ -125,4 +125,6 @@ Registration follows the official [skills](https://learn.chatgpt.com/docs/build-
 [custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents), and
 [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) documentation.
 
-- Database backup/restore is two command-line scripts (`npm run db:export`, `npm run db:import -- <file> [--apply]`), documented in `docs/BACKUP.md`. Never run them against the live database yourself; imports only go into an empty local database. Never put secrets (password/PIN hashes, sessions) into the export; the exclusion lists are in `src/lib/db-backup.ts`. A new table is exported automatically; a new secret-looking column must be excluded there.
+- Database backup/restore: `npm run db:export` / `npm run db:import -- <file> [--apply]` (command line; import is CLI only) plus the Settings export button, documented in `docs/BACKUP.md`. Never run them against the live database yourself; imports only go into an empty local database. Never put secrets (password/PIN hashes, sessions) into the export; the exclusion lists are in `src/lib/db-backup.ts`. A new table is exported automatically; a new secret-looking column must be excluded there.
+
+- The Settings page has a "Download a backup" button (`POST /api/backup`, export only, owner + password re-entry + rate limit); it exports from whatever database the app is connected to. Details: `docs/BACKUP.md` section 9. There is no import button; keep it that way.
