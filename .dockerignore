@@ -18,3 +18,7 @@ dist
 .eslintignore
 coverage
 .turbo
+backups
+.env
+.env.*
+*.json.gz

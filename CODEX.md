@@ -124,3 +124,5 @@ validation alone does not prove discovery in an already-running session.
 Registration follows the official [skills](https://learn.chatgpt.com/docs/build-skills),
 [custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents), and
 [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md) documentation.
+
+- Database backup/restore is two command-line scripts (`npm run db:export`, `npm run db:import -- <file> [--apply]`), documented in `docs/BACKUP.md`. Never run them against the live database yourself; imports only go into an empty local database. Never put secrets (password/PIN hashes, sessions) into the export; the exclusion lists are in `src/lib/db-backup.ts`. A new table is exported automatically; a new secret-looking column must be excluded there.

@@ -39,7 +39,11 @@
     "test:gos": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "gos:create-owner": "tsx scripts/gos-create-owner.ts"
+    "gos:create-owner": "tsx scripts/gos-create-owner.ts",
+    "db:export": "tsx scripts/db-export.ts",
+    "db:import": "tsx scripts/db-import.ts",
+    "test:db-backup": "tsx tests/db-backup.ts",
+    "test:db-backup-db": "tsx tests/db-backup-db.ts"
   },
   "dependencies": {
     "dotenv": "17.3.1",
