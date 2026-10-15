@@ -1,6 +1,6 @@
-# Complete-database backup and restore (command line)
+# Complete-database backup and restore
 
-Two scripts copy the **business data** of the whole database into one file and load it into a fresh database:
+Export can be done from the app (the Settings "Download a backup" button, section 9) or the command line. **Import and restore are command line only.** Two scripts copy the **business data** of the whole database into one file and load it into a fresh database:
 
 | Command | What it does |
 |---|---|
@@ -8,9 +8,9 @@ Two scripts copy the **business data** of the whole database into one file and l
 | `npm run db:import -- <file>` | Dry run: checks the file and the target, writes nothing |
 | `npm run db:import -- <file> --apply` | Loads the file into an **empty** database, all-or-nothing |
 
-There is no screen, route or server action for this. It runs only when somebody types the command, against the database in
-`DATABASE_URL` (environment or `.env`). It never runs by itself and never against production unless the owner deliberately
-points `DATABASE_URL` at it. No `pg_dump` is needed. Works the same on Windows, macOS and Linux (Node 22+).
+The scripts have no screen of their own and the import has **no** button, route or server action anywhere. They run only when
+somebody types the command, against the database in `DATABASE_URL` (environment or `.env`), and never against production unless
+the owner deliberately points `DATABASE_URL` at it. (The only in-app part is the export button, section 9.) No `pg_dump` is needed. Works the same on Windows, macOS and Linux (Node 22+).
 
 This **complements** a raw `pg_dump` backup, it does not replace it (see the end).
 
@@ -233,3 +233,46 @@ disaster-recovery copy, and is even more sensitive (it contains the password has
   every table's row count and content hash, money columns, the gate PIN, portal-link regeneration, refusals (non-empty, tampered, remote, repeated `?host=`). Run:
   `DATABASE_URL=postgresql://postgres@127.0.0.1:5433/postgres DATABASE_SSL=false npx tsx tests/db-backup-db.ts`
   (uses `script` for a pseudo-terminal, so Linux/macOS util-linux/BSD only; scratch databases are left behind).
+
+## 9. The "Download a backup" button (export only)
+
+Home Service > Settings has a card **Download a backup of your data**. It makes the same file as `npm run db:export` (same code, same
+exclusions: no sessions, password/PIN hashes, share-link hashes or secret settings). **It exports from whatever database the deployed
+app is connected to** (on Vercel that is the live database). There is no import button: an import needs an empty database, which the
+running app never has, so restoring stays a command-line job (sections 2 and 3).
+
+How it works (`POST /api/backup`, `src/app/api/backup/route.ts`), in this order:
+
+1. a valid login session is required (401 otherwise, no redirect, no data) and the user must be the **owner** (403);
+2. same-origin check (Origin / Sec-Fetch-Site must match the site, JSON content type; 403), because route handlers have no built-in CSRF protection;
+3. rate limit and brute-force lock. (a) In memory, per server instance: 5 tries per user per 10 minutes (429 with `Retry-After`).
+   (b) Durable and **atomic**: `src/server/backup-lock.ts` uses the existing `gos_login_attempts` table (key `backup:<userId>`) with
+   one `INSERT ... ON CONFLICT DO UPDATE` statement that counts each attempt *before* the password check, so parallel guesses cannot
+   slip through: attempts 1 to 5 are checked, the 6th inside the window starts a 15-minute lock (429), and a correct password resets
+   the counter. It **fails closed**: if that table is missing or the database errors, the route answers 503 "Backup is temporarily
+   unavailable" and exports nothing. (The login code and its own lockout are untouched.)
+4. the owner's **current password** is re-entered and checked (constant-time hash check, generic "Wrong password", never logged);
+5. the data is read in one READ ONLY, REPEATABLE READ snapshot using a connection from the app's pool, with `statement_timeout` and
+   `idle_in_transaction_session_timeout` of 45 s (web only; the CLI has no limit). On any error the connection is destroyed, not reused;
+6. the file is sent as a streamed `application/gzip` attachment (`Cache-Control: no-store`, `X-Content-Type-Options: nosniff`), in
+   64 KB chunks so Vercel's 4.5 MB non-streaming response limit does not apply. The browser saves it; the password is only ever in
+   the request body, never in a URL, and the field is cleared after every attempt.
+
+If the live database is behind the code (manual SQL not yet run) the button says so ("Run the manual SQL files first") instead of
+failing silently. Limits: the route may run at most 60 seconds (`maxDuration`) and builds the whole file in memory; a very large
+database could exceed the platform's time or memory limit. Then the button reports a plain error and the command line
+(`npm run db:export`, no time limit) must be used. The same handling rules as for the CLI file apply (section 0): treat the
+download like a password.
+
+**Audit trail.** Every request that gets past the login check writes one JSON line to the server log, e.g.
+`{"audit":"backup_export","outcome":"ok","userId":"...","ts":"...","ip":"...","ua":"...","bytes":19976}` with outcome `ok`,
+`wrong_password`, `locked`, `rate_limited`, `unavailable`, `failed` or `denied`. It never contains the password, the e-mail or file
+contents. Vercel runtime logs are short-lived: set up a **log drain** if you want a durable trail. Nothing is stored in the database
+(that would trip the settings allow-list).
+
+**Anti-framing.** `/service/settings` and `/api/backup` are sent with `X-Frame-Options: DENY` and `Content-Security-Policy:
+frame-ancestors 'none'` so the button cannot be framed for click-jacking.
+
+**What remains (owner follow-ups, not done here):** the 5-per-10-minutes counter is per server instance (the durable lock above is
+shared); the session cookie has no `Secure` flag (pre-existing); the anti-framing headers are not applied app-wide (a global change
+needs a decision); session tokens are stored unhashed (pre-existing); the Vercel time/size/memory limits are untested.

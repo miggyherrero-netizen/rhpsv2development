@@ -13,9 +13,11 @@ import {
 } from "./db-backup";
 
 const BATCH = 500;
+/** Anything with `query` (a pg Client or a pooled client). */
+export type Queryable = Pick<Client, "query">;
 
 /** Every schema table must exist in the database with exactly the schema's columns. Returns problems (empty = ok). */
-export async function checkDatabaseMatchesSchema(client: Client, registry: TableInfo[] = getRegistry()): Promise<string[]> {
+export async function checkDatabaseMatchesSchema(client: Queryable, registry: TableInfo[] = getRegistry()): Promise<string[]> {
   const res = await client.query<{ table_name: string; column_name: string }>(
     `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`,
   );
@@ -37,13 +39,13 @@ export async function checkDatabaseMatchesSchema(client: Client, registry: Table
   return problems;
 }
 
-async function readTable(client: Client, t: TableInfo): Promise<Record<string, unknown>[]> {
+async function readTable(client: Queryable, t: TableInfo): Promise<Record<string, unknown>[]> {
   const res = await client.query<{ j: string }>(selectRowsSql(t));
   return res.rows.map((r) => JSON.parse(r.j) as Record<string, unknown>);
 }
 
 /** Read the whole database in one READ ONLY, REPEATABLE READ transaction. SELECT only. */
-export async function exportDatabase(client: Client, createdAt = new Date()): Promise<BackupFile> {
+export async function exportDatabase(client: Queryable, createdAt = new Date(), opts: { timeoutMs?: number } = {}): Promise<BackupFile> {
   const registry = getRegistry();
   const problems = await checkDatabaseMatchesSchema(client, registry);
   if (problems.length) {
@@ -52,6 +54,11 @@ export async function exportDatabase(client: Client, createdAt = new Date()): Pr
   await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
   try {
     await client.query("SET LOCAL TIME ZONE 'UTC'");
+    if (opts.timeoutMs) {
+      // Used by the web route only (the CLI has no limit): a stuck export must not hold a pooled connection for ever.
+      await client.query(`SET LOCAL statement_timeout = ${Math.floor(opts.timeoutMs)}`);
+      await client.query(`SET LOCAL idle_in_transaction_session_timeout = ${Math.floor(opts.timeoutMs)}`);
+    }
     const data: Record<string, Record<string, unknown>[]> = {};
     let skippedKeys: string[] = [];
     for (const t of registry.filter((x) => !x.excluded)) {
