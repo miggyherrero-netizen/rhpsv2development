@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
-  Sun, Calendar, ListChecks, Inbox, Settings,
+  Sun, Calendar, ListChecks, Inbox, Settings, Bot,
   Menu, X, LayoutDashboard, Home, LogOut, TrendingUp,
 } from "lucide-react";
 import { logout } from "@/server/auth-actions";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/owner/calendar", label: "Calendar", icon: Calendar },
   { href: "/owner/tasks", label: "Tasks", icon: ListChecks },
   { href: "/owner/inbox", label: "Inbox", icon: Inbox },
+  { href: "/owner/assistant", label: "AI Assistant", icon: Bot },
   { href: "/owner/settings", label: "Settings", icon: Settings },
 ];
 
