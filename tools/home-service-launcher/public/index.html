@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Home Service Control Center</title>
+    <link rel="stylesheet" href="/styles.css?v=20261016" />
+    <link rel="stylesheet" href="/tracker.css?v=20261016" />
+    <script src="/app.js" defer></script>
+    <script src="/tracker-seed.js?v=20261016" defer></script>
+    <script src="/tracker.js?v=20261016" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">RH</div>
+        <div>
+          <p class="eyebrow">R. Herrero Piano Sales &amp; Services</p>
+          <h1>Home Service Control Center</h1>
+        </div>
+        <div id="connectionBadge" class="connection-badge">Launcher connected</div>
+      </header>
+
+      <section class="hero" aria-labelledby="system-heading">
+        <div>
+          <p class="section-label">Local development system</p>
+          <h2 id="system-heading">Run the workspace with one click.</h2>
+          <p class="hero-copy">Start, stop, inspect, and open the Home Service workspace from this private local dashboard.</p>
+        </div>
+        <div class="status-panel">
+          <span id="statusDot" class="status-dot is-checking" aria-hidden="true"></span>
+          <div>
+            <span id="statusLabel" class="status-label">Checking</span>
+            <span id="statusDetail" class="status-detail">Looking for localhost:3000</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Server controls">
+        <button id="startButton" class="button button-primary" type="button">Start system</button>
+        <button id="openButton" class="button button-secondary" type="button" disabled>Open workspace</button>
+        <button id="restartButton" class="button button-secondary" type="button" disabled>Restart</button>
+        <button id="stopButton" class="button button-danger" type="button" disabled>Stop</button>
+        <p id="actionMessage" class="action-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="metrics" aria-label="System details">
+        <article class="metric-card">
+          <span>Workspace address</span>
+          <strong>localhost:3000</strong>
+        </article>
+        <article class="metric-card">
+          <span>Response</span>
+          <strong id="latencyValue">—</strong>
+        </article>
+        <article class="metric-card">
+          <span>Process ownership</span>
+          <strong id="ownershipValue">Checking</strong>
+        </article>
+        <article class="metric-card">
+          <span>Started</span>
+          <strong id="startedValue">—</strong>
+        </article>
+      </section>
+
+      <section class="card tracker" aria-labelledby="tracker-heading">
+        <div class="card-heading">
+          <div><p class="section-label">Your work record</p><h2 id="tracker-heading">AI work tracker</h2></div>
+          <a href="https://github.com/miggyherrero-netizen/rhpsv2development" target="_blank" rel="noopener noreferrer">GitHub repository ↗</a>
+        </div>
+        <div class="tracker-body">
+          <p class="tracker-intro">Track what each agent delivered, read the evidence, and keep your own rating.</p>
+          <div id="trackerStats" class="tracker-stats" aria-label="Work summary"></div>
+          <div class="tracker-toolbar">
+            <label>Search work<input id="trackerSearch" type="search" placeholder="Task, agent, PR or review note"></label>
+            <label>Status<select id="trackerFilter"><option value="">All statuses</option><option>Planned</option><option>In progress</option><option>Ready for review</option><option>Merged</option><option>Done</option></select></label>
+            <button id="trackerAdd" class="button button-primary" type="button">Add work</button>
+            <button id="trackerExport" class="button button-secondary" type="button">Export backup</button>
+            <button id="trackerImport" class="button button-secondary" type="button">Import backup</button>
+            <input id="trackerImportFile" type="file" accept="application/json,.json" hidden>
+          </div>
+          <p class="tracker-storage">Saved in this browser on this address. Use Export backup to keep a separate copy or move browsers. GitHub entries are a snapshot from October 16, 2026; they do not sync automatically.</p>
+          <p id="trackerMessage" role="status" aria-live="polite"></p>
+          <form id="trackerForm" class="tracker-form" hidden>
+            <h3 id="trackerFormTitle">Add work</h3>
+            <input name="id" type="hidden">
+            <div class="tracker-fields">
+              <label>AI agent / model<input name="agent" required maxlength="120" placeholder="e.g. Claude Code / model unknown"></label>
+              <label>Task / work delivered<input name="title" required maxlength="240"></label>
+              <label>Status<select name="status"><option>Planned</option><option>In progress</option><option>Ready for review</option><option>Merged</option><option>Done</option></select></label>
+              <label>Your rating<select name="ownerRating"><option value="">Not rated</option><option value="1">1 / 5 — Poor</option><option value="2">2 / 5 — Needs major fixes</option><option value="3">3 / 5 — Useful, needs follow-up</option><option value="4">4 / 5 — Good</option><option value="5">5 / 5 — Excellent</option></select></label>
+              <label>PR / commit / work link<input name="url" type="url" maxlength="1000" placeholder="https://github.com/…"></label>
+              <label>Work date<input name="workDate" type="date" required></label>
+            </div>
+            <label>Your review notes<textarea name="ownerNotes" rows="3" maxlength="5000" placeholder="What worked, what needs fixing, and what you checked"></textarea></label>
+            <p class="tracker-storage">Your rating is separate from the Codex code-review score. Imported review evidence stays attached when you edit.</p>
+            <div class="tracker-actions"><button class="button button-primary" type="submit">Save work</button><button id="trackerCancel" class="button button-secondary" type="button">Cancel</button></div>
+          </form>
+          <details class="tracker-rubric"><summary>How the code-review ratings work</summary><p>Scores evaluate this task, not the agent overall: correctness, safeguards, maintainability, and verification, each 1–5 with equal weight. 1 = blocked; 2 = major gaps; 3 = useful with follow-ups; 4 = strong with limited gaps; 5 = fully demonstrated for its scope. An unverified check is marked as unverified, not passed. Documentation-only work is evaluated for its stated scope. Scores are provisional; runtime and database integration were not exercised for the historical PRs.</p></details>
+          <div id="trackerList" class="tracker-list"></div>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <section class="card log-card" aria-labelledby="runtime-heading">
+          <div class="card-heading">
+            <div>
+              <p class="section-label">Live output</p>
+              <h2 id="runtime-heading">Runtime logs</h2>
+            </div>
+            <button id="clearLogsButton" class="text-button" type="button">Clear view</button>
+          </div>
+          <div id="logs" class="logs" role="log" aria-live="polite" aria-label="Development server logs">
+            <p class="empty-state">Waiting for launcher output…</p>
+          </div>
+        </section>
+
+        <section class="card update-card" aria-labelledby="updates-heading">
+          <div class="card-heading">
+            <div>
+              <p class="section-label">Changes</p>
+              <h2 id="updates-heading">Patch &amp; update log</h2>
+            </div>
+          </div>
+          <div id="updates" class="updates">
+            <p class="empty-state">Loading update notes…</p>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <span>Local-only control server</span>
+        <span>Nothing is exposed to the internet</span>
+      </footer>
+    </main>
+  </body>
+</html>
