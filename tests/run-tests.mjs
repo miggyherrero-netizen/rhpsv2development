@@ -58,6 +58,9 @@ const testFiles = [
   { name: "service-inquiry", file: "tests/service-inquiry.ts" },
   { name: "service-followups", file: "tests/service-followups.ts" },
   { name: "pub-text", file: "tests/pub-text.ts" },
+  { name: "ops-summary", file: "tests/ops-summary.ts" },
+  { name: "ops-ai", file: "tests/ops-ai.ts" },
+  { name: "ops-handler", file: "tests/ops-handler.ts" },
 ];
 
 function runTest(name, file) {
